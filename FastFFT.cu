@@ -267,6 +267,117 @@ void SimpleFFT_NoPaddingKernel(ScalarType* real_input, ComplexType* complex_outp
 
 }
 
+void FourierTransformer::FFT_R2C_Transposed()
+{
+
+  // TODO add asserts
+
+  // TODO padding or maybe that is a separate funcitno.
+	// For the twiddle factors ahead of the P size ffts
+	// float twiddle_in = -2*PIf/output_image.dims.x;
+	// int   Q = output_image.dims.x / input_image.dims.x; // FIXME assuming for now this is already divisible
+  float twiddle_in = 1.f;
+  int Q = 1;
+
+	dim3 threadsPerBlock = dim3(dims_in.x/elements_per_thread_real, 1, 1); // FIXME make sure its a multiple of 32
+	dim3 gridDims = dim3(1,dims_in.y, 1); // TODO allow 3d and also confirm this isn't used in any artifacts leftover 
+
+  using FFT = decltype( FFT_64_fp32() + Type<fft_type::c2c>() + Direction<fft_direction::forward>() );
+	using complex_type = typename FFT::value_type;
+	using scalar_type    = typename complex_type::value_type;
+
+  // TODO confirm these are the correct memory requirements.
+  int shared_mem =dims_in.w*sizeof(scalar_type) + FFT::shared_memory_size;
+  precheck
+  block_fft_kernel_R2C_Trasnposed<FFT,complex_type,scalar_type><< <gridDims,  threadsPerBlock, shared_mem, cudaStreamPerThread>> >
+  ( (scalar_type *) device_pointer_fp32,  (complex_type*) buffer_fp32_complex, dims_in, dims_out,twiddle_in,Q);
+  postcheck
+
+}
+
+template<class FFT, class ComplexType, class ScalarType>
+__launch_bounds__(FFT::max_threads_per_block) __global__
+void block_fft_kernel_R2C_Trasnposed(ScalarType* input_values, ComplexType* output_values, short4 dims_in, short4 dims_out, float twiddle_in, int Q)
+{
+
+  // Initialize the shared memory, assuming everyting matches the input data X size in
+  using complex_type = ComplexType;
+  using scalar_type  = ScalarType;
+
+	extern __shared__  scalar_type shared_input[];
+	complex_type* shared_output = (complex_type*)&shared_input[dims_in.x];
+	complex_type* shared_mem    = (complex_type*)&shared_output[dims_out.w/2];
+
+	// Memory used by FFT
+	complex_type twiddle;
+  complex_type thread_data[FFT::storage_size];
+
+  // To re-map the thread index to the data
+  int input_MAP[FFT::storage_size];
+  // To re-map the decomposed frequency to the full output frequency
+  int output_MAP[FFT::storage_size];
+  // For a given decomposed fragment
+  float twiddle_factor_args[FFT::storage_size];
+
+  // No need to __syncthreads as each thread only accesses its own shared mem anyway
+  io<FFT>::load_r2c_shared(&input_values[blockIdx.y*dims_in.w], shared_input, thread_data, twiddle_factor_args, twiddle_in, input_MAP, output_MAP, Q, 1);
+
+
+	// In the first FFT the modifying twiddle factor is 1 so the data are real
+	FFT().execute(thread_data, shared_mem);
+
+	io<FFT>::store(thread_data,shared_output,output_MAP,1, dims_out.w/2);
+
+
+    // For the other fragments we need the initial twiddle
+	for (int sub_fft = 1; sub_fft < Q; sub_fft++)
+	{
+
+	    io<FFT>::copy_from_shared(shared_input, thread_data, input_MAP);
+
+
+		// cufftDX expects packed real data for a real xform, but we modify with a complex twiddle factor.
+		// to get around this, split the complex fft into the sum of the real and imaginary parts
+		for (int i = 0; i < FFT::elements_per_thread; i++)
+		{
+			// Pre shift with twiddle
+			__sincosf(twiddle_factor_args[i]*sub_fft,&twiddle.y,&twiddle.x);
+			thread_data[i] *= twiddle;
+		    // increment the output map. Note this only works for the leading non-zero case
+			output_MAP[i]++;
+		}
+
+		FFT().execute(thread_data, shared_mem);
+
+		io<FFT>::store(thread_data,shared_output,output_MAP,1, dims_out.w/2);
+
+	}
+//
+	__syncthreads();
+
+	// Now that the memory output can be coalesced send to global
+	int this_idx;
+	for (int sub_fft = 0; sub_fft < Q; sub_fft++)
+	{
+		for (int i = 0; i < FFT::elements_per_thread; i++)
+		{
+			this_idx = input_MAP[i] + dims_in.x*sub_fft;
+			if (this_idx < dims_out.w/2)
+			{
+				output_values[blockIdx.y * dims_out.w/2 + this_idx] = shared_output[this_idx];
+			}
+		}
+	}
+
+  // blockIdx.y + (dims_out.w/2 - index - 1)*dims_out.y
+  int rotated_offset[2] = {(int)blockIdx.y + (dims_out.w/2 - 1)*dims_out.y, -int(dims_out.y)};
+  io<FFT>::store_r2c_transposed(thread_data, output_values, rotated_offset);
+
+
+	
+
+}
+
 } // namespace fast_FFT
 
 

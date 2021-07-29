@@ -54,6 +54,8 @@ public:
 
   // 1:1 no resizing or anything fancy.
   void SimpleFFT_NoPadding();
+  void FFT_R2C_Transposed();
+
 
 
   inline int ReturnPaddedMemorySize(short4 & wanted_dims) 

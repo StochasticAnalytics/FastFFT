@@ -40,12 +40,17 @@ constexpr const int elements_per_thread_real = 8;
 constexpr const int elements_per_thread_complex = 8;
 
 using FFT_64_fp32         = decltype(Block() + Size<64>()  + Precision<float>() + ElementsPerThread<elements_per_thread_real>() + FFTsPerBlock<1>() + SM<700>());
+
 //////////////////////////////
 // Kernel definitions
 //////////////////////////////
 template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
 void SimpleFFT_NoPaddingKernel(ScalarType * real_input, ComplexType* complex_output, short4 dims_in, short4 dims_out);
+
+template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
+__launch_bounds__(FFT::max_threads_per_block) __global__
+void block_fft_kernel_R2C_Trasnposed(ScalarType* input_values, ComplexType* output_values, short4 dims_in, short4 dims_out, float twiddle_in, int Q);
 
 
 
@@ -104,6 +109,7 @@ struct io
   // TODO set this up for async mem load
   static inline __device__ void load_shared(const complex_type* input,
                                             complex_type*       shared_input,
+                                            complex_type*       thread_data,
                                             float* 	            twiddle_factor_args,
                                             float				        twiddle_in,
                                             int*				        input_map,
@@ -118,7 +124,8 @@ struct io
       input_map[i] = index;
       output_map[i] = Q*index;
       twiddle_factor_args[i] = twiddle_in * index;
-      shared_input[index] = input[index*input_stride];
+      thread_data[i] = input[index*input_stride];
+      shared_input[index] = thread_data[i];
       index += stride;
     }
 
@@ -129,6 +136,7 @@ struct io
   // TODO set this up for async mem load - alternatively, load to registers then copy but leave in register for firt compute
   static inline __device__ void load_r2c_shared(const scalar_type*  input,
                                                 scalar_type*        shared_input,
+                                                complex_type*       thread_data,
                                                 float* 	            twiddle_factor_args,
                                                 float				        twiddle_in,
                                                 int*				        input_map,
@@ -143,7 +151,9 @@ struct io
       input_map[i] = index;
       output_map[i] = Q*index;
       twiddle_factor_args[i] = twiddle_in * index;
-      shared_input[index] = input[index*input_stride];
+      thread_data[i].x = input[index*input_stride];
+      thread_data[i].y = 0.0f;
+      shared_input[index] =  thread_data[i].x;
       index += stride;
     }
 
@@ -173,7 +183,7 @@ struct io
   } // copy_from_shared
 
 
-  static inline __device__ void store_r2c_rotated(const complex_type* thread_data,
+  static inline __device__ void store_r2c_transposed(const complex_type* thread_data,
                                                   complex_type*       output,
                                                   int*	              rotated_offset) 
   {
@@ -191,7 +201,7 @@ struct io
     {
       output[rotated_offset[1]*(int)index + rotated_offset[0]] = thread_data[FFT::elements_per_thread / 2];
     }
-  } // store_r2c_rotated
+  } // store_r2c_transposed
 
 
   static inline __device__ void load_c2r(const complex_type* input,
@@ -218,7 +228,7 @@ struct io
     }
   } // load_c2r
 
-  static inline __device__ void load_c2r_rotated(const complex_type* input,
+  static inline __device__ void load_c2r_transposed(const complex_type* input,
                                                  complex_type*       thread_data,
                                                  int*        		     rotated_offset) 
   {
@@ -237,7 +247,54 @@ struct io
     {
     thread_data[FFT::elements_per_thread / 2] = input[rotated_offset[1]*(int)index + rotated_offset[0]];
     }
-  } // load_c2r_rotated
+  } // load_c2r_transposed
+
+
+
+  static inline __device__ void store(const complex_type* thread_data,
+                                      complex_type*       output,
+                                      int*				        source_idx,
+                                      int	                output_stride) 
+  {
+    const unsigned int  stride = stride_size();
+    for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+    {
+      // If no kernel based changes are made to source_idx, this will be the same as the original index value
+      output[source_idx[i]*output_stride] = thread_data[i];
+    }
+  } // store
+
+  static inline __device__ void store(const complex_type* thread_data,
+                                      complex_type*       output,
+                                      int*				        source_idx,
+                                      int	                output_stride,
+                                      int				          memory_limit) 
+  {
+    //            const unsigned int offset = batch_offset(local_fft_id);
+    const unsigned int stride = stride_size();
+    //            unsigned int       index  = offset + threadIdx.x;
+    for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+    {
+      // If no kernel based changes are made to source_idx, this will be the same as the original index value
+      if (source_idx[i] < memory_limit) output[source_idx[i]*output_stride] = thread_data[i];
+      //                output[index] = thread_data[i];
+      //                index += stride;
+   }
+  } // store
+
+  static inline __device__ void store_transposed(const complex_type* thread_data,
+                                              complex_type*       output,
+                                              int*				        output_map,
+                                              int*                rotated_offset,
+                                              int				          memory_limit) 
+  {
+    for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+    {
+      // If no kernel based changes are made to source_idx, this will be the same as the original index value
+      if (output_map[i] < memory_limit) output[rotated_offset[1]*output_map[i] + rotated_offset[0]] = thread_data[i];
+    }
+  } // store_transposed
+
 
 }; // struct io}
 
