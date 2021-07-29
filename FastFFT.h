@@ -96,6 +96,7 @@ private:
   // booleans to track state, could be bit fields but that seem opaque to me.
   bool is_in_memory_host_pointer;
   bool is_in_memory_device_pointer;
+  bool is_in_buffer_memory;
 
   bool is_host_memory_pinned;
 

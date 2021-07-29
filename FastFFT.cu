@@ -239,7 +239,8 @@ void FourierTransformer::SimpleFFT_NoPadding()
   using complex_type = typename FFT::value_type;
   using scalar_type    = typename complex_type::value_type;
 
-	SimpleFFT_NoPaddingKernel<FFT, complex_type, scalar_type><< <gridDims,  FFT::block_dim, FFT::shared_memory_size, cudaStreamPerThread>> > ( (scalar_type*)device_pointer_fp32, (complex_type*)device_pointer_fp32_complex, dims_in, dims_out);
+	SimpleFFT_NoPaddingKernel<FFT, complex_type, scalar_type>
+  << <gridDims,  FFT::block_dim, FFT::shared_memory_size, cudaStreamPerThread>> > ( (scalar_type*)device_pointer_fp32, (complex_type*)buffer_fp32_complex, dims_in, dims_out);
 	cudaStreamSynchronize(cudaStreamPerThread);
 
 

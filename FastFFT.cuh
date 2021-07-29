@@ -99,7 +99,145 @@ struct io
     }
   }// store_r2c
 
+  // Since we can make repeated use of the same shared memory for each sub-fft
+  // we use this method to load into shared mem instead of directly to registers
+  // TODO set this up for async mem load
+  static inline __device__ void load_shared(const complex_type* input,
+                                            complex_type*       shared_input,
+                                            float* 	            twiddle_factor_args,
+                                            float				        twiddle_in,
+                                            int*				        input_map,
+                                            int*				        output_map,
+                                            int				          Q,
+                                            int       		      input_stride)
+  {
+    const unsigned int stride = stride_size();
+    unsigned int       index  =  threadIdx.x;
+    for (unsigned int i = 0; i < FFT::elements_per_thread; i++)
+    {
+      input_map[i] = index;
+      output_map[i] = Q*index;
+      twiddle_factor_args[i] = twiddle_in * index;
+      shared_input[index] = input[index*input_stride];
+      index += stride;
+    }
 
+  } // load_shared
+
+  // Since we can make repeated use of the same shared memory for each sub-fft
+  // we use this method to load into shared mem instead of directly to registers
+  // TODO set this up for async mem load - alternatively, load to registers then copy but leave in register for firt compute
+  static inline __device__ void load_r2c_shared(const scalar_type*  input,
+                                                scalar_type*        shared_input,
+                                                float* 	            twiddle_factor_args,
+                                                float				        twiddle_in,
+                                                int*				        input_map,
+                                                int*				        output_map,
+                                                int				          Q,
+                                                int       		      input_stride) 
+  {
+    const unsigned int stride = stride_size();
+    unsigned int       index  = threadIdx.x;
+    for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+    {
+      input_map[i] = index;
+      output_map[i] = Q*index;
+      twiddle_factor_args[i] = twiddle_in * index;
+      shared_input[index] = input[index*input_stride];
+      index += stride;
+    }
+
+  } // load_r2c_shared}
+
+  // when using load_shared || load_r2c_shared, we need then copy from shared mem into the registers.
+  // notice we still need the packed complex values for the xform.
+  static inline __device__ void copy_from_shared(const scalar_type* shared_input,
+                                                 complex_type*		  thread_data,
+                                                 int*			        	input_map)
+  {
+    for (unsigned int i = 0; i < FFT::elements_per_thread; i++)
+    {
+      thread_data[i].x = shared_input[input_map[i]];
+      thread_data[i].y = 0.0f;
+    }
+  } // copy_from_shared
+
+  static inline __device__ void copy_from_shared(const complex_type* shared_input_complex,
+                                                 complex_type*		   thread_data,
+                                                 int*				         input_map)
+  {
+    for (unsigned int i = 0; i < FFT::elements_per_thread; i++)
+    {
+      thread_data[i] = shared_input_complex[input_map[i]];
+    }
+  } // copy_from_shared
+
+
+  static inline __device__ void store_r2c_rotated(const complex_type* thread_data,
+                                                  complex_type*       output,
+                                                  int*	              rotated_offset) 
+  {
+    const unsigned int stride = stride_size();
+    unsigned int       index  = threadIdx.x;
+    for (unsigned int i = 0; i < FFT::elements_per_thread / 2; i++) 
+    {
+      output[rotated_offset[1]*(int)index + rotated_offset[0]] = thread_data[i];
+      index += stride;
+    }
+    constexpr unsigned int threads_per_fft        = cufftdx::size_of<FFT>::value / FFT::elements_per_thread;
+    constexpr unsigned int output_values_to_store = (cufftdx::size_of<FFT>::value / 2) + 1;
+    constexpr unsigned int values_left_to_store = threads_per_fft == 1 ? 1 : (output_values_to_store % threads_per_fft);
+    if (threadIdx.x < values_left_to_store)
+    {
+      output[rotated_offset[1]*(int)index + rotated_offset[0]] = thread_data[FFT::elements_per_thread / 2];
+    }
+  } // store_r2c_rotated
+
+
+  static inline __device__ void load_c2r(const complex_type* input,
+                                         complex_type*       thread_data,
+                                         int                 offset,
+                                         int*				         source_idx = NULL) 
+  {
+    const unsigned int stride = stride_size();
+    unsigned int       index  = offset + threadIdx.x;
+    for (unsigned int i = 0; i < FFT::elements_per_thread / 2; i++) 
+    {
+      thread_data[i] = input[index];
+      if (source_idx != NULL) source_idx[i] = index;
+      index += stride;
+    }
+    constexpr unsigned int threads_per_fft       = cufftdx::size_of<FFT>::value / FFT::elements_per_thread;
+    constexpr unsigned int output_values_to_load = (cufftdx::size_of<FFT>::value / 2) + 1;
+    // threads_per_fft == 1 means that EPT == SIZE, so we need to load one more element
+    constexpr unsigned int values_left_to_load = threads_per_fft == 1 ? 1 : (output_values_to_load % threads_per_fft);
+    if (threadIdx.x < values_left_to_load) 
+    {
+      thread_data[FFT::elements_per_thread / 2] = input[index];
+      if (source_idx != NULL) source_idx[FFT::elements_per_thread / 2] = index;
+    }
+  } // load_c2r
+
+  static inline __device__ void load_c2r_rotated(const complex_type* input,
+                                                 complex_type*       thread_data,
+                                                 int*        		     rotated_offset) 
+  {
+    const unsigned int stride = stride_size();
+    unsigned int       index  =  threadIdx.x;
+    for (unsigned int i = 0; i < FFT::elements_per_thread / 2; i++) 
+    {
+      thread_data[i] = input[rotated_offset[1]*(int)index + rotated_offset[0]];
+      index += stride;
+    }
+    constexpr unsigned int threads_per_fft       = cufftdx::size_of<FFT>::value / FFT::elements_per_thread;
+    constexpr unsigned int output_values_to_load = (cufftdx::size_of<FFT>::value / 2) + 1;
+    // threads_per_fft == 1 means that EPT == SIZE, so we need to load one more element
+    constexpr unsigned int values_left_to_load = threads_per_fft == 1 ? 1 : (output_values_to_load % threads_per_fft);
+    if (threadIdx.x < values_left_to_load) 
+    {
+    thread_data[FFT::elements_per_thread / 2] = input[rotated_offset[1]*(int)index + rotated_offset[0]];
+    }
+  } // load_c2r_rotated
 
 }; // struct io}
 
