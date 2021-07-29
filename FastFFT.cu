@@ -7,124 +7,18 @@
 #include <cufftdx.hpp>
 
 #include "FastFFT.h"
+#include "FastFFT.cuh"
 
 
-// This macro is more or less a snippet from the CUDA SDK
-#ifndef cudaErr
-#define cudaErr(error)                                                                      \
-        {                                                                                                   \
-            auto status = static_cast<cudaError_t>(error);                                                  \
-            if (status != cudaSuccess) {                                                                    \
-                std::cerr << cudaGetErrorString(status) << " " << __FILE__ << ":" << __LINE__ << std::endl; \
-                std::exit(status);                                                                          \
-            }                                                                                               \
-        }
-#endif 
-
-
-// #ifdef DEBUG
-#define MyFFTPrint(...)	{std::cerr << __VA_ARGS__ << sizeof(short) << std::endl;}
-#define MyFFTPrintWithDetails(...)	{std::cerr << __VA_ARGS__  << " From: " << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl;}
-#define MyFFTDebugAssertTrue(cond, msg, ...) {if ((cond) != true) { std::cerr << msg   << std::endl << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}}
-#define MyFFTDebugAssertFalse(cond, msg, ...) {if ((cond) == true) { std::cerr << msg  << std::endl << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}}
-// #endif " " << __VA_ARGS__ << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << 
-
-#define HEAVY_ERROR_CHECKING_FFT
-
-#ifdef HEAVY_ERROR_CHECKING_FFT
-#define checkErrorsAndTimingWithSynchronization(input_stream) { cudaError_t cuda_error = cudaStreamSynchronize(input_stream); if (cuda_error != cudaSuccess) { std::cerr << cudaGetErrorString(cuda_error) << std::endl; MyFFTPrintWithDetails("");} };
-#define pre_checkErrorsAndTimingWithSynchronization(input_sream) { cudaErr(cudaGetLastError()); }
-#else
-#define checkErrorsAndTimingWithSynchronization(cudaStreamPerThread);
-#define pre_checkErrorsAndTimingWithSynchronization(cudaStreamPerThread);
-#endif
 
 namespace FastFFT {
 
 
 
-  //////////////////////////////
-  // Kernel definitions
-  //////////////////////////////
-  template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
-  __launch_bounds__(FFT::max_threads_per_block) __global__
-  void SimpleFFT_NoPaddingKernel(ScalarType * real_input, ComplexType* complex_output, short4 dims_in, short4 dims_out);
-
-
-  //////////////////////////////////////////////
-  // IO functions adapted from the cufftdx examples
-  ///////////////////////////////
-
-  template<class FFT>
-  struct io 
-  {
-      using complex_type = typename FFT::value_type;
-      using scalar_type  = typename complex_type::value_type;
-
-      static inline __device__ unsigned int stride_size() 
-      {
-          return cufftdx::size_of<FFT>::value / FFT::elements_per_thread;
-      }
-
-      static inline __device__ void load_r2c(const scalar_type* input,
-                                        complex_type*      thread_data,
-                                        int       		  offset) 
-      {
-        // Calculate global offset of FFT batch
-        //            const unsigned int offset = batch_offset(local_fft_id);
-        // Get stride, this shows how elements from batch should be split between threads
-        const unsigned int stride = stride_size();
-        unsigned int       index  = offset + threadIdx.x;
-        for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
-        {
-        reinterpret_cast<scalar_type*>(thread_data)[i] = input[index];
-        index += stride;
-        }
-      } // load_r2c
-
-      static inline __device__ void store_r2c(const complex_type* thread_data,
-                                              complex_type*       output,
-                                              int        offset) 
-      {
-        //            const unsigned int offset = batch_offset_r2c(local_fft_id);
-        const unsigned int stride = stride_size();
-        unsigned int       index  = offset + threadIdx.x;
-        for (unsigned int i = 0; i < FFT::elements_per_thread / 2; i++) 
-        {
-          output[index] = thread_data[i];
-          index += stride;
-        }
-        constexpr unsigned int threads_per_fft        = cufftdx::size_of<FFT>::value / FFT::elements_per_thread;
-        constexpr unsigned int output_values_to_store = (cufftdx::size_of<FFT>::value / 2) + 1;
-        // threads_per_fft == 1 means that EPT == SIZE, so we need to store one more element
-        constexpr unsigned int values_left_to_store =
-        threads_per_fft == 1 ? 1 : (output_values_to_store % threads_per_fft);
-        if (threadIdx.x < values_left_to_store) 
-        {
-          output[index] = thread_data[FFT::elements_per_thread / 2];
-        }
-       }// store_r2c
-
-
-
-  }; // struct io}
-
-
-
-
-
-
-
-
-
-
-
   ///////////////////////////////////////////////
   ///////////////////////////////////////////////
 
-  using namespace cufftdx;
-  using FFT_64_r2c          = decltype(Block() + Size<64>() + Type<fft_type::r2c>() +
-  Precision<float>() + ElementsPerThread<4>() + FFTsPerBlock<1>() + SM<700>());
+
 
 FourierTransformer::FourierTransformer(DataType wanted_calc_data_type) 
 {
@@ -140,6 +34,7 @@ FourierTransformer::FourierTransformer(DataType wanted_calc_data_type)
 FourierTransformer::~FourierTransformer() 
 {
   Deallocate();
+  UnPinHostMemory();
 }
 
 void FourierTransformer::SetDefaults()
@@ -233,25 +128,21 @@ void FourierTransformer::SetInputPointer(float* input_pointer, bool is_input_on_
   }
   else
   {
-    MyFFTPrintWithDetails("Input pointer is on host memory");
-    // host_pointer = static_cast<float*>(host_pointer); 
     host_pointer = input_pointer;
-    // pinnedPtr = static_cast<float*>(pinnedPtr); 
   }
 
   // Check to see if the host memory is pinned.
   if ( ! is_host_memory_pinned)
   {
-    pre_checkErrorsAndTimingWithSynchronization(cudaStreamPerThread);
+    precheck
     cudaErr(cudaHostRegister(host_pointer, sizeof(float)*input_memory_allocated, cudaHostRegisterDefault));
-    checkErrorsAndTimingWithSynchronization(cudaStreamPerThread);
+    postcheck
 
-    pre_checkErrorsAndTimingWithSynchronization(cudaStreamPerThread);
+    precheck
     cudaErr(cudaHostGetDevicePointer( &pinnedPtr, host_pointer, 0));
-    checkErrorsAndTimingWithSynchronization(cudaStreamPerThread);
+    postcheck
 
     is_host_memory_pinned = true;
-
   }
   is_in_memory_host_pointer = true;
   
@@ -269,9 +160,9 @@ void FourierTransformer::CopyHostToDevice()
 	{
     // Allocate enough for the out of place buffer as well.
     MyFFTPrintWithDetails("Allocating device memory for input pointer");
-    pre_checkErrorsAndTimingWithSynchronization(cudaStreamPerThread);
+    precheck
 		cudaErr(cudaMalloc(&device_pointer_fp32, 2*output_memory_allocated*sizeof(float)));
-    checkErrorsAndTimingWithSynchronization(cudaStreamPerThread);
+    postcheck
 
 		device_pointer_fp32_complex = (float2 *)device_pointer_fp32;
 
@@ -282,12 +173,12 @@ void FourierTransformer::CopyHostToDevice()
 	}
 
 
-  pre_checkErrorsAndTimingWithSynchronization(cudaStreamPerThread);
+  precheck
   // This will be too big on the output memory if padded
   cudaErr(cudaMemcpyAsync(device_pointer_fp32, pinnedPtr, output_memory_allocated*sizeof(float),cudaMemcpyDeviceToHost,cudaStreamPerThread));
   bool should_block_until_complete = true;
 	if (should_block_until_complete) cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
-  checkErrorsAndTimingWithSynchronization(cudaStreamPerThread);
+  postcheck
 
 
 }
@@ -298,24 +189,17 @@ void FourierTransformer::CopyDeviceToHost(bool free_gpu_memory, bool unpin_host_
 	MyFFTDebugAssertTrue(is_in_memory_device_pointer, "GPU memory not allocated");
 
 
-  pre_checkErrorsAndTimingWithSynchronization(cudaStreamPerThread);
+  precheck
 	cudaErr(cudaMemcpyAsync(pinnedPtr, device_pointer_fp32, output_memory_allocated*sizeof(float),cudaMemcpyDeviceToHost,cudaStreamPerThread));
-  checkErrorsAndTimingWithSynchronization(cudaStreamPerThread);
+  postcheck
+
   // Just set true her for now
   bool should_block_until_complete = true;
 	if (should_block_until_complete) cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
   	// TODO add asserts etc.
-	if (free_gpu_memory) 
-	{ 
-		Deallocate();
-	}
-	if (unpin_host_memory && is_host_memory_pinned)
-	{
-    pre_checkErrorsAndTimingWithSynchronization(cudaStreamPerThread);
-		cudaHostUnregister(host_pointer);
-    checkErrorsAndTimingWithSynchronization(cudaStreamPerThread);
-		is_host_memory_pinned = false;
-	}
+	if (free_gpu_memory) { Deallocate();}
+  if (unpin_host_memory) { UnPinHostMemory();}
+
 
 }
 
@@ -323,17 +207,26 @@ void FourierTransformer::CopyDeviceToHost(bool free_gpu_memory, bool unpin_host_
 void FourierTransformer::Deallocate()
 {
 
-  if (is_host_memory_pinned)
-	{
-		cudaErr(cudaHostUnregister(host_pointer));
-		is_host_memory_pinned = false;
-	} 
 	if (is_in_memory_device_pointer) 
 	{
+    precheck
 		cudaErr(cudaFree(device_pointer_fp32));
+    postcheck
 		is_in_memory_device_pointer = false;
 	}	
 }
+
+void FourierTransformer::UnPinHostMemory()
+{
+  if (is_host_memory_pinned)
+	{
+    precheck
+		cudaErr(cudaHostUnregister(host_pointer));
+    postcheck
+		is_host_memory_pinned = false;
+	} 
+}
+
 
 void FourierTransformer::SimpleFFT_NoPadding()
 {
@@ -342,9 +235,9 @@ void FourierTransformer::SimpleFFT_NoPadding()
 	int threadsPerBlock = dims_in.x; // FIXME make sure its a multiple of 32
 	int gridDims = 1;
 
-	using FFT = decltype( FFT_64_r2c() + Direction<fft_direction::forward>() );
-	using complex_type = typename FFT::value_type;
-	using scalar_type    = typename complex_type::value_type;
+	using FFT = decltype( FFT_64_fp32() + Type<fft_type::r2c>() + Direction<fft_direction::forward>() );
+  using complex_type = typename FFT::value_type;
+  using scalar_type    = typename complex_type::value_type;
 
 	SimpleFFT_NoPaddingKernel<FFT, complex_type, scalar_type><< <gridDims,  FFT::block_dim, FFT::shared_memory_size, cudaStreamPerThread>> > ( (scalar_type*)device_pointer_fp32, (complex_type*)device_pointer_fp32_complex, dims_in, dims_out);
 	cudaStreamSynchronize(cudaStreamPerThread);

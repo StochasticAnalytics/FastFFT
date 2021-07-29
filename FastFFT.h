@@ -47,6 +47,8 @@ public:
   void CopyHostToDevice();
   void CopyDeviceToHost(bool free_gpu_memory, bool unpin_host_memory);
   void Deallocate();
+  void UnPinHostMemory();
+
 
   // FFT calls
 
