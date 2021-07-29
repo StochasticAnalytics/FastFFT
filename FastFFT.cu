@@ -4,12 +4,10 @@
 #include <iostream>
 #include <string>
 #include <stdio.h>
-// #include <fstream>
-// #include <stdio.h>
-// #include <stdlib.h>
 #include <cufftdx.hpp>
 
 #include "FastFFT.h"
+
 
 // This macro is more or less a snippet from the CUDA SDK
 #ifndef cudaErr
@@ -44,6 +42,89 @@
 namespace FastFFT {
 
 
+
+  //////////////////////////////
+  // Kernel definitions
+  //////////////////////////////
+  template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
+  __launch_bounds__(FFT::max_threads_per_block) __global__
+  void SimpleFFT_NoPaddingKernel(ScalarType * real_input, ComplexType* complex_output, short4 dims_in, short4 dims_out);
+
+
+  //////////////////////////////////////////////
+  // IO functions adapted from the cufftdx examples
+  ///////////////////////////////
+
+  template<class FFT>
+  struct io 
+  {
+      using complex_type = typename FFT::value_type;
+      using scalar_type  = typename complex_type::value_type;
+
+      static inline __device__ unsigned int stride_size() 
+      {
+          return cufftdx::size_of<FFT>::value / FFT::elements_per_thread;
+      }
+
+      static inline __device__ void load_r2c(const scalar_type* input,
+                                        complex_type*      thread_data,
+                                        int       		  offset) 
+      {
+        // Calculate global offset of FFT batch
+        //            const unsigned int offset = batch_offset(local_fft_id);
+        // Get stride, this shows how elements from batch should be split between threads
+        const unsigned int stride = stride_size();
+        unsigned int       index  = offset + threadIdx.x;
+        for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+        {
+        reinterpret_cast<scalar_type*>(thread_data)[i] = input[index];
+        index += stride;
+        }
+      } // load_r2c
+
+      static inline __device__ void store_r2c(const complex_type* thread_data,
+                                              complex_type*       output,
+                                              int        offset) 
+      {
+        //            const unsigned int offset = batch_offset_r2c(local_fft_id);
+        const unsigned int stride = stride_size();
+        unsigned int       index  = offset + threadIdx.x;
+        for (unsigned int i = 0; i < FFT::elements_per_thread / 2; i++) 
+        {
+          output[index] = thread_data[i];
+          index += stride;
+        }
+        constexpr unsigned int threads_per_fft        = cufftdx::size_of<FFT>::value / FFT::elements_per_thread;
+        constexpr unsigned int output_values_to_store = (cufftdx::size_of<FFT>::value / 2) + 1;
+        // threads_per_fft == 1 means that EPT == SIZE, so we need to store one more element
+        constexpr unsigned int values_left_to_store =
+        threads_per_fft == 1 ? 1 : (output_values_to_store % threads_per_fft);
+        if (threadIdx.x < values_left_to_store) 
+        {
+          output[index] = thread_data[FFT::elements_per_thread / 2];
+        }
+       }// store_r2c
+
+
+
+  }; // struct io}
+
+
+
+
+
+
+
+
+
+
+
+  ///////////////////////////////////////////////
+  ///////////////////////////////////////////////
+
+  using namespace cufftdx;
+  using FFT_64_r2c          = decltype(Block() + Size<64>() + Type<fft_type::r2c>() +
+  Precision<float>() + ElementsPerThread<4>() + FFTsPerBlock<1>() + SM<700>());
 
 FourierTransformer::FourierTransformer(DataType wanted_calc_data_type) 
 {
@@ -104,7 +185,7 @@ void FourierTransformer::SetInputDimensionsAndType(size_t input_logical_x_dimens
 
   dims_in = make_short4(input_logical_x_dimension, input_logical_y_dimension, input_logical_z_dimension,input_logical_x_dimension + w);
 
-  input_memory_allocated = ReturnPaddedMemorySize(input_logical_x_dimension, input_logical_y_dimension, input_logical_z_dimension);
+  input_memory_allocated = ReturnPaddedMemorySize(dims_in);
   this->input_origin_type = input_origin_type;
   is_set_input_params = true;
 }
@@ -131,7 +212,7 @@ void FourierTransformer::SetOutputDimensionsAndType(size_t output_logical_x_dime
 
   dims_out = make_short4(output_logical_x_dimension, output_logical_y_dimension, output_logical_z_dimension,output_logical_x_dimension + w);
 
-  output_memory_allocated = ReturnPaddedMemorySize(output_logical_x_dimension, output_logical_y_dimension, output_logical_z_dimension);
+  output_memory_allocated = ReturnPaddedMemorySize(dims_out);
 
   this->output_origin_type = output_origin_type;
   is_set_output_params = true;
@@ -254,6 +335,43 @@ void FourierTransformer::Deallocate()
 	}	
 }
 
+void FourierTransformer::SimpleFFT_NoPadding()
+{
+
+  using namespace cufftdx;
+	int threadsPerBlock = dims_in.x; // FIXME make sure its a multiple of 32
+	int gridDims = 1;
+
+	using FFT = decltype( FFT_64_r2c() + Direction<fft_direction::forward>() );
+	using complex_type = typename FFT::value_type;
+	using scalar_type    = typename complex_type::value_type;
+
+	SimpleFFT_NoPaddingKernel<FFT, complex_type, scalar_type><< <gridDims,  FFT::block_dim, FFT::shared_memory_size, cudaStreamPerThread>> > ( (scalar_type*)device_pointer_fp32, (complex_type*)device_pointer_fp32_complex, dims_in, dims_out);
+	cudaStreamSynchronize(cudaStreamPerThread);
+
+
+
+}
+
+template<class FFT, class ComplexType, class ScalarType>
+__launch_bounds__(FFT::max_threads_per_block) __global__
+void SimpleFFT_NoPaddingKernel(ScalarType* real_input, ComplexType* complex_output, short4 dims_in, short4 dims_out)
+{
+
+	// Initialize the shared memory, assuming everying matches the input data X size in
+	// Check that setting cudaFuncSetSharedMemConfig  to 8byte makes any diff for complex reads
+  using complex_type = ComplexType;
+  using scalar_type  = ScalarType;
+
+  extern __shared__  complex_type shared_mem[];
+  complex_type thread_data[FFT::storage_size];
+
+  io<FFT>::load_r2c(real_input, thread_data, 0);
+  FFT().execute(thread_data, shared_mem);
+  io<FFT>::store_r2c(thread_data, complex_output,  0);
+
+
+}
 
 } // namespace fast_FFT
 

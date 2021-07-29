@@ -48,6 +48,39 @@ public:
   void CopyDeviceToHost(bool free_gpu_memory, bool unpin_host_memory);
   void Deallocate();
 
+  // FFT calls
+
+  // 1:1 no resizing or anything fancy.
+  void SimpleFFT_NoPadding();
+
+
+  inline int ReturnPaddedMemorySize(short4 & wanted_dims) 
+  {
+    int wanted_memory = 0;
+    wanted_dims.w = wanted_dims.x;
+    if (wanted_dims.x % 2 == 0) { wanted_dims.w +=2; wanted_memory = wanted_dims.x / 2 + 1;}
+    else { wanted_dims.w += 1 ; wanted_memory = (wanted_dims.x - 1) / 2 + 1;}
+
+    wanted_memory *= wanted_dims.y * wanted_dims.z; // other dimensions
+    wanted_memory *= 2; // room for complex
+    return wanted_memory;
+  };
+
+  template<typename T, bool is_on_host = true>
+  void SetToConstant(T* input_pointer, int N_values, const T wanted_value)
+  {
+    if (is_on_host) 
+    {
+      for (int i = 0; i < N_values; i++)
+      {
+        input_pointer[i] = (T)wanted_value;
+      }
+    }
+    else
+    {
+      exit(-1);
+    }
+  }
 private:
 
 
@@ -84,23 +117,6 @@ private:
   int output_memory_allocated;
 
   void SetDefaults();
-  inline int ReturnPaddedMemorySize(size_t wanted_x, size_t wanted_y, size_t wanted_z) 
-  {
-    int wanted_memory = 0;
-    if (wanted_x % 2 == 0) wanted_memory = wanted_x / 2 + 1;
-    else wanted_memory = (wanted_x - 1) / 2 + 1;
-
-    wanted_memory *= wanted_y * wanted_z; // other dimensions
-    wanted_memory *= 2; // room for complex
-    return wanted_memory;
-  };
-
-
-    
-  
-
-
-
 
 
 
