@@ -142,16 +142,17 @@ int main(int argc, char** argv) {
   // Now let's do the forward FFT on the host and check that the result is correct.
   fftwf_execute_dft_r2c(plan_fwd, host_input, reinterpret_cast<fftwf_complex*>(host_input_complex));
   if(int(host_input_complex[0].x) != input_size.x*input_size.y*input_size.z) {std::cout << "FFT size (N) of a constant value (C) should be a unit impulse, with magnitue = N*C" << std::endl; exit(-1);}
-  print_values(host_input, "After xform on host ", 6);
+  print_values_complex(host_input, "After xfer d->h ", 64);
+
   FT.SetToConstant<float>(host_input, host_input_memory_allocated, 2.0f);
   print_values(host_input, "After xform scramble ", 6);
 
   // FT.SimpleFFT_NoPadding();
   FT.FFT_R2C_Transposed();
   FT.FFT_C2C_WithPadding(true);
-	FT.CopyDeviceToHost(true, true, true);
+	FT.CopyDeviceToHost(false, true, true);
 
-  print_values_complex(host_input, "After xfer d->h ", 64);
+  print_values_complex(host_input, "After xfer d->h ", 64*2);
 
   fftwf_free(host_input);
   fftwf_destroy_plan(plan_fwd);

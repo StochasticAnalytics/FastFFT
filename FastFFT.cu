@@ -324,12 +324,12 @@ void block_fft_kernel_R2C_Transposed(ScalarType* input_values, ComplexType* outp
 
   // No need to __syncthreads as each thread only accesses its own shared mem anyway
   // multiply Q*dims_out.w because x maps to y in the output transposed FFT
-  io<FFT>::load_r2c_shared(&input_values[blockIdx.y*dims_in.w], shared_input, thread_data, twiddle_factor_args, twiddle_in, input_MAP, output_MAP, Q*dims_out.w, 1);
+  io<FFT>::load_r2c_shared(&input_values[blockIdx.y*dims_in.w*2], shared_input, thread_data, twiddle_factor_args, twiddle_in, input_MAP, output_MAP, Q);
 
 	// In the first FFT the modifying twiddle factor is 1 so the data are real
 	FFT().execute(thread_data, shared_mem);
 
-  io<FFT>::store_r2c_transposed(thread_data, output_values, output_MAP);
+  io<FFT>::store_r2c_transposed(thread_data, output_values, output_MAP, dims_out.y);
 
     // For the other fragments we need the initial twiddle
 	for (int sub_fft = 1; sub_fft < Q; sub_fft++)
@@ -337,7 +337,7 @@ void block_fft_kernel_R2C_Transposed(ScalarType* input_values, ComplexType* outp
 
 	    io<FFT>::copy_from_shared(shared_input, thread_data, input_MAP);
 
-
+    printf("I SHOULD NOT BE HERA\n");
 		// cufftDX expects packed real data for a real xform, but we modify with a complex twiddle factor.
 		// to get around this, split the complex fft into the sum of the real and imaginary parts
 		for (int i = 0; i < FFT::elements_per_thread; i++)
@@ -346,12 +346,12 @@ void block_fft_kernel_R2C_Transposed(ScalarType* input_values, ComplexType* outp
 			__sincosf(twiddle_factor_args[i]*sub_fft,&twiddle.y,&twiddle.x);
 			thread_data[i] *= twiddle;
 		  // increment the output map. 
-			output_MAP[i]+=dims_out.w;
+			output_MAP[i]++;
 		}
 
 		FFT().execute(thread_data, shared_mem);
 
-    io<FFT>::store_r2c_transposed(thread_data, output_values, output_MAP);
+    io<FFT>::store_r2c_transposed(thread_data, output_values, output_MAP, dims_out.y);
 
 	}
 

@@ -146,17 +146,18 @@ struct io
                                                 float				        twiddle_in,
                                                 int*				        input_map,
                                                 int*				        output_map,
-                                                int				          Q,
-                                                int       		      input_stride) 
+                                                int				          Q) 
   {
     const unsigned int stride = stride_size();
     unsigned int       index  = threadIdx.x;
     for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
     {
+      // printf("blck %i index %i \n", Q*index, index*input_stride);
+
       input_map[i] = index;
       output_map[i] = Q*index;
       twiddle_factor_args[i] = twiddle_in * index;
-      thread_data[i].x = input[index*input_stride];
+      thread_data[i].x = input[index];
       thread_data[i].y = 0.0f;
       shared_input[index] =  thread_data[i].x;
       index += stride;
@@ -190,21 +191,21 @@ struct io
 
   static inline __device__ void store_r2c_transposed(const complex_type* thread_data,
                                                      complex_type*       output,
-                                                     int*	               output_map) 
+                                                     int*	               output_MAP,
+                                                     int                 pixel_pitch) 
   {
     const unsigned int stride = stride_size();
-    unsigned int       index  = threadIdx.x;
     for (unsigned int i = 0; i < FFT::elements_per_thread / 2; i++) 
     {
-      output[output_map[i] + blockIdx.y] = thread_data[i];
-      index += stride;
+      // output map is thread local, so output_MAP[i] gives the x-index in the non-transposed array and blockIdx.y gives the y-index
+      output[output_MAP[i]*pixel_pitch + blockIdx.y] = thread_data[i];
     }
     constexpr unsigned int threads_per_fft        = cufftdx::size_of<FFT>::value / FFT::elements_per_thread;
     constexpr unsigned int output_values_to_store = (cufftdx::size_of<FFT>::value / 2) + 1;
     constexpr unsigned int values_left_to_store = threads_per_fft == 1 ? 1 : (output_values_to_store % threads_per_fft);
     if (threadIdx.x < values_left_to_store)
     {
-      output[output_map[FFT::elements_per_thread / 2] + blockIdx.y] =  thread_data[FFT::elements_per_thread / 2];
+      output[output_MAP[FFT::elements_per_thread / 2]*pixel_pitch + blockIdx.y] =  thread_data[FFT::elements_per_thread / 2];
     }
   } // store_r2c_transposed
 
