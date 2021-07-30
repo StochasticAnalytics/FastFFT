@@ -183,14 +183,17 @@ void FourierTransformer::CopyHostToDevice()
 
 }
 
-void FourierTransformer::CopyDeviceToHost(bool free_gpu_memory, bool unpin_host_memory)
+void FourierTransformer::CopyDeviceToHost(bool is_in_buffer, bool free_gpu_memory, bool unpin_host_memory)
 {
  
 	MyFFTDebugAssertTrue(is_in_memory_device_pointer, "GPU memory not allocated");
 
+  float* copy_pointer;
+  if (is_in_buffer) copy_pointer = buffer_fp32;
+  else copy_pointer = device_pointer_fp32;
 
   precheck
-	cudaErr(cudaMemcpyAsync(pinnedPtr, device_pointer_fp32, output_memory_allocated*sizeof(float),cudaMemcpyDeviceToHost,cudaStreamPerThread));
+	cudaErr(cudaMemcpyAsync(pinnedPtr, copy_pointer, output_memory_allocated*sizeof(float),cudaMemcpyDeviceToHost,cudaStreamPerThread));
   postcheck
 
   // Just set true her for now
@@ -239,10 +242,10 @@ void FourierTransformer::SimpleFFT_NoPadding()
   using complex_type = typename FFT::value_type;
   using scalar_type    = typename complex_type::value_type;
 
+  precheck
 	SimpleFFT_NoPaddingKernel<FFT, complex_type, scalar_type>
   << <gridDims,  FFT::block_dim, FFT::shared_memory_size, cudaStreamPerThread>> > ( (scalar_type*)device_pointer_fp32, (complex_type*)buffer_fp32_complex, dims_in, dims_out);
-	cudaStreamSynchronize(cudaStreamPerThread);
-
+  postcheck
 
 
 }
@@ -286,7 +289,7 @@ void FourierTransformer::FFT_R2C_Transposed()
 	using complex_type = typename FFT::value_type;
 	using scalar_type    = typename complex_type::value_type;
 
-  int shared_mem = FFT::shared_memory_size;
+  int shared_mem = dims_in.x*sizeof(scalar_type) + FFT::shared_memory_size;
   precheck
   block_fft_kernel_R2C_Transposed<FFT,complex_type,scalar_type><< <gridDims,  threadsPerBlock, shared_mem, cudaStreamPerThread>> >
   ( (scalar_type *) device_pointer_fp32,  (complex_type*) buffer_fp32_complex, dims_in, dims_out,twiddle_in,Q);

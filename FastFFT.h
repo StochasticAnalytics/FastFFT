@@ -45,7 +45,7 @@ public:
   // void SetInputPointer(int16* input_pointer, bool is_input_on_device);
   void SetInputPointer(float* input_pointer, bool is_input_on_device);
   void CopyHostToDevice();
-  void CopyDeviceToHost(bool free_gpu_memory, bool unpin_host_memory);
+  void CopyDeviceToHost(bool is_in_buffer, bool free_gpu_memory, bool unpin_host_memory);
   void Deallocate();
   void UnPinHostMemory();
 

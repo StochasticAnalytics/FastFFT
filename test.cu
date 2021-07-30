@@ -117,10 +117,10 @@ int main(int argc, char** argv) {
   FT.SetToConstant<float>(host_input, host_input_memory_allocated, 2.0f);
   print_values(host_input, "After xform scramble ", 6);
 
-  FT.SimpleFFT_NoPadding();
-  // FT.FFT_R2C_Transposed();
-  // FT.FFT_C2C_WithPadding(true);
-	FT.CopyDeviceToHost(true, true);
+  // FT.SimpleFFT_NoPadding();
+  FT.FFT_R2C_Transposed();
+  FT.FFT_C2C_WithPadding(true);
+	FT.CopyDeviceToHost(false, true, true);
 
   print_values(host_input, "After xfer d->h ", 6);
 
