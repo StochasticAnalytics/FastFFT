@@ -100,8 +100,8 @@ int main(int argc, char** argv) {
 
 
   // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
-	FT.SetInputDimensionsAndType(64,1,1,true, false,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
-	FT.SetOutputDimensionsAndType(64,1,1,true,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
+	FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
+	FT.SetOutputDimensionsAndType(input_size.x,input_size.y,input_size.z,true,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
 
   // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
   // ensures faster transfer. If false, it will be pinned for you.
@@ -114,9 +114,12 @@ int main(int argc, char** argv) {
   fftwf_execute_dft_r2c(plan_fwd, host_input, reinterpret_cast<fftwf_complex*>(host_input_complex));
   if(int(host_input_complex[0].x) != input_size.x*input_size.y*input_size.z) {std::cout << "FFT size (N) of a constant value (C) should be a unit impulse, with magnitue = N*C" << std::endl; exit(-1);}
   print_values(host_input, "After xform on host ", 6);
-  
-  // Now we do the forward FFT on the device
+  FT.SetToConstant<float>(host_input, host_input_memory_allocated, 2.0f);
+  print_values(host_input, "After xform scramble ", 6);
+
   FT.SimpleFFT_NoPadding();
+  // FT.FFT_R2C_Transposed();
+  // FT.FFT_C2C_WithPadding(true);
 	FT.CopyDeviceToHost(true, true);
 
   print_values(host_input, "After xfer d->h ", 6);

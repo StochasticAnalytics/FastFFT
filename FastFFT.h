@@ -55,18 +55,21 @@ public:
   // 1:1 no resizing or anything fancy.
   void SimpleFFT_NoPadding();
   void FFT_R2C_Transposed();
+  void FFT_C2C(bool forward_transform);
+  void FFT_C2C_WithPadding(bool forward_transform);
+
 
 
 
   inline int ReturnPaddedMemorySize(short4 & wanted_dims) 
   {
     int wanted_memory = 0;
-    wanted_dims.w = wanted_dims.x;
-    if (wanted_dims.x % 2 == 0) { wanted_dims.w +=2; wanted_memory = wanted_dims.x / 2 + 1;}
-    else { wanted_dims.w += 1 ; wanted_memory = (wanted_dims.x - 1) / 2 + 1;}
+    if (wanted_dims.x % 2 == 0) { padding_jump_val = 2; wanted_memory = wanted_dims.x / 2 + 1;}
+    else { padding_jump_val = 1 ; wanted_memory = (wanted_dims.x - 1) / 2 + 1;}
 
     wanted_memory *= wanted_dims.y * wanted_dims.z; // other dimensions
     wanted_memory *= 2; // room for complex
+    wanted_dims.w = (wanted_dims.x + padding_jump_val) / 2; // number of complex elements in the X dimesnions after FFT.
     return wanted_memory;
   };
 
@@ -111,6 +114,7 @@ private:
 
   short4 dims_in;
   short4 dims_out;
+  short  padding_jump_val;
 
   float* host_pointer;
   float* pinnedPtr;

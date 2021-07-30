@@ -32,6 +32,7 @@
 
 namespace FastFFT {
 
+constexpr const float PIf = 3.14159275358979323846f;
 //////////////////////
 // Base FFT kerenel types, direction (r2c, c2r, c2c) and direction are ommited, to be applied in the method calling afull kernel
 using namespace cufftdx;
@@ -50,7 +51,11 @@ void SimpleFFT_NoPaddingKernel(ScalarType * real_input, ComplexType* complex_out
 
 template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_R2C_Trasnposed(ScalarType* input_values, ComplexType* output_values, short4 dims_in, short4 dims_out, float twiddle_in, int Q);
+void block_fft_kernel_R2C_Transposed(ScalarType* input_values, ComplexType* output_values, short4 dims_in, short4 dims_out, float twiddle_in, int Q);
+
+template<class FFT, class ComplexType = typename FFT::value_type>
+__launch_bounds__(FFT::max_threads_per_block) __global__
+void block_fft_kernel_C2C_WithPadding(ComplexType* input_values, ComplexType* output_values, short4 dims_in, short4 dims_out, float twiddle_in, int Q);
 
 
 
@@ -184,14 +189,14 @@ struct io
 
 
   static inline __device__ void store_r2c_transposed(const complex_type* thread_data,
-                                                  complex_type*       output,
-                                                  int*	              rotated_offset) 
+                                                     complex_type*       output,
+                                                     int*	               output_map) 
   {
     const unsigned int stride = stride_size();
     unsigned int       index  = threadIdx.x;
     for (unsigned int i = 0; i < FFT::elements_per_thread / 2; i++) 
     {
-      output[rotated_offset[1]*(int)index + rotated_offset[0]] = thread_data[i];
+      output[output_map[i] + blockIdx.y] = thread_data[i];
       index += stride;
     }
     constexpr unsigned int threads_per_fft        = cufftdx::size_of<FFT>::value / FFT::elements_per_thread;
@@ -199,7 +204,7 @@ struct io
     constexpr unsigned int values_left_to_store = threads_per_fft == 1 ? 1 : (output_values_to_store % threads_per_fft);
     if (threadIdx.x < values_left_to_store)
     {
-      output[rotated_offset[1]*(int)index + rotated_offset[0]] = thread_data[FFT::elements_per_thread / 2];
+      output[output_map[FFT::elements_per_thread / 2] + blockIdx.y] =  thread_data[FFT::elements_per_thread / 2];
     }
   } // store_r2c_transposed
 
