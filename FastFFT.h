@@ -11,6 +11,14 @@
 
 namespace FastFFT {
 
+  typedef
+	struct __align__(8) _Offsets{
+    short shared_input;
+    short shared_output;
+    int pixel_pitch;
+  } Offsets;
+
+  Offsets mem_offsets;
 
 class FourierTransformer 
   
@@ -21,6 +29,11 @@ public:
   // Used to specify input/calc/output data types
   enum DataType { int4_2, uint8, int8, uint16, int16, fp16, bf16, tf32, uint32, int32, fp32};
   enum OriginType { natural, centered, quadrant_swapped}; // Used to specify the origin of the data
+  short  padding_jump_val;
+  int input_memory_allocated;
+  int output_memory_allocated;
+  int input_number_of_real_values;
+  int output_number_of_real_values;
 
   FourierTransformer(DataType wanted_calc_data_type);
   // FourierTransformer(const FourierTransformer &); // Copy constructor
@@ -113,7 +126,11 @@ private:
 
   short4 dims_in;
   short4 dims_out;
-  short  padding_jump_val;
+  short  fft_status; // 
+
+
+  dim3 gridDims;
+  dim3 threadsPerBlock;
 
   float* host_pointer;
   float* pinnedPtr;
@@ -121,10 +138,43 @@ private:
   float* buffer_fp32; float2* buffer_fp32_complex;
   __half* device_pointer_fp16; __half2* device_pointer_fp16_complex;
 
-  int input_memory_allocated;
-  int output_memory_allocated;
+
 
   void SetDefaults();
+  inline void SetLaunchParameters(const int& ept)
+  {
+    
+    switch (fft_status)
+    {
+      case 0:
+         threadsPerBlock = dim3(dims_in.x/ept, 1, 1);
+         gridDims = dim3(1, dims_in.y, 1); 
+         mem_offsets.shared_input = dims_in.x;
+         mem_offsets.shared_output = dims_in.w*2;
+         mem_offsets.pixel_pitch = dims_out.y;
+         break;
+      case 1:
+        threadsPerBlock = dim3(dims_in.y/ept, 1, 1); 
+        gridDims = dim3(1, dims_out.w, 1);
+         mem_offsets.shared_input = dims_in.y;
+         mem_offsets.shared_output = dims_out.y;
+         mem_offsets.pixel_pitch = dims_out.y;
+        break;
+      case 2:
+        threadsPerBlock = dim3(dims_out.y/ept, 1, 1);
+        gridDims = dim3(1, dims_out.w, 1);
+        break;
+      case 3:
+        threadsPerBlock = dim3(dims_out.y/ept, 1, 1);
+        gridDims = dim3(1, dims_out.w, 1);
+        break;
+      default:
+        std::cerr << "ERROR: Unrecognized fft_status" << std::endl;
+        exit(-1);
+        
+    }
+
+  }
 
 
 

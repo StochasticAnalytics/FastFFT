@@ -1,5 +1,5 @@
 // Utilites for FastFFT.cu that we don't need the host to know about (FastFFT.h)
-
+#include "FastFFT.h"
 // “This software contains source code provided by NVIDIA Corporation.” Much of it is modfied as noted at relevant function definitions.
 
 
@@ -16,6 +16,8 @@
 #define MyFFTPrintWithDetails(...)	{std::cerr << __VA_ARGS__  << " From: " << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl;}
 #define MyFFTDebugAssertTrue(cond, msg, ...) {if ((cond) != true) { std::cerr << msg   << std::endl << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}}
 #define MyFFTDebugAssertFalse(cond, msg, ...) {if ((cond) == true) { std::cerr << msg  << std::endl << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}}
+#define MyFFTDebugAssertTestTrue(cond, msg, ...) {if ((cond) != true) { std::cerr <<  "    Test " << msg << " FAILED!"  << std::endl << "  at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);} else { std::cerr << "    Test " << msg << " passed!" << std::endl;}}
+#define MyFFTDebugAssertTestFalse(cond, msg, ...) {if ((cond) == true) { std::cerr<<  "    Test " << msg << " FAILED!"  << std::endl  << " at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);} else { std::cerr << "    Test " << msg << " passed!" << std::endl;}}
 
 
 // Note we are using std::cerr b/c the wxWidgets apps running in cisTEM are capturing std::cout
@@ -51,11 +53,11 @@ void SimpleFFT_NoPaddingKernel(ScalarType * real_input, ComplexType* complex_out
 
 template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_R2C_Transposed(ScalarType* input_values, ComplexType* output_values, short4 dims_in, short4 dims_out, float twiddle_in, int Q);
+void block_fft_kernel_R2C_Transposed(ScalarType* input_values, ComplexType* output_values, Offsets mem_offsets, float twiddle_in, int Q);
 
 template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2C_WithPadding(ComplexType* input_values, ComplexType* output_values, short4 dims_in, short4 dims_out, float twiddle_in, int Q);
+void block_fft_kernel_C2C_WithPadding(ComplexType* input_values, ComplexType* output_values, Offsets mem_offsets, float twiddle_in, int Q);
 
 
 
@@ -119,8 +121,7 @@ struct io
                                             float				        twiddle_in,
                                             int*				        input_map,
                                             int*				        output_map,
-                                            int				          Q,
-                                            int       		      input_stride)
+                                            int				          Q)
   {
     const unsigned int stride = stride_size();
     unsigned int       index  =  threadIdx.x;
@@ -129,7 +130,7 @@ struct io
       input_map[i] = index;
       output_map[i] = Q*index;
       twiddle_factor_args[i] = twiddle_in * index;
-      thread_data[i] = input[index*input_stride];
+      thread_data[i] = input[index];
       shared_input[index] = thread_data[i];
       index += stride;
     }
@@ -259,14 +260,13 @@ struct io
 
   static inline __device__ void store(const complex_type* thread_data,
                                       complex_type*       output,
-                                      int*				        source_idx,
-                                      int	                output_stride) 
+                                      int*				        source_idx) 
   {
     const unsigned int  stride = stride_size();
     for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
     {
       // If no kernel based changes are made to source_idx, this will be the same as the original index value
-      output[source_idx[i]*output_stride] = thread_data[i];
+      output[source_idx[i]] = thread_data[i];
     }
   } // store
 
@@ -285,23 +285,23 @@ struct io
       if (source_idx[i] < memory_limit) output[source_idx[i]*output_stride] = thread_data[i];
       //                output[index] = thread_data[i];
       //                index += stride;
-   }
+  }
   } // store
 
   static inline __device__ void store_coalesced(const complex_type* shared_output,
                                                 complex_type*       global_output,
-                                                int				          sub_fft, 
-                                                int       		      input_stride)
+                                                int*                  output_MAP)
   {
     const unsigned int stride = stride_size();
-    unsigned int       index  =  threadIdx.x + input_stride*sub_fft;
-    for (unsigned int i = 0; i < FFT::elements_per_thread; i++);
+    unsigned int       index  =  threadIdx.x;
+    for (unsigned int i = 0; i < FFT::elements_per_thread; i++)
     {
-      global_output[index] = shared_output[index];
+      global_output[output_MAP[i]] = shared_output[index];
+      output_MAP[i]--;
       index += stride;
     }
-  } // load_shared
-
+  } // store_coalesced
+//
   static inline __device__ void store_transposed(const complex_type* thread_data,
                                               complex_type*       output,
                                               int*				        output_map,
