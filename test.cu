@@ -14,7 +14,36 @@
 
 void print_values(float* input, std::string msg, int n_to_print)
 {
-  for (int i = 0; i < n_to_print; i++) { std::cout << msg << input[i] << std::endl ;}
+  for (int i = 0; i < n_to_print; i++) { std::cout << msg << i << "  " << input[i] << std::endl ;}
+}
+
+void print_values_complex(float* input, std::string msg, int n_to_print)
+{
+  for (int i = 0; i < n_to_print*2; i+=2) { std::cout << msg << i/2 << "  " << input[i] << " " << input[i+1] << std::endl ;}
+}
+
+void print_values_matrix(float* input, std::string msg, int n_row, int n_col)
+{
+  std::cout << msg << std::endl;
+  int padding_val;
+  if (n_row % 2 == 0) { padding_val =  2; }
+  else { padding_val =  1; }
+
+  int address = (n_row + padding_val) * n_col;
+
+  // print matrix rotated 90 degrees
+  for (int y = n_col-1; y >= 0; y--) 
+  {
+    address -= (n_row+padding_val);
+    for (int x = 0; x < n_row; x++)
+    {
+      std::cout << input[address] << " ";
+      address++;
+    }
+    std::cout << std::endl;
+    address -= (n_row+padding_val);
+  }
+  
 }
 
 int main(int argc, char** argv) {
@@ -120,9 +149,9 @@ int main(int argc, char** argv) {
   // FT.SimpleFFT_NoPadding();
   FT.FFT_R2C_Transposed();
   FT.FFT_C2C_WithPadding(true);
-	FT.CopyDeviceToHost(false, true, true);
+	FT.CopyDeviceToHost(true, true, true);
 
-  print_values(host_input, "After xfer d->h ", 6);
+  print_values_complex(host_input, "After xfer d->h ", 64);
 
   fftwf_free(host_input);
   fftwf_destroy_plan(plan_fwd);

@@ -55,7 +55,6 @@ public:
   // 1:1 no resizing or anything fancy.
   void SimpleFFT_NoPadding();
   void FFT_R2C_Transposed();
-  void FFT_C2C(bool forward_transform);
   void FFT_C2C_WithPadding(bool forward_transform);
 
 

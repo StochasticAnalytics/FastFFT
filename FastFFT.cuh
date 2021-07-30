@@ -287,6 +287,20 @@ struct io
    }
   } // store
 
+  static inline __device__ void store_coalesced(const complex_type* shared_output,
+                                                complex_type*       global_output,
+                                                int				          sub_fft, 
+                                                int       		      input_stride)
+  {
+    const unsigned int stride = stride_size();
+    unsigned int       index  =  threadIdx.x + input_stride*sub_fft;
+    for (unsigned int i = 0; i < FFT::elements_per_thread; i++);
+    {
+      global_output[index] = shared_output[index];
+      index += stride;
+    }
+  } // load_shared
+
   static inline __device__ void store_transposed(const complex_type* thread_data,
                                               complex_type*       output,
                                               int*				        output_map,

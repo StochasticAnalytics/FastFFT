@@ -277,10 +277,9 @@ void FourierTransformer::FFT_R2C_Transposed()
 
   // TODO padding or maybe that is a separate funcitno.
 	// For the twiddle factors ahead of the P size ffts
-	// float twiddle_in = -2*PIf/output_image.dims.x;
-	// int   Q = output_image.dims.x / input_image.dims.x; // FIXME assuming for now this is already divisible
-  float twiddle_in = 1.f;
-  int Q = 1;
+	float twiddle_in = -2*PIf/dims_out.x;
+	int   Q = dims_out.x / dims_in.x; // FIXME assuming for now this is already divisible
+
 
 	dim3 threadsPerBlock = dim3(dims_in.x/elements_per_thread_real, 1, 1); // FIXME make sure its a multiple of 32
 	dim3 gridDims = dim3(1,dims_in.y, 1); // TODO allow 3d and also confirm this isn't used in any artifacts leftover 
@@ -421,7 +420,7 @@ void block_fft_kernel_C2C_WithPadding(ComplexType* input_values, ComplexType* ou
   float twiddle_factor_args[FFT::storage_size];
 
   // No need to __syncthreads as each thread only accesses its own shared mem anyway
-  io<FFT>::load_shared(&input_values[blockIdx.y*dims_out.w], shared_input_complex, thread_data, twiddle_factor_args, twiddle_in, input_MAP, output_MAP, Q, 1);
+  io<FFT>::load_shared(&input_values[blockIdx.y*dims_out.y], shared_input_complex, thread_data, twiddle_factor_args, twiddle_in, input_MAP, output_MAP, Q, 1);
 
 
 	// In the first FFT the modifying twiddle factor is 1 so the data are reeal
@@ -456,17 +455,18 @@ void block_fft_kernel_C2C_WithPadding(ComplexType* input_values, ComplexType* ou
 
 	// Now that the memory output can be coalesced send to global
   // FIXME is this actually coalced?
-	int this_idx;
+	// int this_idx;
 	for (int sub_fft = 0; sub_fft < Q; sub_fft++)
 	{
-		for (int i = 0; i < FFT::elements_per_thread; i++)
-		{
-			this_idx = input_MAP[i] + dims_in.x*sub_fft;
-			if (this_idx < dims_out.w)
-			{
-				output_values[blockIdx.y * dims_out.w + this_idx] = shared_output[this_idx];
-			}
-		}
+    io<FFT>::store_coalesced(shared_output, &output_values[blockIdx.y * dims_out.y], sub_fft, dims_in.y);
+		// for (int i = 0; i < FFT::elements_per_thread; i++)
+		// {
+		// 	this_idx = input_MAP[i] + dims_in.x*sub_fft;
+		// 	if (this_idx < dims_out.w)
+		// 	{
+		// 		output_values[blockIdx.y * dims_out.w + this_idx] = shared_output[this_idx];
+		// 	}
+		// }
 	}
 
 
