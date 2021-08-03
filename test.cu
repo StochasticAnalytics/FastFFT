@@ -46,6 +46,25 @@ void print_values_matrix(float* input, std::string msg, int n_row, int n_col)
   
 }
 
+void ReturnSumOfReal(float* input, float& sum, short4 size)
+{
+
+  long address = 0;
+  int padding_jump_val = size.w*2 - size.x;
+  for (int k = 0; k < size.z; k++)
+  {
+    for (int j = 0; j < size.y; j++)
+    {
+      for (int i = 0; i < size.x; i++)
+      {
+        sum += (input[address]);
+        address++;
+      }
+      address += padding_jump_val;
+    }
+  }
+}
+
 void ReturnSumOfComplex(float2* input, float2& sum, int n_to_print)
 {
   sum.x = 0.f;
@@ -166,11 +185,22 @@ int main(int argc, char** argv) {
   // FT.SimpleFFT_NoPadding();
   FT.FFT_R2C_Transposed();
   FT.FFT_C2C_WithPadding(true);
+  FT.FFT_C2C(true);
+  FT.FFT_C2R_Transposed();
 	FT.CopyDeviceToHost(false, true, true);
 
-  ReturnSumOfComplex(host_input_complex, sum, FT.output_memory_allocated/2);
-  std::cout << sum.x << " " << sum.y << std::endl;
-  MyFFTDebugAssertTestTrue( sum.x == FT.output_number_of_real_values  && sum.y == 0,"FastFFT unit impulse forward FFT");
+  print_values(host_input,"asdfs",20);
+  float s = 0;
+  for (int i = 0; i < host_output_memory_allocated; i++)
+  {
+    if (host_input[i] != 4096) {std::cout << " " << host_input[i] << " "<< i  << std::endl;}
+    else s += host_input[i];
+  }
+  std::cout << "sum " << s << std::endl;
+  float sumf = 0.0f;
+  ReturnSumOfReal(host_input, sumf, output_size);
+  std::cout << sumf << " " << powf(input_size.x*input_size.y*input_size.z,2) << " " << std::endl;
+  MyFFTDebugAssertTestTrue( sumf == powf(input_size.x*input_size.y*input_size.z,2),"FastFFT unit impulse round trip FFT");
 
   fftwf_free(host_input);
   fftwf_destroy_plan(plan_fwd);

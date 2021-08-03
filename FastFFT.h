@@ -182,7 +182,7 @@ private:
         mem_offsets.pixel_pitch = dims_out.y;
         break;
       case 3:
-        threadsPerBlock = dim3(dims_out.w/ept, 1, 1); // or w*2?
+        threadsPerBlock = dim3(2*dims_out.w/ept, 1, 1); // or w*2?
         gridDims = dim3(1, dims_out.y, 1);
         twiddle_in = -2*PIf/dims_out.y;
         Q = 1; // Already full size - FIXME when working out limited number of output pixels  
