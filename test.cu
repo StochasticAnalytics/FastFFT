@@ -156,7 +156,7 @@ int main(int argc, char** argv) {
   
   // Now let's do the forward FFT on the host and check that the result is correct.
   fftwf_execute_dft_r2c(plan_fwd, host_input, reinterpret_cast<fftwf_complex*>(host_input_complex));
-  print_values_complex(host_input, "fftw ", FT.output_memory_allocated/2);
+  // print_values_complex(host_input, "fftw ", FT.output_memory_allocated/2);
   
   ReturnSumOfComplex(host_input_complex, sum, FT.output_memory_allocated/2);
   std::cout << sum.x << " " << sum.y << std::endl;

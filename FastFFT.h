@@ -11,6 +11,8 @@
 
 namespace FastFFT {
 
+  constexpr const float PIf = 3.14159275358979323846f;
+
   typedef
 	struct __align__(8) _Offsets{
     short shared_input;
@@ -69,6 +71,10 @@ public:
   void SimpleFFT_NoPadding();
   void FFT_R2C_Transposed();
   void FFT_C2C_WithPadding(bool forward_transform);
+  void FFT_C2C(bool forward_transform);
+  void FFT_C2R_Transposed();
+
+
 
 
 
@@ -138,6 +144,8 @@ private:
   float* buffer_fp32; float2* buffer_fp32_complex;
   __half* device_pointer_fp16; __half2* device_pointer_fp16_complex;
 
+  float twiddle_in; // (twiddle factor for input)
+  int   Q; // N/L (FULL SIZE/ NON-ZERO DIMENSIONS)
 
 
   void SetDefaults();
@@ -147,26 +155,40 @@ private:
     switch (fft_status)
     {
       case 0:
-         threadsPerBlock = dim3(dims_in.x/ept, 1, 1);
-         gridDims = dim3(1, dims_in.y, 1); 
-         mem_offsets.shared_input = dims_in.x;
-         mem_offsets.shared_output = dims_in.w*2;
-         mem_offsets.pixel_pitch = dims_out.y;
-         break;
+        threadsPerBlock = dim3(dims_in.x/ept, 1, 1);
+        gridDims = dim3(1, dims_in.y, 1); 
+        mem_offsets.shared_input = dims_in.x;
+        mem_offsets.shared_output = dims_in.w*2;
+        mem_offsets.pixel_pitch = dims_out.y;
+        twiddle_in = -2*PIf/dims_out.x;
+        Q = dims_out.x / dims_in.x; 
+        break;
       case 1:
         threadsPerBlock = dim3(dims_in.y/ept, 1, 1); 
         gridDims = dim3(1, dims_out.w, 1);
-         mem_offsets.shared_input = dims_in.y;
-         mem_offsets.shared_output = dims_out.y;
-         mem_offsets.pixel_pitch = dims_out.y;
+        mem_offsets.shared_input = dims_in.y;
+        mem_offsets.shared_output = dims_out.y;
+        mem_offsets.pixel_pitch = dims_out.y;
+        twiddle_in = -2*PIf/dims_out.y;
+        Q = dims_out.y / dims_in.y; // FIXME assuming for now this is already divisible
         break;
       case 2:
         threadsPerBlock = dim3(dims_out.y/ept, 1, 1);
         gridDims = dim3(1, dims_out.w, 1);
+        twiddle_in = -2*PIf/dims_out.y;
+        Q = 1; // Already full size - FIXME when working out limited number of output pixels       
+        mem_offsets.shared_input = 0;
+        mem_offsets.shared_output = 0;
+        mem_offsets.pixel_pitch = dims_out.y;
         break;
       case 3:
-        threadsPerBlock = dim3(dims_out.y/ept, 1, 1);
-        gridDims = dim3(1, dims_out.w, 1);
+        threadsPerBlock = dim3(dims_out.w/ept, 1, 1); // or w*2?
+        gridDims = dim3(1, dims_out.y, 1);
+        twiddle_in = -2*PIf/dims_out.y;
+        Q = 1; // Already full size - FIXME when working out limited number of output pixels  
+        mem_offsets.shared_input = 0;
+        mem_offsets.shared_output = dims_out.w*2; // It turns out that we need pitch in and pitch out, FIXME hack
+        mem_offsets.pixel_pitch = dims_out.y;         
         break;
       default:
         std::cerr << "ERROR: Unrecognized fft_status" << std::endl;
