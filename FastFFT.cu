@@ -145,12 +145,12 @@ void FourierTransformer::CopyHostToDevice()
 	MyFFTDebugAssertTrue(is_in_memory_host_pointer, "Host memory not allocated");
   MyFFTDebugAssertTrue(is_set_output_params, "Output parameters need to be set");
   MyFFTDebugAssertTrue(is_set_input_params, "Input parameters need to be set");
-  MyFFTPrintWithDetails("Copying host to device");
-  MyFFTPrint(std::to_string(output_memory_allocated) + " bytes of host memory to device");
+  // MyFFTPrintWithDetails("Copying host to device");
+  // MyFFTPrint(std::to_string(output_memory_allocated) + " bytes of host memory to device");
 	if ( ! is_in_memory_device_pointer )
 	{
     // Allocate enough for the out of place buffer as well.
-    MyFFTPrintWithDetails("Allocating device memory for input pointer");
+    // MyFFTPrintWithDetails("Allocating device memory for input pointer");
     precheck
 		cudaErr(cudaMalloc(&device_pointer_fp32, 2*output_memory_allocated*sizeof(float)));
     postcheck

@@ -12,43 +12,16 @@
 
 #include "FastFFT.cu"
 
-void print_values(float* input, std::string msg, int n_to_print)
-{
-  for (int i = 0; i < n_to_print; i++) { std::cout << msg << i << "  " << input[i] << std::endl ;}
-}
-
+// To print a message and some number n_to_print complex values to stdout
 void print_values_complex(float* input, std::string msg, int n_to_print)
 {
   for (int i = 0; i < n_to_print*2; i+=2) { std::cout << msg << i/2 << "  " << input[i] << " " << input[i+1] << std::endl ;}
 }
 
-void print_values_matrix(float* input, std::string msg, int n_row, int n_col)
+// Return sum of real values
+float ReturnSumOfReal(float* input, short4 size)
 {
-  std::cout << msg << std::endl;
-  int padding_val;
-  if (n_row % 2 == 0) { padding_val =  2; }
-  else { padding_val =  1; }
-
-  int address = (n_row + padding_val) * n_col;
-
-  // print matrix rotated 90 degrees
-  for (int y = n_col-1; y >= 0; y--) 
-  {
-    address -= (n_row+padding_val);
-    for (int x = 0; x < n_row; x++)
-    {
-      std::cout << input[address] << " ";
-      address++;
-    }
-    std::cout << std::endl;
-    address -= (n_row+padding_val);
-  }
-  
-}
-
-void ReturnSumOfReal(float* input, float& sum, short4 size)
-{
-
+  double temp_sum = 0;
   long address = 0;
   int padding_jump_val = size.w*2 - size.x;
   for (int k = 0; k < size.z; k++)
@@ -57,57 +30,34 @@ void ReturnSumOfReal(float* input, float& sum, short4 size)
     {
       for (int i = 0; i < size.x; i++)
       {
-        sum += (input[address]);
+        temp_sum += (input[address]);
         address++;
       }
       address += padding_jump_val;
     }
   }
+
+  return float(temp_sum);
 }
 
-void ReturnSumOfComplex(float2* input, float2& sum, int n_to_print)
+// Return the sum of the complex values
+float2 ReturnSumOfComplex(float2* input, int n_to_print)
 {
-  sum.x = 0.f;
-  sum.y = 0.f;
+  double sum_x = 0;
+  double sum_y = 0;
+
   for (int i = 0; i < n_to_print; i++) 
   {
-    sum.x += input[i].x;
-    sum.y += input[i].y;
+    sum_x += input[i].x;
+    sum_y += input[i].y;
   }
   
+  return make_float2(float(sum_x), float(sum_y));  
 }
-int main(int argc, char** argv) {
-
-  std::printf("Entering main in tests.cpp\n");
-  std::printf("Standard is %i\n\n",__cplusplus);
-
-  // Input and output dimensions, with simple checks. I'm sure there are better checks on argv.
-  short4 input_size;
-  short4 output_size;
-
-  if ( argc != 4 && argc != 7) 
-  { 
-    std::cout << argc << std::endl;
-    std::cout << "Usage: ./tests n_x n_y n_z [optionally 3 larger or smaller sizes, otherwise input_size=output_size]" << std::endl;
-    exit(1);
-  }
-  else
-  {
-    for (int i = 1; i < 4; i++) { if (atoi(argv[i]) <=0) { std::cout << "Error: " << argv[i] << " is not a positive integer" << std::endl; exit(1);}}
-    input_size  = make_short4( atoi(argv[1]), atoi(argv[2]), atoi(argv[3]), 0 );
-
-    if (argc == 7) 
-    {
-      for (int i = 1; i < 4; i++) { if (atoi(argv[i+3]) <=0) { std::cout << "Error: " << argv[i+3] << " is not a positive integer" << std::endl; exit(1);}}
-      output_size = make_short4( atoi(argv[4]), atoi(argv[5]), atoi(argv[6]), 0 );
-    }
-    else
-    {
-      output_size = input_size;
-    }
-  }
 
 
+void unit_impulse_test(short4 input_size, short4 output_size)
+{
   // Pointers to the arrays on the host -- maybe make this a struct of some sort? I'm sure there is a parallel in cuda, look into cuarray/texture code
   float* host_input;
   float* host_output;
@@ -124,12 +74,16 @@ int main(int argc, char** argv) {
   float2* device_output_complex;
   int device_memory_allocated;
 
-  float2 sum;
+  float sum;
+  float2 sum_complex;
 
 
   // We just make one instance of the FourierTransformer class, with calc type float.
   // For the time being input and output are also float. TODO calc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
   FastFFT::FourierTransformer FT(FastFFT::FourierTransformer::DataType::fp32);
+
+
+
 
   // Determine how much memory we need, working with FFTW/CUDA style in place transform padding.
   // Note: there is no reason we really need this, because the xforms will always be out of place. 
@@ -167,8 +121,8 @@ int main(int argc, char** argv) {
   // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
   // ensures faster transfer. If false, it will be pinned for you.
 	FT.SetInputPointer(&host_input[0], false);
-  ReturnSumOfComplex(host_input_complex, sum, FT.input_memory_allocated/2);
-  MyFFTDebugAssertTestTrue( sum.x == FT.input_memory_allocated/2 && sum.y == FT.input_memory_allocated/2, "Unit impulse init");
+  sum_complex = ReturnSumOfComplex(host_input_complex, FT.input_memory_allocated/2);
+  MyFFTDebugAssertTestTrue( sum_complex.x == FT.input_memory_allocated/2 && sum_complex.y == FT.input_memory_allocated/2, "Unit impulse init");
 
   // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
 	FT.CopyHostToDevice();
@@ -177,33 +131,50 @@ int main(int argc, char** argv) {
   fftwf_execute_dft_r2c(plan_fwd, host_input, reinterpret_cast<fftwf_complex*>(host_input_complex));
   // print_values_complex(host_input, "fftw ", FT.output_memory_allocated/2);
   
-  ReturnSumOfComplex(host_input_complex, sum, FT.output_memory_allocated/2);
-  std::cout << sum.x << " " << sum.y << std::endl;
-  MyFFTDebugAssertTestTrue( sum.x == FT.output_number_of_real_values && sum.y == 0, "FFTW unit impulse forward FFT");
+  sum_complex = ReturnSumOfComplex(host_input_complex, FT.output_memory_allocated/2);
+  // std::cout << sum_complex.x << " " << sum_complex.y << std::endl;
+  MyFFTDebugAssertTestTrue( sum_complex.x == FT.output_number_of_real_values && sum_complex.y == 0, "FFTW unit impulse forward FFT");
   FT.SetToConstant<float>(host_input, host_input_memory_allocated, 2.0f);
 
-  // FT.SimpleFFT_NoPadding();
+  // Forward FFT ;
   FT.FFT_R2C_Transposed();
   FT.FFT_C2C_WithPadding(true);
+  // in buffer, do not deallocate, do not unpin memory
+	FT.CopyDeviceToHost(true, false, false);
+
+  sum_complex = ReturnSumOfComplex(host_input_complex, FT.output_memory_allocated/2);
+  // std::cout << sum_complex.x << " " << sum_complex.y << std::endl;
+  MyFFTDebugAssertTestTrue( sum_complex.x == FT.output_number_of_real_values && sum_complex.y == 0, "FastFFT unit impulse forward FFT");
+  FT.SetToConstant<float>(host_input, host_input_memory_allocated, 2.0f);
+
   FT.FFT_C2C(true);
   FT.FFT_C2R_Transposed();
 	FT.CopyDeviceToHost(false, true, true);
 
-  print_values(host_input,"asdfs",20);
-  float s = 0;
-  for (int i = 0; i < host_output_memory_allocated; i++)
-  {
-    if (host_input[i] != 4096) {std::cout << " " << host_input[i] << " "<< i  << std::endl;}
-    else s += host_input[i];
-  }
-  std::cout << "sum " << s << std::endl;
-  float sumf = 0.0f;
-  ReturnSumOfReal(host_input, sumf, output_size);
-  std::cout << sumf << " " << powf(input_size.x*input_size.y*input_size.z,2) << " " << std::endl;
-  MyFFTDebugAssertTestTrue( sumf == powf(input_size.x*input_size.y*input_size.z,2),"FastFFT unit impulse round trip FFT");
+  // Assuming the outputs are always even dimensions, padding_jump_val is always 2.
+  sum = ReturnSumOfReal(host_input, output_size);
+  // std::cout << sum << " " << powf(input_size.x*input_size.y*input_size.z,2) << " " << std::endl;
+  MyFFTDebugAssertTestTrue( sum == powf(input_size.x*input_size.y*input_size.z,2),"FastFFT unit impulse round trip FFT");
 
   fftwf_free(host_input);
   fftwf_destroy_plan(plan_fwd);
   fftwf_destroy_plan(plan_bwd);
+
+}
+
+int main(int argc, char** argv) {
+
+  std::printf("Entering main in tests.cpp\n");
+  std::printf("Standard is %i\n\n",__cplusplus);
+
+  // Input and output dimensions, with simple checks. I'm sure there are better checks on argv.
+  short4 input_size;
+  short4 output_size;
+
+  input_size = make_short4(64,64,1,0);
+  output_size = make_short4(64,64,1,0);
+
+  unit_impulse_test(input_size, output_size);
+
   
 }
