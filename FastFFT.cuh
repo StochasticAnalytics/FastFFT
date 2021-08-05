@@ -1,5 +1,6 @@
 // Utilites for FastFFT.cu that we don't need the host to know about (FastFFT.h)
 #include "FastFFT.h"
+
 // “This software contains source code provided by NVIDIA Corporation.” Much of it is modfied as noted at relevant function definitions.
 
 
@@ -34,14 +35,34 @@
 
 namespace FastFFT {
 
+// GetCudaDeviceArch from https://github.com/mnicely/cufft_examples/blob/master/Common/cuda_helper.h
+void GetCudaDeviceArch( int &device, int &arch ) {
+  int major;
+  int minor;
+  cudaErr( cudaGetDevice( &device ) );
+
+  cudaErr( cudaDeviceGetAttribute( &major, cudaDevAttrComputeCapabilityMajor, device ) );
+  cudaErr( cudaDeviceGetAttribute( &minor, cudaDevAttrComputeCapabilityMinor, device ) );
+
+  arch = major * 100 + minor * 10;
+}
+
 //////////////////////
 // Base FFT kerenel types, direction (r2c, c2r, c2c) and direction are ommited, to be applied in the method calling afull kernel
 using namespace cufftdx;
 
 constexpr const int elements_per_thread_real = 8;
 constexpr const int elements_per_thread_complex = 8;
+constexpr const uint device_arch = 700;
 
-using FFT_64_fp32         = decltype(Block() + Size<64>()  + Precision<float>() + ElementsPerThread<elements_per_thread_real>() + FFTsPerBlock<1>() + SM<700>());
+// All transforms are 
+using FFT_base   = decltype(Block() + Precision<float>() + ElementsPerThread<elements_per_thread_complex>()  + FFTsPerBlock<1>()  );
+
+using FFT_64_fp32   = decltype(Block() + Size<64>()  + Precision<float>() + ElementsPerThread<elements_per_thread_complex>()  + FFTsPerBlock<1>() + SM<device_arch>() );
+using FFT_128_fp32   = decltype(Block() + Size<128>()  + Precision<float>() + ElementsPerThread<elements_per_thread_complex>()  + FFTsPerBlock<1>() + SM<device_arch>() );
+
+
+
 
 //////////////////////////////
 // Kernel definitions
@@ -140,6 +161,7 @@ struct io
       thread_data[i] = input[index];
       shared_input[index] = thread_data[i];
       index += stride;
+
     }
 
   } // load_shared
@@ -226,7 +248,7 @@ struct io
     unsigned int       index  =  threadIdx.x;
     for (unsigned int i = 0; i < FFT::elements_per_thread / 2; i++) 
     {
-      thread_data[i] = input[pixel_pitch*(int)index + blockIdx.y];
+      thread_data[i] = input[pixel_pitch*(int)index];
       index += stride;
     }
     constexpr unsigned int threads_per_fft       = cufftdx::size_of<FFT>::value / FFT::elements_per_thread;
@@ -235,7 +257,7 @@ struct io
     constexpr unsigned int values_left_to_load = threads_per_fft == 1 ? 1 : (output_values_to_load % threads_per_fft);
     if (threadIdx.x < values_left_to_load) 
     {
-      thread_data[FFT::elements_per_thread / 2] = input[pixel_pitch*(int)index + blockIdx.y];
+      thread_data[FFT::elements_per_thread / 2] = input[pixel_pitch*(int)index];
     }
   } // load_c2r_transposed
 
@@ -298,14 +320,14 @@ struct io
 
   static inline __device__ void store_coalesced(const complex_type* shared_output,
                                                 complex_type*       global_output,
-                                                int*                  output_MAP)
+                                                int 				        offset)
   {
+
     const unsigned int stride = stride_size();
-    unsigned int       index  =  threadIdx.x;
+    unsigned int       index  =  offset + threadIdx.x;
     for (unsigned int i = 0; i < FFT::elements_per_thread; i++)
     {
-      global_output[output_MAP[i]] = shared_output[index];
-      output_MAP[i]--;
+      global_output[index] = shared_output[index];
       index += stride;
     }
   } // store_coalesced

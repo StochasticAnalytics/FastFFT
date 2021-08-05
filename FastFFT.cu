@@ -15,10 +15,6 @@ namespace FastFFT {
 
 
 
-  ///////////////////////////////////////////////
-  ///////////////////////////////////////////////
-
-
 
 FourierTransformer::FourierTransformer(DataType wanted_calc_data_type) 
 {
@@ -229,7 +225,7 @@ void FourierTransformer::SimpleFFT_NoPadding()
 	int threadsPerBlock = dims_in.x; // FIXME make sure its a multiple of 32
 	int gridDims = 1;
 
-	using FFT = decltype( FFT_64_fp32() + Type<fft_type::r2c>() + Direction<fft_direction::forward>() );
+	using FFT = decltype( FFT_64_fp32() + Direction<fft_direction::forward>() + Type<fft_type::c2c>());
   using complex_type = typename FFT::value_type;
   using scalar_type    = typename complex_type::value_type;
   cudaError_t error_code = cudaSuccess;
@@ -263,34 +259,53 @@ void SimpleFFT_NoPaddingKernel(ScalarType* real_input, ComplexType* complex_outp
 
 }
 
-void FourierTransformer::FFT_R2C_Transposed()
+template<class FFT>
+void FourierTransformer::FFT_R2C_Transposed_t()
 {
 
+  LaunchParams LP = SetLaunchParameters(elements_per_thread_complex);
 
+  using complex_type = typename FFT::value_type;
+  using scalar_type = typename complex_type::value_type;
+  int shared_mem = LP.mem_offsets.shared_input*sizeof(scalar_type) + FFT::shared_memory_size;
+
+  precheck
+  block_fft_kernel_R2C_Transposed<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
+  ( (scalar_type*) device_pointer_fp32,  (complex_type*) buffer_fp32_complex, LP.mem_offsets, LP.twiddle_in,LP.Q);
+  postcheck
+}
+
+void FourierTransformer::FFT_R2C_Transposed()
+{
   MyFFTDebugAssertTrue(fft_status == 0, "fft status must be 0 (real space) for R2C");
 
+  int device, arch;
+  GetCudaDeviceArch( device, arch );
 
-  SetLaunchParameters(elements_per_thread_real);
+  switch (dims_in.x)
+  {
+    case 64: {
+      switch (arch)
+      {
+        case 700: { using FFT = decltype(FFT_base()  + Size<64>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_Transposed_t<FFT>(); break;}
+        case 750: { using FFT = decltype(FFT_base()  + Size<64>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_R2C_Transposed_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<64>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_Transposed_t<FFT>(); break;}
+      }
+      break; }
 
-  using FFT = decltype( FFT_64_fp32() + Type<fft_type::c2c>() + Direction<fft_direction::forward>() );
-	using complex_type = typename FFT::value_type;
-	using scalar_type    = typename complex_type::value_type;
-
-  int shared_mem = dims_in.x*sizeof(scalar_type) + FFT::shared_memory_size;
-  precheck
-  block_fft_kernel_R2C_Transposed<FFT,complex_type,scalar_type><< <gridDims,  threadsPerBlock, shared_mem, cudaStreamPerThread>> >
-  ( (scalar_type *) device_pointer_fp32,  (complex_type*) buffer_fp32_complex, mem_offsets, twiddle_in,Q);
-  postcheck
-
+    case 128: {
+      using FFT = decltype(FFT_128_fp32() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>());
+      FFT_R2C_Transposed_t<FFT>();
+      break; }
+   
+  }
   fft_status = 1;
-
 }
 
 template<class FFT, class ComplexType, class ScalarType>
 __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_R2C_Transposed(ScalarType* input_values, ComplexType* output_values, Offsets mem_offsets, float twiddle_in, int Q)
 {
-
   // Initialize the shared memory, assuming everyting matches the input data X size in
   using complex_type = ComplexType;
   using scalar_type  = ScalarType;
@@ -314,12 +329,12 @@ void block_fft_kernel_R2C_Transposed(ScalarType* input_values, ComplexType* outp
 
   // No need to __syncthreads as each thread only accesses its own shared mem anyway
   // multiply Q*dims_out.w because x maps to y in the output transposed FFT
-  io<FFT>::load_r2c_shared(&input_values[blockIdx.y*mem_offsets.shared_output], shared_input, thread_data, twiddle_factor_args, twiddle_in, input_MAP, output_MAP, Q);
+  io<FFT>::load_r2c_shared(&input_values[blockIdx.y*mem_offsets.pixel_pitch_input], shared_input, thread_data, twiddle_factor_args, twiddle_in, input_MAP, output_MAP, Q);
 
 	// In the first FFT the modifying twiddle factor is 1 so the data are real
 	FFT().execute(thread_data, shared_mem);
-
-  io<FFT>::store_r2c_transposed(thread_data, output_values, output_MAP, mem_offsets.pixel_pitch);
+  
+  io<FFT>::store_r2c_transposed(thread_data, output_values, output_MAP, mem_offsets.pixel_pitch_output);
 
     // For the other fragments we need the initial twiddle
 	for (int sub_fft = 1; sub_fft < Q; sub_fft++)
@@ -341,7 +356,7 @@ void block_fft_kernel_R2C_Transposed(ScalarType* input_values, ComplexType* outp
 
 		FFT().execute(thread_data, shared_mem);
 
-    io<FFT>::store_r2c_transposed(thread_data, output_values, output_MAP, mem_offsets.pixel_pitch);
+    io<FFT>::store_r2c_transposed(thread_data, output_values, output_MAP, mem_offsets.pixel_pitch_output);
 
 	}
 
@@ -354,31 +369,26 @@ void FourierTransformer::FFT_C2C_WithPadding(bool forward_transform)
 	// This is the first set of 1d ffts when the input data are real valued, accessing the strided dimension. Since we need the full length, it will actually run a C2C xform
   MyFFTDebugAssertTrue(fft_status == 1, "fft status must be 1 (partial forward)");
 
-	float twiddle_in;
-	int Q;
-	int shared_mem;
+  LaunchParams LP = SetLaunchParameters(elements_per_thread_complex);
 
-
-  using FFT = decltype( FFT_64_fp32() + Type<fft_type::c2c>() + Direction<fft_direction::inverse>() );  
+  using FFT = decltype( FFT_64_fp32() + Direction<fft_direction::forward>() + Type<fft_type::c2c>());  
 	using complex_type = typename FFT::value_type;
-	using scalar_type    = typename complex_type::value_type;
   cudaError_t error_code = cudaSuccess;
   auto workspace = make_workspace<FFT>(error_code);
 
 
-  SetLaunchParameters(elements_per_thread_complex);
-
+  int shared_mem;
   // Aggregate the transformed frequency data in shared memory so that we can write to global coalesced.
-  shared_mem = mem_offsets.shared_output*sizeof(complex_type) + mem_offsets.shared_input*sizeof(complex_type) + FFT::shared_memory_size;
+  shared_mem = LP.mem_offsets.shared_output*sizeof(complex_type) + LP.mem_offsets.shared_input*sizeof(complex_type) + FFT::shared_memory_size;
   // When it is the output dims being smaller, may need a logical or different method
   precheck
-  block_fft_kernel_C2C_WithPadding<FFT,complex_type><< <gridDims,  threadsPerBlock, shared_mem, cudaStreamPerThread>> >
-  ( (complex_type*)buffer_fp32_complex,  (complex_type*)device_pointer_fp32_complex, mem_offsets, twiddle_in,Q);
+  block_fft_kernel_C2C_WithPadding<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
+  ( (complex_type*)buffer_fp32_complex,  (complex_type*)device_pointer_fp32_complex, LP.mem_offsets, LP.twiddle_in,LP.Q);
   postcheck
 
   // Relies on the debug assert above
-  if (fft_status == 1) fft_status = 2;
-  else fft_status = 3;
+  fft_status = 2;
+
 }
 
 template<class FFT, class ComplexType>
@@ -406,7 +416,7 @@ void block_fft_kernel_C2C_WithPadding(ComplexType* input_values, ComplexType* ou
   float twiddle_factor_args[FFT::storage_size];
 
   // No need to __syncthreads as each thread only accesses its own shared mem anyway
-  io<FFT>::load_shared(&input_values[blockIdx.y*mem_offsets.shared_input], shared_input_complex, thread_data, twiddle_factor_args, twiddle_in, input_MAP, output_MAP, Q);
+  io<FFT>::load_shared(&input_values[blockIdx.y*mem_offsets.pixel_pitch_input], shared_input_complex, thread_data, twiddle_factor_args, twiddle_in, input_MAP, output_MAP, Q);
 
 
 	// In the first FFT the modifying twiddle factor is 1 so the data are reeal
@@ -441,10 +451,11 @@ void block_fft_kernel_C2C_WithPadding(ComplexType* input_values, ComplexType* ou
 	// Now that the memory output can be coalesced send to global
   // FIXME is this actually coalced?
 	// int this_idx;
-	for (int sub_fft = Q - 1; sub_fft >= 0; sub_fft--)
+	for (int sub_fft = 0; sub_fft < Q; sub_fft++)
 	{
 
-    io<FFT>::store_coalesced(shared_output, &output_values[blockIdx.y * mem_offsets.pixel_pitch], output_MAP);
+    io<FFT>::store_coalesced(shared_output, &output_values[blockIdx.y * mem_offsets.pixel_pitch_output], sub_fft*mem_offsets.shared_input);
+
 
 	}
 
@@ -455,24 +466,22 @@ void FourierTransformer::FFT_C2C(bool forward_transform)
 {
 
   MyFFTDebugAssertTrue(fft_status == 2, "For now, FFT_C2C only works for a full inverse transform along the transposed X dimension")
-	int shared_mem;
+
+  LaunchParams LP = SetLaunchParameters(elements_per_thread_complex);
 
 
-  using FFT = decltype( FFT_64_fp32() + Type<fft_type::c2c>() + Direction<fft_direction::inverse>() );  
+  using FFT = decltype( FFT_64_fp32()  + Direction<fft_direction::inverse>() + Type<fft_type::c2c>());  
 	using complex_type = typename FFT::value_type;
 	using scalar_type    = typename complex_type::value_type;
   cudaError_t error_code = cudaSuccess;
   auto workspace = make_workspace<FFT>(error_code);
 
-
-  SetLaunchParameters(elements_per_thread_complex);
-
   // Aggregate the transformed frequency data in shared memory so that we can write to global coalesced.
-  shared_mem = FFT::shared_memory_size;
+  int shared_mem = FFT::shared_memory_size;
   // When it is the output dims being smaller, may need a logical or different method
   precheck
-  block_fft_kernel_C2C<FFT,complex_type><< <gridDims,  threadsPerBlock, shared_mem, cudaStreamPerThread>> >
-  ( (complex_type*)device_pointer_fp32_complex,  (complex_type*)buffer_fp32_complex, mem_offsets, workspace);
+  block_fft_kernel_C2C<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
+  ( (complex_type*)device_pointer_fp32_complex,  (complex_type*)buffer_fp32_complex, LP.mem_offsets, workspace);
   postcheck
 
   // Relies on the debug assert above
@@ -494,13 +503,13 @@ void block_fft_kernel_C2C(ComplexType* input_values, ComplexType* output_values,
   complex_type thread_data[FFT::storage_size];
 
   // No need to __syncthreads as each thread only accesses its own shared mem anyway
-  io<FFT>::load(&input_values[blockIdx.y*mem_offsets.shared_input],  thread_data);
+  io<FFT>::load(&input_values[blockIdx.y*mem_offsets.pixel_pitch_input],  thread_data);
 
 
 	// In the first FFT the modifying twiddle factor is 1 so the data are reeal
 	FFT().execute(thread_data, shared_mem, workspace);
 
-	io<FFT>::store(thread_data ,&output_values[blockIdx.y*mem_offsets.shared_output]);
+	io<FFT>::store(thread_data ,&output_values[blockIdx.y*mem_offsets.pixel_pitch_output]);
 
 
 } // end of block_fft_kernel_C2C
@@ -508,21 +517,22 @@ void block_fft_kernel_C2C(ComplexType* input_values, ComplexType* output_values,
 void FourierTransformer::FFT_C2R_Transposed()
 {
 
+
+  LaunchParams LP = SetLaunchParameters(elements_per_thread_complex);
+
   MyFFTDebugAssertTrue(fft_status == 3, "status must be 3");
-  using FFT = decltype( FFT_64_fp32() + Type<fft_type::c2r>() + Direction<fft_direction::inverse>() );  
+  using FFT = decltype( FFT_64_fp32() + Direction<fft_direction::inverse>() + Type<fft_type::c2r>());  
 	using complex_type = typename FFT::value_type;
 	using scalar_type    = typename complex_type::value_type;
   cudaError_t error_code = cudaSuccess;
   auto workspace = make_workspace<FFT>(error_code);
 
 
-  SetLaunchParameters(elements_per_thread_complex);
-
   // Aggregate the transformed frequency data in shared memory so that we can write to global coalesced.
   int shared_mem = FFT::shared_memory_size;
 	precheck
-	block_fft_kernel_C2R_Transformed<FFT, complex_type, scalar_type><< <gridDims, threadsPerBlock, FFT::shared_memory_size, cudaStreamPerThread>> >
-	( (complex_type*)buffer_fp32_complex, (scalar_type*)device_pointer_fp32, mem_offsets, workspace);
+	block_fft_kernel_C2R_Transformed<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, FFT::shared_memory_size, cudaStreamPerThread>> >
+	( (complex_type*)buffer_fp32_complex, (scalar_type*)device_pointer_fp32, LP.mem_offsets, workspace);
   postcheck
 
 }
@@ -540,12 +550,12 @@ void block_fft_kernel_C2R_Transformed(ComplexType* input_values, ScalarType* out
 
   complex_type thread_data[FFT::storage_size];
 
-  io<FFT>::load_c2r_transposed(input_values, thread_data, mem_offsets.pixel_pitch);
+  io<FFT>::load_c2r_transposed(&input_values[blockIdx.y], thread_data, mem_offsets.pixel_pitch_input);
 
   // For loop zero the twiddles don't need to be computed
   FFT().execute(thread_data, shared_mem, workspace);
 
-  io<FFT>::store_c2r(thread_data, &output_values[blockIdx.y*mem_offsets.shared_output]);
+  io<FFT>::store_c2r(thread_data, &output_values[blockIdx.y*mem_offsets.pixel_pitch_output]);
 
 } // end of block_fft_kernel_C2R_Transposed
 
