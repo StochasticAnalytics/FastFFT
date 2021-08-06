@@ -267,11 +267,14 @@ void FourierTransformer::FFT_R2C_Transposed_t()
 
   using complex_type = typename FFT::value_type;
   using scalar_type = typename complex_type::value_type;
+  cudaError_t error_code = cudaSuccess;
+  auto workspace = make_workspace<FFT>(error_code);
+
   int shared_mem = LP.mem_offsets.shared_input*sizeof(scalar_type) + FFT::shared_memory_size;
 
   precheck
   block_fft_kernel_R2C_Transposed<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
-  ( (scalar_type*) device_pointer_fp32,  (complex_type*) buffer_fp32_complex, LP.mem_offsets, LP.twiddle_in,LP.Q);
+  ( (scalar_type*) device_pointer_fp32,  (complex_type*) buffer_fp32_complex, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
   postcheck
 }
 
@@ -294,20 +297,37 @@ void FourierTransformer::FFT_R2C_Transposed()
       break; }
 
     case 128: {
+      switch (arch)
       {
         case 700: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_Transposed_t<FFT>(); break;}
         case 750: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_R2C_Transposed_t<FFT>(); break;}
         case 800: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_Transposed_t<FFT>(); break;}
       }
       break; }
-   
+    
+    case 4096: {
+      switch (arch)
+      {
+        case 700: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_Transposed_t<FFT>(); break;}
+        case 750: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_R2C_Transposed_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_Transposed_t<FFT>(); break;}
+      }
+      break; }  
+
+    case 8192: {
+      switch (arch)
+      {
+        case 700: { using FFT = decltype(FFT_base()  + Size<8192>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_Transposed_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<8192>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_Transposed_t<FFT>(); break;}
+      }
+      break; } 
   }
   fft_status = 1;
 }
 
 template<class FFT, class ComplexType, class ScalarType>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_R2C_Transposed(ScalarType* input_values, ComplexType* output_values, Offsets mem_offsets, float twiddle_in, int Q)
+void block_fft_kernel_R2C_Transposed(ScalarType* input_values, ComplexType* output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace)
 {
   // Initialize the shared memory, assuming everyting matches the input data X size in
   using complex_type = ComplexType;
@@ -335,7 +355,7 @@ void block_fft_kernel_R2C_Transposed(ScalarType* input_values, ComplexType* outp
   io<FFT>::load_r2c_shared(&input_values[blockIdx.y*mem_offsets.pixel_pitch_input], shared_input, thread_data, twiddle_factor_args, twiddle_in, input_MAP, output_MAP, Q);
 
 	// In the first FFT the modifying twiddle factor is 1 so the data are real
-	FFT().execute(thread_data, shared_mem);
+	FFT().execute(thread_data, shared_mem, workspace);
   
   io<FFT>::store_r2c_transposed(thread_data, output_values, output_MAP, mem_offsets.pixel_pitch_output);
 
@@ -357,7 +377,7 @@ void block_fft_kernel_R2C_Transposed(ScalarType* input_values, ComplexType* outp
 			output_MAP[i]++;
 		}
 
-		FFT().execute(thread_data, shared_mem);
+		FFT().execute(thread_data, shared_mem, workspace);
 
     io<FFT>::store_r2c_transposed(thread_data, output_values, output_MAP, mem_offsets.pixel_pitch_output);
 
@@ -383,7 +403,7 @@ void FourierTransformer::FFT_C2C_WithPadding_t()
   // When it is the output dims being smaller, may need a logical or different method
   precheck
   block_fft_kernel_C2C_WithPadding<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
-  ( (complex_type*)buffer_fp32_complex,  (complex_type*)device_pointer_fp32_complex, LP.mem_offsets, LP.twiddle_in,LP.Q);
+  ( (complex_type*)buffer_fp32_complex,  (complex_type*)device_pointer_fp32_complex, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
   postcheck
 
 
@@ -409,13 +429,30 @@ void FourierTransformer::FFT_C2C_WithPadding()
       break; }
 
     case 128: {
+      switch (arch)
       {
         case 700: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_C2C_WithPadding_t<FFT>(); break;}
         case 750: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_C2C_WithPadding_t<FFT>(); break;}
         case 800: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_C2C_WithPadding_t<FFT>(); break;}
       }
       break; }
-   
+    
+    case 4096: {
+      switch (arch)
+      {
+        case 700: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_C2C_WithPadding_t<FFT>(); break;}
+        case 750: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_C2C_WithPadding_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_C2C_WithPadding_t<FFT>(); break;}
+      }
+      break; }  
+
+    case 8192: {
+      switch (arch)
+      {
+        case 700: { using FFT = decltype(FFT_base()  + Size<8192>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_C2C_WithPadding_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<8192>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_C2C_WithPadding_t<FFT>(); break;}
+      }
+      break; }    
   }
 
   // Relies on the debug assert above
@@ -425,7 +462,7 @@ void FourierTransformer::FFT_C2C_WithPadding()
 
 template<class FFT, class ComplexType>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2C_WithPadding(ComplexType* input_values, ComplexType* output_values, Offsets mem_offsets, float twiddle_in, int Q)
+void block_fft_kernel_C2C_WithPadding(ComplexType* input_values, ComplexType* output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace)
 {
 
 //	// Initialize the shared memory, assuming everyting matches the input data X size in
@@ -452,7 +489,7 @@ void block_fft_kernel_C2C_WithPadding(ComplexType* input_values, ComplexType* ou
 
 
 	// In the first FFT the modifying twiddle factor is 1 so the data are reeal
-	FFT().execute(thread_data, shared_mem);
+	FFT().execute(thread_data, shared_mem, workspace);
 
 	io<FFT>::store(thread_data,shared_output,output_MAP);
 
@@ -471,7 +508,7 @@ void block_fft_kernel_C2C_WithPadding(ComplexType* input_values, ComplexType* ou
 			output_MAP[i]++;
 		}
 
-		FFT().execute(thread_data, shared_mem);
+		FFT().execute(thread_data, shared_mem, workspace);
 
 		io<FFT>::store(thread_data,shared_output,output_MAP);
 
@@ -515,10 +552,10 @@ void FourierTransformer::FFT_C2C_t()
 void FourierTransformer::FFT_C2C()
 {
 
-  MyFFTDebugAssertTrue(fft_status == 2, "For now, FFT_C2C only works for a full inverse transform along the transposed X dimension")
-
+  MyFFTDebugAssertTrue(fft_status == 2, "For now, FFT_C2C only works for a full inverse transform along the transposed X dimension");
   int device, arch;
   GetCudaDeviceArch( device, arch );
+
 
   switch (dims_in.x)
   {
@@ -532,13 +569,30 @@ void FourierTransformer::FFT_C2C()
       break; }
 
     case 128: {
+      switch (arch)
       {
         case 700: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2c>() + SM<700>());  FFT_C2C_t<FFT>(); break;}
         case 750: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2c>() + SM<750>());  FFT_C2C_t<FFT>(); break;}
         case 800: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2c>() + SM<800>());  FFT_C2C_t<FFT>(); break;}
       }
       break; }
-   
+  
+    case 4096: {
+      switch (arch)
+      {
+        case 700: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2c>() + SM<700>());  FFT_C2C_t<FFT>(); break;}
+        case 750: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2c>() + SM<750>());  FFT_C2C_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2c>() + SM<800>());  FFT_C2C_t<FFT>(); break;}
+      }
+      break; }  
+
+    case 8192: {
+      switch (arch)
+      {
+        case 700: { using FFT = decltype(FFT_base()  + Size<8192>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2c>() + SM<700>());  FFT_C2C_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<8192>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2c>() + SM<800>());  FFT_C2C_t<FFT>(); break;}
+      }
+      break; }      
   }
 
   // Relies on the debug assert above
@@ -610,13 +664,31 @@ void FourierTransformer::FFT_C2R_Transposed()
       break; }
 
     case 128: {
+      switch (arch)
       {
         case 700: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2r>() + SM<700>());  FFT_C2R_Transposed_t<FFT>(); break;}
         case 750: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2r>() + SM<750>());  FFT_C2R_Transposed_t<FFT>(); break;}
         case 800: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2r>() + SM<800>());  FFT_C2R_Transposed_t<FFT>(); break;}
       }
       break; }
-   
+  
+    case 4096: {
+      switch (arch)
+      {
+        case 700: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2r>() + SM<700>());  FFT_C2R_Transposed_t<FFT>(); break;}
+        case 750: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2r>() + SM<750>());  FFT_C2R_Transposed_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2r>() + SM<800>());  FFT_C2R_Transposed_t<FFT>(); break;}
+      }
+      break; }  
+
+    case 8192: {
+      switch (arch)
+      {
+        case 700: { using FFT = decltype(FFT_base()  + Size<8192>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2r>() + SM<700>());  FFT_C2R_Transposed_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<8192>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2r>() + SM<800>());  FFT_C2R_Transposed_t<FFT>(); break;}
+      }
+      break; }      
+     
   }
 
 

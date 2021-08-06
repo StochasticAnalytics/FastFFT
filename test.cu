@@ -175,11 +175,13 @@ int main(int argc, char** argv) {
   short4 input_size;
   short4 output_size;
 
-  for (int iSize = 64; iSize <= 128; iSize *= 2) {
+  constexpr const int n_tests = 4;
+  int test_size[n_tests] = {64, 128, 4096, 8192};
+  for (int iSize = 0; iSize < n_tests; iSize++) {
 
-    std::cout << std::endl << "Testing " << iSize << "x" << std::endl;
-    input_size = make_short4(iSize,iSize,1,0);
-    output_size = make_short4(iSize,iSize,1,0);
+    std::cout << std::endl << "Testing " << test_size[iSize] << " x" << std::endl;
+    input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+    output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
 
     unit_impulse_test(input_size, output_size);
 

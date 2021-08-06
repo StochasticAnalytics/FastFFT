@@ -20,6 +20,8 @@
 #define MyFFTDebugAssertTestTrue(cond, msg, ...) {if ((cond) != true) { std::cerr <<  "    Test " << msg << " FAILED!"  << std::endl << "  at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);} else { std::cerr << "    Test " << msg << " passed!" << std::endl;}}
 #define MyFFTDebugAssertTestFalse(cond, msg, ...) {if ((cond) == true) { std::cerr<<  "    Test " << msg << " FAILED!"  << std::endl  << " at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);} else { std::cerr << "    Test " << msg << " passed!" << std::endl;}}
 
+#define MyFFTRunTimeAssertTrue(cond, msg, ...) {if ((cond) != true) { std::cerr << msg   << std::endl << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}}
+#define MyFFTRunTimeAssertFalse(cond, msg, ...) {if ((cond) == true) { std::cerr << msg  << std::endl << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}}
 
 // Note we are using std::cerr b/c the wxWidgets apps running in cisTEM are capturing std::cout
 #ifndef HEAVYERRORCHECKING_FFT 
@@ -73,11 +75,11 @@ void SimpleFFT_NoPaddingKernel(ScalarType * real_input, ComplexType* complex_out
 
 template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_R2C_Transposed(ScalarType* input_values, ComplexType* output_values, Offsets mem_offsets, float twiddle_in, int Q);
+void block_fft_kernel_R2C_Transposed(ScalarType* input_values, ComplexType* output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 
 template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2C_WithPadding(ComplexType* input_values, ComplexType* output_values, Offsets mem_offsets, float twiddle_in, int Q);
+void block_fft_kernel_C2C_WithPadding(ComplexType* input_values, ComplexType* output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 
 template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
