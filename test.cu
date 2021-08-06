@@ -137,11 +137,12 @@ void unit_impulse_test(short4 input_size, short4 output_size)
   FT.SetToConstant<float>(host_input, host_input_memory_allocated, 2.0f);
 
   // Forward FFT ;
-  FT.FFT_R2C_Transposed();
-  FT.FFT_C2C_WithPadding();
+  // FT.FFT_R2C_WithPadding_Transposed();
+  // FT.FFT_C2C_WithPadding();
+  FT.FwdFFT();
+
   // in buffer, do not deallocate, do not unpin memory
 	FT.CopyDeviceToHost(false, false, false);
-
   sum_complex = ReturnSumOfComplex(host_input_complex, FT.output_memory_allocated/2);
   // std::cout << sum_complex.x << " " << powf(input_size.x*input_size.y*input_size.z,2) << " " << std::endl;
 
@@ -149,8 +150,10 @@ void unit_impulse_test(short4 input_size, short4 output_size)
   MyFFTDebugAssertTestTrue( sum_complex.x == FT.output_number_of_real_values && sum_complex.y == 0, "FastFFT unit impulse forward FFT");
   FT.SetToConstant<float>(host_input, host_input_memory_allocated, 2.0f);
 
-  FT.FFT_C2C();
-  FT.FFT_C2R_Transposed();
+  // FT.FFT_C2C();
+  // FT.FFT_C2R_Transposed();
+  FT.InvFFT();
+
 	FT.CopyDeviceToHost(false, true, true);
 
   // Assuming the outputs are always even dimensions, padding_jump_val is always 2.
@@ -176,7 +179,7 @@ int main(int argc, char** argv) {
   short4 output_size;
 
   constexpr const int n_tests = 4;
-  int test_size[n_tests] = {64, 128, 4096, 8192};
+  int test_size[n_tests] = {64, 128, 256, 512};
   for (int iSize = 0; iSize < n_tests; iSize++) {
 
     std::cout << std::endl << "Testing " << test_size[iSize] << " x" << std::endl;

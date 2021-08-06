@@ -60,22 +60,19 @@ constexpr const uint device_arch = 700;
 // All transforms are 
 using FFT_base   = decltype(Block() + Precision<float>() + ElementsPerThread<elements_per_thread_complex>()  + FFTsPerBlock<1>()  );
 
-using FFT_64_fp32   = decltype(Block() + Size<64>()  + Precision<float>() + ElementsPerThread<elements_per_thread_complex>()  + FFTsPerBlock<1>() + SM<device_arch>() );
-using FFT_128_fp32   = decltype(Block() + Size<128>()  + Precision<float>() + ElementsPerThread<elements_per_thread_complex>()  + FFTsPerBlock<1>() + SM<device_arch>() );
-
-
 
 
 //////////////////////////////
 // Kernel definitions
 //////////////////////////////
-template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
-__launch_bounds__(FFT::max_threads_per_block) __global__
-void SimpleFFT_NoPaddingKernel(ScalarType * real_input, ComplexType* complex_output, short4 dims_in, short4 dims_out);
 
 template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_R2C_Transposed(ScalarType* input_values, ComplexType* output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
+void block_fft_kernel_R2C_Transposed(ScalarType* input_values, ComplexType* output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+
+template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
+__launch_bounds__(FFT::max_threads_per_block) __global__
+void block_fft_kernel_R2C_WithPadding_Transposed(ScalarType* input_values, ComplexType* output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 
 template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
@@ -107,14 +104,14 @@ struct io
   }
 
   static inline __device__ void load_r2c(const scalar_type* input,
-                                         complex_type*      thread_data,
-                                         int       		      offset) 
+                                         complex_type*      thread_data) 
   {
     const unsigned int stride = stride_size();
-    unsigned int       index  = offset + threadIdx.x;
+    unsigned int       index  = threadIdx.x;
     for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
     {
-      reinterpret_cast<scalar_type*>(thread_data)[i] = input[index];
+      thread_data[i].x = input[index];
+      thread_data[i].y = 0.0f;
       index += stride;
     }
   } // load_r2c 
@@ -220,6 +217,26 @@ struct io
     }
   } // copy_from_shared
 
+  static inline __device__ void store_r2c_transposed(const complex_type* thread_data,
+                                                     complex_type*       output,
+                                                     int                 pixel_pitch) 
+  {
+    const unsigned int stride = stride_size();
+    unsigned int       index  = threadIdx.x;
+    for (unsigned int i = 0; i < FFT::elements_per_thread / 2; i++) 
+    {
+      // output map is thread local, so output_MAP[i] gives the x-index in the non-transposed array and blockIdx.y gives the y-index
+      output[index*pixel_pitch + blockIdx.y] = thread_data[i];
+      index += stride;
+    }
+    constexpr unsigned int threads_per_fft        = cufftdx::size_of<FFT>::value / FFT::elements_per_thread;
+    constexpr unsigned int output_values_to_store = (cufftdx::size_of<FFT>::value / 2) + 1;
+    constexpr unsigned int values_left_to_store = threads_per_fft == 1 ? 1 : (output_values_to_store % threads_per_fft);
+    if (threadIdx.x < values_left_to_store)
+    {
+     output[index*pixel_pitch + blockIdx.y] =  thread_data[FFT::elements_per_thread / 2];
+    }
+  } // store_r2c_transposed
 
   static inline __device__ void store_r2c_transposed(const complex_type* thread_data,
                                                      complex_type*       output,

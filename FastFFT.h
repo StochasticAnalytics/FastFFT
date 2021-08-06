@@ -78,15 +78,10 @@ public:
   // FFT calls
 
   // 1:1 no resizing or anything fancy.
-  void SimpleFFT_NoPadding();
-  void FFT_R2C_Transposed();
-  void FFT_C2C_WithPadding();
-  void FFT_C2C();
-  void FFT_C2R_Transposed();
 
 
-
-
+  void FwdFFT();
+  void InvFFT();
 
 
   inline int ReturnPaddedMemorySize(short4 & wanted_dims) 
@@ -136,6 +131,10 @@ private:
   bool is_fftw_padded_input;
   bool is_fftw_padded_output;
   bool is_fftw_padded_buffer;
+
+  bool is_padded  = false;
+  bool is_neutral = true;
+  bool is_trimmed = false;
 
   bool is_set_input_params;
   bool is_set_output_params;
@@ -210,9 +209,17 @@ private:
     return L;
   }
 
+
+  void FFT_R2C_Transposed();
+  void FFT_R2C_WithPadding_Transposed();
+  void FFT_C2C_WithPadding();
+  void FFT_C2C( bool do_forward_transform );
+  void FFT_C2R_Transposed();
+
   template<class FFT> void FFT_R2C_Transposed_t();
+  template<class FFT> void FFT_R2C_WithPadding_Transposed_t();
   template<class FFT> void FFT_C2C_WithPadding_t();
-  template<class FFT> void FFT_C2C_t();
+  template<class FFT> void FFT_C2C_t( bool do_forward_transform );
   template<class FFT> void FFT_C2R_Transposed_t();
 
 
