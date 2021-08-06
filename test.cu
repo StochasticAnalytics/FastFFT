@@ -1,121 +1,7 @@
-#include <iostream>
-#include <vector>
-#include <chrono>
-#include <cmath>
-#include <string>
-
-// sudo apt-get install libfftw3-dev libfftw3-doc
-#include <fftw3.h>
-
-#include <cuda_runtime_api.h>
-#include <cufftdx.hpp>
-
+#include "test_helpers.h"
 #include "FastFFT.cu"
 
-// To print a message and some number n_to_print complex values to stdout
-void print_values_complex(float* input, std::string msg, int n_to_print)
-{
-  for (int i = 0; i < n_to_print*2; i+=2) { std::cout << msg << i/2 << "  " << input[i] << " " << input[i+1] << std::endl ;}
-}
 
-// Return sum of real values
-float ReturnSumOfReal(float* input, short4 size)
-{
-  double temp_sum = 0;
-  long address = 0;
-  int padding_jump_val = size.w*2 - size.x;
-  for (int k = 0; k < size.z; k++)
-  {
-    for (int j = 0; j < size.y; j++)
-    {
-      for (int i = 0; i < size.x; i++)
-      {
-        temp_sum += (input[address]);
-        address++;
-      }
-      address += padding_jump_val;
-    }
-  }
-
-  return float(temp_sum);
-}
-
-// Return the sum of the complex values
-float2 ReturnSumOfComplex(float2* input, int n_to_print)
-{
-  double sum_x = 0;
-  double sum_y = 0;
-
-  for (int i = 0; i < n_to_print; i++) 
-  {
-    sum_x += input[i].x;
-    sum_y += input[i].y;
-  }
-  
-  return make_float2(float(sum_x), float(sum_y));  
-}
-
-void ClipInto(const float* array_to_paste, float* array_to_paste_into, short4 size_from, short4 size_into, short4 wanted_center, float wanted_padding_value)
-{
-
-
-	long pixel_counter = 0;
-
-	int kk;
-	int k;
-	int kk_logi;
-
-	int jj;
-	int jj_logi;
-	int j;
-
-	int ii;
-	int ii_logi;
-	int i;
-
-	double junk;
-
-  short4 center_to_paste_into = make_short4(size_into.x/2, size_into.y/2, size_into.z/2, 0);
-  short4 center_to_paste = make_short4(size_from.x/2, size_from.y/2, size_from.z/2, 0);
-  int padding_jump_value;
-
-  if (size_into.x % 2 == 0) padding_jump_value = 2;
-  else padding_jump_value = 1;
-
-  for (kk = 0; kk < size_into.z; kk++)
-  {
-    kk_logi = kk - center_to_paste_into.z;
-    k = center_to_paste.z + wanted_center.z + kk_logi;
-
-    for (jj = 0; jj < size_into.y; jj++)
-    {
-      jj_logi = jj - center_to_paste_into.y;
-      j = center_to_paste.y + wanted_center.y + jj_logi;
-
-      for (ii = 0; ii < size_into.x; ii++)
-      {
-        ii_logi = ii - center_to_paste_into.x;
-        i = center_to_paste.x + wanted_center.x + ii_logi;
-
-        if (k < 0 || k >= size_from.z || j < 0 || j >= size_from.y || i < 0 || i >= size_from.x)
-        {
-          array_to_paste_into[pixel_counter] = wanted_padding_value;
-        }
-        else
-        {
-          array_to_paste_into[pixel_counter] = array_to_paste[ k*(size_from.w*2 *size_from.y) + j*(size_from.x+padding_jump_value) + i];
-        }
-
-        pixel_counter++;
-      }
-
-      pixel_counter+=padding_jump_value;
-    }
-  }
-	
-
-
-} // end of clip into
 
 void unit_impulse_test(short4 input_size, short4 output_size)
 {
@@ -172,8 +58,8 @@ void unit_impulse_test(short4 input_size, short4 output_size)
   plan_bwd = fftwf_plan_dft_c2r_3d(output_size.z, output_size.y, output_size.x, reinterpret_cast<fftwf_complex*>(host_input_complex), host_input, FFTW_ESTIMATE);
   
   // Set our input host memory to a constant. Then FFT[0] = host_input_memory_allocated
-  FT.SetToConstant<float>(host_input, host_input_memory_allocated, 1.0f);
-  
+  // FT.SetToConstant<float>(host_input, host_input_memory_allocated, 1.0f);
+  host_input[ input_size.x/2 + (input_size.y/2)*(input_size.x+2) ] = 1.0f;
   // short4 wanted_center = make_short4(input_size.x/2, input_size.y/2, input_size.z/2, 0);
   short4 wanted_center = make_short4(0,0,0, 0);
   ClipInto(host_input, host_output, input_size, output_size, wanted_center, 0.0f);
@@ -199,23 +85,24 @@ void unit_impulse_test(short4 input_size, short4 output_size)
   // ensures faster transfer. If false, it will be pinned for you.
 	FT.SetInputPointer(&host_output[0], false);
   sum = ReturnSumOfReal(host_output, output_size);
-  MyFFTDebugAssertTestTrue( sum == input_size.x*input_size.y*input_size.z,"Unit impulse Init ");
+  // MyFFTDebugAssertTestTrue( sum == input_size.x*input_size.y*input_size.z,"Unit impulse Init ");
+  MyFFTDebugAssertTestTrue( sum == 1,"Unit impulse Init ");
 
   // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
 	FT.CopyHostToDevice();
   
   // Now let's do the forward FFT on the host and check that the result is correct.
   fftwf_execute_dft_r2c(plan_fwd, host_output, reinterpret_cast<fftwf_complex*>(host_output_complex));
-  print_values_complex(host_output, "fftw ", 5);
-  
-  sum_complex = ReturnSumOfComplex(host_output_complex, FT.output_memory_allocated/2);
-  std::cout << sum_complex.x << " " << sum_complex.y << std::endl;
-  MyFFTDebugAssertTestTrue( sum_complex.x == FT.input_number_of_real_values && sum_complex.y == 0, "FFTW unit impulse forward FFT");
+
+  float fftw_epsilon;
+  sum = ReturnSumOfComplexAmplitudes(host_output_complex, FT.output_memory_allocated/2);
+  fftw_epsilon = std::abs(sum - float(FT.output_number_of_real_values/2 + output_size.y));
+
+  MyFFTDebugAssertTestTrue( fftw_epsilon < 1e-6, "FFTW unit impulse forward FFT");
+
   FT.SetToConstant<float>(host_output, host_output_memory_allocated, 2.0f);
 
-  // Forward FFT ;
-  // FT.FFT_R2C_WithPadding_Transposed();
-  // FT.FFT_C2C_WithPadding();
+
   FT.FwdFFT();
 
   // in buffer, do not deallocate, do not unpin memory
