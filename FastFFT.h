@@ -71,8 +71,7 @@ public:
   void SetInputPointer(float* input_pointer, bool is_input_on_device);
   void CopyHostToDevice();
   void CopyDeviceToHost(bool is_in_buffer, bool free_gpu_memory, bool unpin_host_memory);
-  void Deallocate();
-  void UnPinHostMemory();
+
 
 
   // FFT calls
@@ -82,8 +81,7 @@ public:
 
   void FwdFFT();
   void InvFFT();
-
-
+  
   inline int ReturnPaddedMemorySize(short4 & wanted_dims) 
   {
     int wanted_memory = 0;
@@ -132,9 +130,9 @@ private:
   bool is_fftw_padded_output;
   bool is_fftw_padded_buffer;
 
-  bool is_padded  = false;
-  bool is_neutral = true;
-  bool is_trimmed = false;
+  bool is_size_validated;
+  enum SizeChangeType { increase, decrease, none };
+  SizeChangeType size_change_type;
 
   bool is_set_input_params;
   bool is_set_output_params;
@@ -151,9 +149,13 @@ private:
   float* buffer_fp32; float2* buffer_fp32_complex;
   __half* device_pointer_fp16; __half2* device_pointer_fp16_complex;
 
-
+  void Deallocate();
+  void UnPinHostMemory();
 
   void SetDefaults();
+  void CheckDimensions();
+
+
   inline LaunchParams SetLaunchParameters(const int& ept)
   {
     LaunchParams L;

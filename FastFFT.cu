@@ -33,6 +33,7 @@ FourierTransformer::~FourierTransformer()
   UnPinHostMemory();
 }
 
+
 void FourierTransformer::SetDefaults()
 {
   DataType input_data_type = fp32;
@@ -50,6 +51,8 @@ void FourierTransformer::SetDefaults()
   is_set_output_params = false;
 
   is_host_memory_pinned = false;
+
+  is_size_validated = false;
 
   fft_status = 0;
 }
@@ -100,7 +103,35 @@ void FourierTransformer::SetOutputDimensionsAndType(size_t output_logical_x_dime
   is_set_output_params = true;
 }
 
+void FourierTransformer::CheckDimensions()
+{
+  // This should be run inside any public method call to ensure things ar properly setup.
+  if ( ! is_size_validated )
+  {
+    MyFFTDebugAssertTrue(is_set_input_params, "Input parameters not set");
+    MyFFTDebugAssertTrue(is_set_output_params, "Output parameters not set");
+  
+    if (dims_out.x > dims_in.x || dims_out.y > dims_in.y || dims_out.z > dims_in.z)
+    {
+      // For now we must pad in all dimensions, this is not needed and should be lifted. FIXME
+      MyFFTRunTimeAssertTrue(dims_out.x >= dims_in.x, "If padding, all dimensions must be >=, x out < x in");
+      MyFFTRunTimeAssertTrue(dims_out.y >= dims_in.y, "If padding, all dimensions must be >=, y out < y in");
+      MyFFTRunTimeAssertTrue(dims_out.z >= dims_in.z, "If padding, all dimensions must be >=, z out < z in");
+  
+      size_change_type = increase;
+    }
+  
+    MyFFTRunTimeAssertFalse(dims_out.x < dims_in.x || dims_out.y < dims_in.y || dims_out.z < dims_in.z, "Trimming (subset of output points) is yet to be implemented.");
+  
+    if (dims_out.x == dims_in.x && dims_out.y == dims_in.y && dims_out.z == dims_in.z)
+    {
+      size_change_type = none;
+    }
+  
+    is_size_validated = true;
+  }
 
+}
 
 
 void FourierTransformer::SetInputPointer(float* input_pointer, bool is_input_on_device) 
@@ -220,19 +251,51 @@ void FourierTransformer::UnPinHostMemory()
 
 void FourierTransformer::FwdFFT()
 {
-  MyFFTDebugAssertTrue(is_neutral, "Only setup for netural (no padding/trim)");
+  CheckDimensions();
   
-  FFT_R2C_Transposed();
-  FFT_C2C(true);
+  switch (size_change_type)
+  {
+    case none: {
+      FFT_R2C_Transposed();
+      FFT_C2C(true);
+      break;
+    }
+    case increase: {
+      FFT_R2C_WithPadding_Transposed();
+      FFT_C2C_WithPadding();
+      break;
+    }
+    case decrease: {
+      // not defined;
+      break;
+    }
+  }
+
 }
 
 
 void FourierTransformer::InvFFT()
 {
-  MyFFTDebugAssertTrue(is_neutral, "Only setup for netural (no padding/trim)");\
+  CheckDimensions();
 
-  FFT_C2C(false);
-  FFT_C2R_Transposed();
+  switch (size_change_type)
+  {
+    case none: {
+      FFT_C2C(false);
+      FFT_C2R_Transposed();
+      break;
+    }
+    case increase: {
+      FFT_C2C(false);
+      FFT_C2R_Transposed();
+      break;
+    }
+    case decrease: {
+      // not defined;
+      break;
+    }
+  }
+
 }
 
 template<class FFT>
@@ -802,8 +865,6 @@ void FourierTransformer::FFT_C2R_Transposed_t()
   auto workspace = make_workspace<FFT>(error_code);
 
 
-  // Aggregate the transformed frequency data in shared memory so that we can write to global coalesced.
-  int shared_mem = FFT::shared_memory_size;
 	precheck
 	block_fft_kernel_C2R_Transformed<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, FFT::shared_memory_size, cudaStreamPerThread>> >
 	( (complex_type*)buffer_fp32_complex, (scalar_type*)device_pointer_fp32, LP.mem_offsets, workspace);

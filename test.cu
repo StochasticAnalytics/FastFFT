@@ -55,6 +55,67 @@ float2 ReturnSumOfComplex(float2* input, int n_to_print)
   return make_float2(float(sum_x), float(sum_y));  
 }
 
+void ClipInto(const float* array_to_paste, float* array_to_paste_into, short4 size_from, short4 size_into, short4 wanted_center, float wanted_padding_value)
+{
+
+
+	long pixel_counter = 0;
+
+	int kk;
+	int k;
+	int kk_logi;
+
+	int jj;
+	int jj_logi;
+	int j;
+
+	int ii;
+	int ii_logi;
+	int i;
+
+	double junk;
+
+  short4 center_to_paste_into = make_short4(size_into.x/2, size_into.y/2, size_into.z/2, 0);
+  short4 center_to_paste = make_short4(size_from.x/2, size_from.y/2, size_from.z/2, 0);
+  int padding_jump_value;
+
+  if (size_into.x % 2 == 0) padding_jump_value = 2;
+  else padding_jump_value = 1;
+
+  for (kk = 0; kk < size_into.z; kk++)
+  {
+    kk_logi = kk - center_to_paste_into.z;
+    k = center_to_paste.z + wanted_center.z + kk_logi;
+
+    for (jj = 0; jj < size_into.y; jj++)
+    {
+      jj_logi = jj - center_to_paste_into.y;
+      j = center_to_paste.y + wanted_center.y + jj_logi;
+
+      for (ii = 0; ii < size_into.x; ii++)
+      {
+        ii_logi = ii - center_to_paste_into.x;
+        i = center_to_paste.x + wanted_center.x + ii_logi;
+
+        if (k < 0 || k >= size_from.z || j < 0 || j >= size_from.y || i < 0 || i >= size_from.x)
+        {
+          array_to_paste_into[pixel_counter] = wanted_padding_value;
+        }
+        else
+        {
+          array_to_paste_into[pixel_counter] = array_to_paste[ k*(size_from.w*2 *size_from.y) + j*(size_from.x+padding_jump_value) + i];
+        }
+
+        pixel_counter++;
+      }
+
+      pixel_counter+=padding_jump_value;
+    }
+  }
+	
+
+
+} // end of clip into
 
 void unit_impulse_test(short4 input_size, short4 output_size)
 {
@@ -83,8 +144,6 @@ void unit_impulse_test(short4 input_size, short4 output_size)
   FastFFT::FourierTransformer FT(FastFFT::FourierTransformer::DataType::fp32);
 
 
-
-
   // Determine how much memory we need, working with FFTW/CUDA style in place transform padding.
   // Note: there is no reason we really need this, because the xforms will always be out of place. 
   //       For now, this is just in place because all memory in cisTEM is allocated accordingly.
@@ -100,41 +159,59 @@ void unit_impulse_test(short4 input_size, short4 output_size)
   // I think fftwf_malloc may potentially create a different alignment than new/delete, but kinda doubt it. For cisTEM consistency...
 	host_input = (float *) fftwf_malloc(sizeof(float) * host_input_memory_allocated);
 	host_input_complex = (float2*) host_input;  // Set the complex_values to point at the newly allocated real values;
+
+  host_output = (float *) fftwf_malloc(sizeof(float) * host_output_memory_allocated);
+	host_output_complex = (float2*) host_input;  // Set the complex_values to point at the newly allocated real values;
   
   // Make FFTW plans for comparing CPU to GPU xforms.
   // This is nearly verbatim from cisTEM::Image::Allocate - I do not know if FFTW_ESTIMATE is the best option.
   // In cisTEM we almost always use MKL, so this might be worth testing. I always used exhaustive in Matlab/emClarity.
   fftwf_plan plan_fwd = NULL;
   fftwf_plan plan_bwd = NULL;
-	plan_fwd = fftwf_plan_dft_r2c_3d(input_size.z, input_size.y, input_size.x, host_input, reinterpret_cast<fftwf_complex*>(host_input_complex), FFTW_ESTIMATE);
-  plan_bwd = fftwf_plan_dft_c2r_3d(input_size.z, input_size.y, input_size.x, reinterpret_cast<fftwf_complex*>(host_input_complex), host_input, FFTW_ESTIMATE);
+	plan_fwd = fftwf_plan_dft_r2c_3d(output_size.z, output_size.y, output_size.x, host_input, reinterpret_cast<fftwf_complex*>(host_input_complex), FFTW_ESTIMATE);
+  plan_bwd = fftwf_plan_dft_c2r_3d(output_size.z, output_size.y, output_size.x, reinterpret_cast<fftwf_complex*>(host_input_complex), host_input, FFTW_ESTIMATE);
   
   // Set our input host memory to a constant. Then FFT[0] = host_input_memory_allocated
   FT.SetToConstant<float>(host_input, host_input_memory_allocated, 1.0f);
   
+  // short4 wanted_center = make_short4(input_size.x/2, input_size.y/2, input_size.z/2, 0);
+  short4 wanted_center = make_short4(0,0,0, 0);
+  ClipInto(host_input, host_output, input_size, output_size, wanted_center, 0.0f);
+  // int padding_jump_value;
+  // if (output_size.x % 2 == 0) padding_jump_value = 2;
+  // else padding_jump_value = 1;
+  // for (int i = 0; i < output_size.x; i++) 
+  // { 
+  //   for (int j = 0; j < output_size.y; j++)
+  //   {
+  //     std::cout << host_output[i + j*(padding_jump_value+output_size.x)] << " "; 
+  //   }
+  //   std::cout << std::endl; 
+  // }
+  // exit(-1);
 
   
   // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
-	FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
-	FT.SetOutputDimensionsAndType(input_size.x,input_size.y,input_size.z,true,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
+	FT.SetInputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, false,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
+	FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
   
   // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
   // ensures faster transfer. If false, it will be pinned for you.
-	FT.SetInputPointer(&host_input[0], false);
-  sum_complex = ReturnSumOfComplex(host_input_complex, FT.input_memory_allocated/2);
-  MyFFTDebugAssertTestTrue( sum_complex.x == FT.input_memory_allocated/2 && sum_complex.y == FT.input_memory_allocated/2, "Unit impulse init");
+	FT.SetInputPointer(&host_output[0], false);
+  sum = ReturnSumOfReal(host_output, output_size);
+  MyFFTDebugAssertTestTrue( sum == input_size.x*input_size.y*input_size.z,"Unit impulse Init ");
 
   // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
 	FT.CopyHostToDevice();
   
   // Now let's do the forward FFT on the host and check that the result is correct.
-  fftwf_execute_dft_r2c(plan_fwd, host_input, reinterpret_cast<fftwf_complex*>(host_input_complex));
-  // print_values_complex(host_input, "fftw ", FT.output_memory_allocated/2);
+  fftwf_execute_dft_r2c(plan_fwd, host_output, reinterpret_cast<fftwf_complex*>(host_output_complex));
+  print_values_complex(host_output, "fftw ", 5);
   
-  sum_complex = ReturnSumOfComplex(host_input_complex, FT.output_memory_allocated/2);
-  // std::cout << sum_complex.x << " " << sum_complex.y << std::endl;
-  MyFFTDebugAssertTestTrue( sum_complex.x == FT.output_number_of_real_values && sum_complex.y == 0, "FFTW unit impulse forward FFT");
-  FT.SetToConstant<float>(host_input, host_input_memory_allocated, 2.0f);
+  sum_complex = ReturnSumOfComplex(host_output_complex, FT.output_memory_allocated/2);
+  std::cout << sum_complex.x << " " << sum_complex.y << std::endl;
+  MyFFTDebugAssertTestTrue( sum_complex.x == FT.input_number_of_real_values && sum_complex.y == 0, "FFTW unit impulse forward FFT");
+  FT.SetToConstant<float>(host_output, host_output_memory_allocated, 2.0f);
 
   // Forward FFT ;
   // FT.FFT_R2C_WithPadding_Transposed();
@@ -143,7 +220,7 @@ void unit_impulse_test(short4 input_size, short4 output_size)
 
   // in buffer, do not deallocate, do not unpin memory
 	FT.CopyDeviceToHost(false, false, false);
-  sum_complex = ReturnSumOfComplex(host_input_complex, FT.output_memory_allocated/2);
+  sum_complex = ReturnSumOfComplex(host_output_complex, FT.output_memory_allocated/2);
   // std::cout << sum_complex.x << " " << powf(input_size.x*input_size.y*input_size.z,2) << " " << std::endl;
 
   // for (int i = 0; i < output_size.w*output_size.x*2; i++) { std::cout << host_input[i] << " "; }
@@ -180,13 +257,27 @@ int main(int argc, char** argv) {
 
   constexpr const int n_tests = 4;
   int test_size[n_tests] = {64, 128, 256, 512};
-  for (int iSize = 0; iSize < n_tests; iSize++) {
+  // for (int iSize = 0; iSize < n_tests; iSize++) {
 
-    std::cout << std::endl << "Testing " << test_size[iSize] << " x" << std::endl;
-    input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
-    output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+  //   std::cout << std::endl << "Testing " << test_size[iSize] << " x" << std::endl;
+  //   input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+  //   output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
 
-    unit_impulse_test(input_size, output_size);
+  //   unit_impulse_test(input_size, output_size);
+
+  // }
+
+  for (int iSize = 0; iSize < n_tests - 1; iSize++) {
+    int oSize = iSize + 1;
+    while (oSize > iSize)
+    {
+      std::cout << std::endl << "Testing padding from   " << test_size[iSize] << " to " << test_size[oSize] << std::endl;
+      input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+      output_size = make_short4(test_size[oSize],test_size[oSize],1,0);
+  
+      unit_impulse_test(input_size, output_size);
+    }
+
 
   }
   
