@@ -294,8 +294,11 @@ void FourierTransformer::FFT_R2C_Transposed()
       break; }
 
     case 128: {
-      using FFT = decltype(FFT_128_fp32() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>());
-      FFT_R2C_Transposed_t<FFT>();
+      {
+        case 700: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_Transposed_t<FFT>(); break;}
+        case 750: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_R2C_Transposed_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_Transposed_t<FFT>(); break;}
+      }
       break; }
    
   }
@@ -363,15 +366,12 @@ void block_fft_kernel_R2C_Transposed(ScalarType* input_values, ComplexType* outp
 
 } // end of block_fft_kernel_R2C_Transposed
 
-void FourierTransformer::FFT_C2C_WithPadding(bool forward_transform)
+template <class FFT>
+void FourierTransformer::FFT_C2C_WithPadding_t()
 {
-
-	// This is the first set of 1d ffts when the input data are real valued, accessing the strided dimension. Since we need the full length, it will actually run a C2C xform
-  MyFFTDebugAssertTrue(fft_status == 1, "fft status must be 1 (partial forward)");
 
   LaunchParams LP = SetLaunchParameters(elements_per_thread_complex);
 
-  using FFT = decltype( FFT_64_fp32() + Direction<fft_direction::forward>() + Type<fft_type::c2c>());  
 	using complex_type = typename FFT::value_type;
   cudaError_t error_code = cudaSuccess;
   auto workspace = make_workspace<FFT>(error_code);
@@ -385,6 +385,38 @@ void FourierTransformer::FFT_C2C_WithPadding(bool forward_transform)
   block_fft_kernel_C2C_WithPadding<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
   ( (complex_type*)buffer_fp32_complex,  (complex_type*)device_pointer_fp32_complex, LP.mem_offsets, LP.twiddle_in,LP.Q);
   postcheck
+
+
+}
+void FourierTransformer::FFT_C2C_WithPadding()
+{
+
+	// This is the first set of 1d ffts when the input data are real valued, accessing the strided dimension. Since we need the full length, it will actually run a C2C xform
+  MyFFTDebugAssertTrue(fft_status == 1, "fft status must be 1 (partial forward)");
+
+  int device, arch;
+  GetCudaDeviceArch( device, arch );
+
+  switch (dims_in.x)
+  {
+    case 64: {
+      switch (arch)
+      {
+        case 700: { using FFT = decltype(FFT_base()  + Size<64>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_C2C_WithPadding_t<FFT>(); break;}
+        case 750: { using FFT = decltype(FFT_base()  + Size<64>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_C2C_WithPadding_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<64>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_C2C_WithPadding_t<FFT>(); break;}
+      }
+      break; }
+
+    case 128: {
+      {
+        case 700: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_C2C_WithPadding_t<FFT>(); break;}
+        case 750: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_C2C_WithPadding_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_C2C_WithPadding_t<FFT>(); break;}
+      }
+      break; }
+   
+  }
 
   // Relies on the debug assert above
   fft_status = 2;
@@ -453,24 +485,18 @@ void block_fft_kernel_C2C_WithPadding(ComplexType* input_values, ComplexType* ou
 	// int this_idx;
 	for (int sub_fft = 0; sub_fft < Q; sub_fft++)
 	{
-
     io<FFT>::store_coalesced(shared_output, &output_values[blockIdx.y * mem_offsets.pixel_pitch_output], sub_fft*mem_offsets.shared_input);
-
-
 	}
 
 
 } // end of block_fft_kernel_C2C_WithPadding
 
-void FourierTransformer::FFT_C2C(bool forward_transform)
+
+template<class FFT>
+void FourierTransformer::FFT_C2C_t()
 {
-
-  MyFFTDebugAssertTrue(fft_status == 2, "For now, FFT_C2C only works for a full inverse transform along the transposed X dimension")
-
   LaunchParams LP = SetLaunchParameters(elements_per_thread_complex);
 
-
-  using FFT = decltype( FFT_64_fp32()  + Direction<fft_direction::inverse>() + Type<fft_type::c2c>());  
 	using complex_type = typename FFT::value_type;
 	using scalar_type    = typename complex_type::value_type;
   cudaError_t error_code = cudaSuccess;
@@ -483,6 +509,37 @@ void FourierTransformer::FFT_C2C(bool forward_transform)
   block_fft_kernel_C2C<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
   ( (complex_type*)device_pointer_fp32_complex,  (complex_type*)buffer_fp32_complex, LP.mem_offsets, workspace);
   postcheck
+
+}
+
+void FourierTransformer::FFT_C2C()
+{
+
+  MyFFTDebugAssertTrue(fft_status == 2, "For now, FFT_C2C only works for a full inverse transform along the transposed X dimension")
+
+  int device, arch;
+  GetCudaDeviceArch( device, arch );
+
+  switch (dims_in.x)
+  {
+    case 64: {
+      switch (arch)
+      {
+        case 700: { using FFT = decltype(FFT_base()  + Size<64>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2c>() + SM<700>());  FFT_C2C_t<FFT>(); break;}
+        case 750: { using FFT = decltype(FFT_base()  + Size<64>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2c>() + SM<750>());  FFT_C2C_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<64>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2c>() + SM<800>());  FFT_C2C_t<FFT>(); break;}
+      }
+      break; }
+
+    case 128: {
+      {
+        case 700: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2c>() + SM<700>());  FFT_C2C_t<FFT>(); break;}
+        case 750: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2c>() + SM<750>());  FFT_C2C_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2c>() + SM<800>());  FFT_C2C_t<FFT>(); break;}
+      }
+      break; }
+   
+  }
 
   // Relies on the debug assert above
   fft_status = 3;
@@ -514,14 +571,11 @@ void block_fft_kernel_C2C(ComplexType* input_values, ComplexType* output_values,
 
 } // end of block_fft_kernel_C2C
 
-void FourierTransformer::FFT_C2R_Transposed()
+template <class FFT>
+void FourierTransformer::FFT_C2R_Transposed_t()
 {
-
-
   LaunchParams LP = SetLaunchParameters(elements_per_thread_complex);
 
-  MyFFTDebugAssertTrue(fft_status == 3, "status must be 3");
-  using FFT = decltype( FFT_64_fp32() + Direction<fft_direction::inverse>() + Type<fft_type::c2r>());  
 	using complex_type = typename FFT::value_type;
 	using scalar_type    = typename complex_type::value_type;
   cudaError_t error_code = cudaSuccess;
@@ -534,6 +588,37 @@ void FourierTransformer::FFT_C2R_Transposed()
 	block_fft_kernel_C2R_Transformed<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, FFT::shared_memory_size, cudaStreamPerThread>> >
 	( (complex_type*)buffer_fp32_complex, (scalar_type*)device_pointer_fp32, LP.mem_offsets, workspace);
   postcheck
+}
+
+void FourierTransformer::FFT_C2R_Transposed()
+{
+
+  MyFFTDebugAssertTrue(fft_status == 3, "status must be 3");
+
+  int device, arch;
+  GetCudaDeviceArch( device, arch );
+
+  switch (dims_in.x)
+  {
+    case 64: {
+      switch (arch)
+      {
+        case 700: { using FFT = decltype(FFT_base()  + Size<64>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2r>() + SM<700>());  FFT_C2R_Transposed_t<FFT>(); break;}
+        case 750: { using FFT = decltype(FFT_base()  + Size<64>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2r>() + SM<750>());  FFT_C2R_Transposed_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<64>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2r>() + SM<800>());  FFT_C2R_Transposed_t<FFT>(); break;}
+      }
+      break; }
+
+    case 128: {
+      {
+        case 700: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2r>() + SM<700>());  FFT_C2R_Transposed_t<FFT>(); break;}
+        case 750: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2r>() + SM<750>());  FFT_C2R_Transposed_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2r>() + SM<800>());  FFT_C2R_Transposed_t<FFT>(); break;}
+      }
+      break; }
+   
+  }
+
 
 }
 

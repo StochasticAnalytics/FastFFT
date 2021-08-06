@@ -138,24 +138,24 @@ void unit_impulse_test(short4 input_size, short4 output_size)
 
   // Forward FFT ;
   FT.FFT_R2C_Transposed();
-  FT.FFT_C2C_WithPadding(true);
+  FT.FFT_C2C_WithPadding();
   // in buffer, do not deallocate, do not unpin memory
 	FT.CopyDeviceToHost(false, false, false);
 
   sum_complex = ReturnSumOfComplex(host_input_complex, FT.output_memory_allocated/2);
-  std::cout << sum_complex.x << " " << powf(input_size.x*input_size.y*input_size.z,2) << " " << std::endl;
+  // std::cout << sum_complex.x << " " << powf(input_size.x*input_size.y*input_size.z,2) << " " << std::endl;
 
   // for (int i = 0; i < output_size.w*output_size.x*2; i++) { std::cout << host_input[i] << " "; }
   MyFFTDebugAssertTestTrue( sum_complex.x == FT.output_number_of_real_values && sum_complex.y == 0, "FastFFT unit impulse forward FFT");
   FT.SetToConstant<float>(host_input, host_input_memory_allocated, 2.0f);
 
-  FT.FFT_C2C(true);
+  FT.FFT_C2C();
   FT.FFT_C2R_Transposed();
 	FT.CopyDeviceToHost(false, true, true);
 
   // Assuming the outputs are always even dimensions, padding_jump_val is always 2.
   sum = ReturnSumOfReal(host_input, output_size);
-  std::cout << sum << " " << powf(input_size.x*input_size.y*input_size.z,2) << " " << std::endl;
+  // std::cout << sum << " " << powf(input_size.x*input_size.y*input_size.z,2) << " " << std::endl;
   // for (int i = 0; i < output_size.w*output_size.x*2; i++) { std::cout << host_input[i] << " "; }
 
   MyFFTDebugAssertTestTrue( sum == powf(input_size.x*input_size.y*input_size.z,2),"FastFFT unit impulse round trip FFT");
@@ -175,10 +175,14 @@ int main(int argc, char** argv) {
   short4 input_size;
   short4 output_size;
 
-  input_size = make_short4(64,64,1,0);
-  output_size = make_short4(64,64,1,0);
+  for (int iSize = 64; iSize <= 128; iSize *= 2) {
 
-  unit_impulse_test(input_size, output_size);
+    std::cout << std::endl << "Testing " << iSize << "x" << std::endl;
+    input_size = make_short4(iSize,iSize,1,0);
+    output_size = make_short4(iSize,iSize,1,0);
 
+    unit_impulse_test(input_size, output_size);
+
+  }
   
 }
