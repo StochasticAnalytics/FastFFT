@@ -166,6 +166,40 @@ void FourierTransformer::SetInputPointer(float* input_pointer, bool is_input_on_
   
 }
 
+void FourierTransformer::ReSetInputPointer(float* input_pointer, bool is_input_on_device) 
+{ 
+  MyFFTDebugAssertTrue(calc_data_type == DataType::fp32, "Only F32 is supported at the moment");
+  MyFFTDebugAssertTrue(is_set_input_params, "Input parameters not set");
+
+  UnPinHostMemory();
+
+  if ( is_input_on_device) 
+  {
+    // We'll need a check on compute type, and a conversion if needed prior to this.
+    device_pointer_fp32 = input_pointer;
+  }
+  else
+  {
+    host_pointer = input_pointer;
+  }
+
+  // Check to see if the host memory is pinned. FIXME input output
+  if ( ! is_host_memory_pinned)
+  {
+    precheck
+    cudaErr(cudaHostRegister(host_pointer, sizeof(float)*output_memory_allocated, cudaHostRegisterDefault));
+    postcheck
+
+    precheck
+    cudaErr(cudaHostGetDevicePointer( &pinnedPtr, host_pointer, 0));
+    postcheck
+
+    is_host_memory_pinned = true;
+  }
+  is_in_memory_host_pointer = true;
+  
+}
+
 void FourierTransformer::CopyHostToDevice()
 {
  
@@ -193,7 +227,7 @@ void FourierTransformer::CopyHostToDevice()
 
   precheck
   // This will be too big on the output memory if padded
-  cudaErr(cudaMemcpyAsync(device_pointer_fp32, pinnedPtr, output_memory_allocated*sizeof(float),cudaMemcpyDeviceToHost,cudaStreamPerThread));
+  cudaErr(cudaMemcpyAsync(device_pointer_fp32, pinnedPtr, input_memory_allocated*sizeof(float),cudaMemcpyDeviceToHost,cudaStreamPerThread));
   bool should_block_until_complete = true;
 	if (should_block_until_complete) cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
   postcheck
@@ -539,9 +573,8 @@ void block_fft_kernel_R2C_WithPadding_Transposed(ScalarType* input_values, Compl
 	for (int sub_fft = 1; sub_fft < Q; sub_fft++)
 	{
 
-	    io<FFT>::copy_from_shared(shared_input, thread_data, input_MAP);
+	  io<FFT>::copy_from_shared(shared_input, thread_data, input_MAP);
 
-    printf("I SHOULD NOT BE HERA\n");
 		// cufftDX expects packed real data for a real xform, but we modify with a complex twiddle factor.
 		// to get around this, split the complex fft into the sum of the real and imaginary parts
 		for (int i = 0; i < FFT::elements_per_thread; i++)

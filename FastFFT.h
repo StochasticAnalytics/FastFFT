@@ -69,6 +69,8 @@ public:
 
   // void SetInputPointer(int16* input_pointer, bool is_input_on_device);
   void SetInputPointer(float* input_pointer, bool is_input_on_device);
+  void ReSetInputPointer(float* input_pointer, bool is_input_on_device) ;
+
   void CopyHostToDevice();
   void CopyDeviceToHost(bool is_in_buffer, bool free_gpu_memory, bool unpin_host_memory);
 
@@ -145,6 +147,7 @@ private:
 
   float* host_pointer;
   float* pinnedPtr;
+
   float* device_pointer_fp32; float2* device_pointer_fp32_complex;
   float* buffer_fp32; float2* buffer_fp32_complex;
   __half* device_pointer_fp16; __half2* device_pointer_fp16_complex;
