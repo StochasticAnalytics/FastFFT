@@ -160,7 +160,6 @@ struct io
       thread_data[i] = input[index];
       shared_input[index] = thread_data[i];
       index += stride;
-
     }
 
   } // load_shared
@@ -181,7 +180,7 @@ struct io
     unsigned int       index  = threadIdx.x;
     for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
     {
-      // printf("blck %i index %i \n", Q*index, index*input_stride);
+      // if (blockIdx.y == 0) ("blck %i index %i \n", Q*index, index);
 
       input_map[i] = index;
       output_map[i] = Q*index;
@@ -248,6 +247,8 @@ struct io
     {
       // output map is thread local, so output_MAP[i] gives the x-index in the non-transposed array and blockIdx.y gives the y-index
       output[output_MAP[i]*pixel_pitch + blockIdx.y] = thread_data[i];
+      // if (blockIdx.y == 32) printf("from store transposed %i , val %f %f\n", output_MAP[i], thread_data[i].x, thread_data[i].y);
+
     }
     constexpr unsigned int threads_per_fft        = cufftdx::size_of<FFT>::value / FFT::elements_per_thread;
     constexpr unsigned int output_values_to_store = (cufftdx::size_of<FFT>::value / 2) + 1;
@@ -289,6 +290,8 @@ struct io
     for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
     {
       thread_data[i] = input[index];
+      // if (blockIdx.y == 0) printf("block %i , val %f %f\n", index, input[index].x, input[index].y);
+
       index += stride;
     }
   }
@@ -298,10 +301,18 @@ struct io
   {
     const unsigned int  stride = stride_size();
     unsigned int       index  = threadIdx.x;
+    complex_type phase_shifted;
     for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
     {
       // If no kernel based changes are made to source_idx, this will be the same as the original index value
-      output[index] = thread_data[i];
+      // TEMP HACK TO Swap quadrants
+      // phase_shift =  (index + blockIdx.y) % 2 == 0 ? 1.f : -1.f;
+      phase_shifted = thread_data[i];
+      if ((index + blockIdx.y) % 2 != 0) phase_shifted *= -1.f;
+
+      output[index] = phase_shifted; //thread_data[i];
+      // if (blockIdx.y == 1) printf("block iyt %i , val %f %f\n", index, thread_data[i].x,thread_data[i].y);
+
       index += stride;
     }
   } // store
@@ -344,9 +355,10 @@ struct io
 
     const unsigned int stride = stride_size();
     unsigned int       index  =  offset + threadIdx.x;
+    unsigned int phase_shift;
     for (unsigned int i = 0; i < FFT::elements_per_thread; i++)
     {
-      global_output[index] = shared_output[index];
+      global_output[index] = shared_output[index] ;
       index += stride;
     }
   } // store_coalesced

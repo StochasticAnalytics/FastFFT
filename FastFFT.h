@@ -67,12 +67,14 @@ public:
                                   DataType output_data_type,
                                   OriginType output_origin_type);
 
-  // void SetInputPointer(int16* input_pointer, bool is_input_on_device);
+  // For the time being, the caller is responsible for having the memory allocated for any of these input/output pointers.
   void SetInputPointer(float* input_pointer, bool is_input_on_device);
-  void ReSetInputPointer(float* input_pointer, bool is_input_on_device) ;
 
   void CopyHostToDevice();
-  void CopyDeviceToHost(bool is_in_buffer, bool free_gpu_memory, bool unpin_host_memory);
+  // By default we are blocking with a stream sync until complete for simplicity. This is overkill and should FIXME.
+  void CopyDeviceToHost(bool free_gpu_memory, bool unpin_host_memory);
+  // When the size changes, we need a new host pointer
+  void CopyDeviceToHost(float* output_pointer, bool free_gpu_memory = true, bool unpin_host_memory = true);
 
 
 
@@ -165,6 +167,7 @@ private:
     switch (fft_status)
     {
       case 0:
+        // The only read from the input array is in this blcok
         L.threadsPerBlock = dim3(dims_in.x/ept, 1, 1);
         L.gridDims = dim3(1, dims_in.y, 1); 
         L.mem_offsets.shared_input = dims_in.x;
@@ -179,7 +182,7 @@ private:
         L.gridDims = dim3(1, dims_out.w, 1);
         L.mem_offsets.shared_input = dims_in.y;
         L.mem_offsets.shared_output = dims_out.y;
-        L.mem_offsets.pixel_pitch_input = dims_in.y;
+        L.mem_offsets.pixel_pitch_input = dims_out.y;
         L.mem_offsets.pixel_pitch_output = dims_out.y;
 
         L.twiddle_in = -2*PIf/dims_out.y;

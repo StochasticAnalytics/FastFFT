@@ -166,39 +166,8 @@ void FourierTransformer::SetInputPointer(float* input_pointer, bool is_input_on_
   
 }
 
-void FourierTransformer::ReSetInputPointer(float* input_pointer, bool is_input_on_device) 
-{ 
-  MyFFTDebugAssertTrue(calc_data_type == DataType::fp32, "Only F32 is supported at the moment");
-  MyFFTDebugAssertTrue(is_set_input_params, "Input parameters not set");
 
-  UnPinHostMemory();
 
-  if ( is_input_on_device) 
-  {
-    // We'll need a check on compute type, and a conversion if needed prior to this.
-    device_pointer_fp32 = input_pointer;
-  }
-  else
-  {
-    host_pointer = input_pointer;
-  }
-
-  // Check to see if the host memory is pinned. FIXME input output
-  if ( ! is_host_memory_pinned)
-  {
-    precheck
-    cudaErr(cudaHostRegister(host_pointer, sizeof(float)*output_memory_allocated, cudaHostRegisterDefault));
-    postcheck
-
-    precheck
-    cudaErr(cudaHostGetDevicePointer( &pinnedPtr, host_pointer, 0));
-    postcheck
-
-    is_host_memory_pinned = true;
-  }
-  is_in_memory_host_pointer = true;
-  
-}
 
 void FourierTransformer::CopyHostToDevice()
 {
@@ -232,20 +201,22 @@ void FourierTransformer::CopyHostToDevice()
 	if (should_block_until_complete) cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
   postcheck
 
+  is_in_buffer_memory = false;
+
 
 }
 
-void FourierTransformer::CopyDeviceToHost(bool is_in_buffer, bool free_gpu_memory, bool unpin_host_memory)
+void FourierTransformer::CopyDeviceToHost( bool free_gpu_memory, bool unpin_host_memory)
 {
  
 	MyFFTDebugAssertTrue(is_in_memory_device_pointer, "GPU memory not allocated");
 
   float* copy_pointer;
-  if (is_in_buffer) copy_pointer = buffer_fp32;
+  if (is_in_buffer_memory) copy_pointer = buffer_fp32;
   else copy_pointer = device_pointer_fp32;
 
   precheck
-	cudaErr(cudaMemcpyAsync(pinnedPtr, copy_pointer, output_memory_allocated*sizeof(float),cudaMemcpyDeviceToHost,cudaStreamPerThread));
+	cudaErr(cudaMemcpyAsync(pinnedPtr, copy_pointer, input_memory_allocated*sizeof(float),cudaMemcpyDeviceToHost,cudaStreamPerThread));
   postcheck
 
   // Just set true her for now
@@ -255,6 +226,43 @@ void FourierTransformer::CopyDeviceToHost(bool is_in_buffer, bool free_gpu_memor
 	if (free_gpu_memory) { Deallocate();}
   if (unpin_host_memory) { UnPinHostMemory();}
 
+
+}
+
+
+void FourierTransformer::CopyDeviceToHost(float* output_pointer, bool free_gpu_memory, bool unpin_host_memory)
+{
+ 
+	MyFFTDebugAssertTrue(is_in_memory_device_pointer, "GPU memory not allocated");
+
+  float* copy_pointer;
+  if (is_in_buffer_memory) copy_pointer = buffer_fp32;
+  else copy_pointer = device_pointer_fp32;
+
+  // Assuming the output is not pinned, TODO change to optionally maintain as host_input as well.
+  float* tmpPinnedPtr;
+  precheck
+  cudaErr(cudaHostRegister(output_pointer, sizeof(float)*output_memory_allocated, cudaHostRegisterDefault));
+  postcheck
+  
+  precheck
+  cudaErr(cudaHostGetDevicePointer( &tmpPinnedPtr, output_pointer, 0));
+  postcheck
+  
+  precheck
+	cudaErr(cudaMemcpyAsync(tmpPinnedPtr, copy_pointer, output_memory_allocated*sizeof(float),cudaMemcpyDeviceToHost,cudaStreamPerThread));
+  postcheck
+
+  // Just set true her for now
+  bool should_block_until_complete = true;
+  if (should_block_until_complete) cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
+
+  precheck
+  cudaErr(cudaHostUnregister(tmpPinnedPtr));
+  postcheck
+
+	if (free_gpu_memory) { Deallocate();}
+  if (unpin_host_memory) { UnPinHostMemory();}
 
 }
 
@@ -349,6 +357,8 @@ void FourierTransformer::FFT_R2C_Transposed_t()
   block_fft_kernel_R2C_Transposed<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
   ( (scalar_type*) device_pointer_fp32,  (complex_type*) buffer_fp32_complex, LP.mem_offsets, workspace);
   postcheck
+
+  is_in_buffer_memory = true;
 }
 
 void FourierTransformer::FFT_R2C_Transposed()
@@ -457,6 +467,8 @@ void FourierTransformer::FFT_R2C_WithPadding_Transposed_t()
 
   LaunchParams LP = SetLaunchParameters(elements_per_thread_complex);
 
+  std::cout << " IN .x = 3.14; R2C with padding transpose" << std::endl;
+
   using complex_type = typename FFT::value_type;
   using scalar_type = typename complex_type::value_type;
   cudaError_t error_code = cudaSuccess;
@@ -468,6 +480,8 @@ void FourierTransformer::FFT_R2C_WithPadding_Transposed_t()
   block_fft_kernel_R2C_WithPadding_Transposed<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
   ( (scalar_type*) device_pointer_fp32,  (complex_type*) buffer_fp32_complex, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
   postcheck
+
+  is_in_buffer_memory = true;
 }
 
 void FourierTransformer::FFT_R2C_WithPadding_Transposed()
@@ -575,14 +589,13 @@ void block_fft_kernel_R2C_WithPadding_Transposed(ScalarType* input_values, Compl
 
 	  io<FFT>::copy_from_shared(shared_input, thread_data, input_MAP);
 
-		// cufftDX expects packed real data for a real xform, but we modify with a complex twiddle factor.
-		// to get around this, split the complex fft into the sum of the real and imaginary parts
+
 		for (int i = 0; i < FFT::elements_per_thread; i++)
 		{
 			// Pre shift with twiddle
 			__sincosf(twiddle_factor_args[i]*sub_fft,&twiddle.y,&twiddle.x);
 			thread_data[i] *= twiddle;
-		  // increment the output map. 
+		  // increment the output mapping. 
 			output_MAP[i]++;
 		}
 
@@ -601,6 +614,7 @@ void FourierTransformer::FFT_C2C_WithPadding_t()
 
   LaunchParams LP = SetLaunchParameters(elements_per_thread_complex);
 
+
 	using complex_type = typename FFT::value_type;
   cudaError_t error_code = cudaSuccess;
   auto workspace = make_workspace<FFT>(error_code);
@@ -615,6 +629,8 @@ void FourierTransformer::FFT_C2C_WithPadding_t()
   ( (complex_type*)buffer_fp32_complex,  (complex_type*)device_pointer_fp32_complex, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
   postcheck
 
+  is_in_buffer_memory = false;
+
 
 }
 void FourierTransformer::FFT_C2C_WithPadding()
@@ -626,7 +642,7 @@ void FourierTransformer::FFT_C2C_WithPadding()
   int device, arch;
   GetCudaDeviceArch( device, arch );
 
-  switch (dims_in.x)
+  switch (dims_in.y)
   {
     case 64: {
       switch (arch)
@@ -712,7 +728,7 @@ void block_fft_kernel_C2C_WithPadding(ComplexType* input_values, ComplexType* ou
   float twiddle_factor_args[FFT::storage_size];
 
   // No need to __syncthreads as each thread only accesses its own shared mem anyway
-  io<FFT>::load_shared(&input_values[blockIdx.y*mem_offsets.pixel_pitch_input], shared_input_complex, thread_data, twiddle_factor_args, twiddle_in, input_MAP, output_MAP, Q);
+  io<FFT>::load_shared(&input_values[(1+blockIdx.y)*mem_offsets.pixel_pitch_input], shared_input_complex, thread_data, twiddle_factor_args, twiddle_in, input_MAP, output_MAP, Q);
 
 
 	// In the first FFT the modifying twiddle factor is 1 so the data are reeal
@@ -746,7 +762,6 @@ void block_fft_kernel_C2C_WithPadding(ComplexType* input_values, ComplexType* ou
 
 	// Now that the memory output can be coalesced send to global
   // FIXME is this actually coalced?
-	// int this_idx;
 	for (int sub_fft = 0; sub_fft < Q; sub_fft++)
 	{
     io<FFT>::store_coalesced(shared_output, &output_values[blockIdx.y * mem_offsets.pixel_pitch_output], sub_fft*mem_offsets.shared_input);
@@ -774,6 +789,8 @@ void FourierTransformer::FFT_C2C_t( bool do_forward_transform )
     block_fft_kernel_C2C<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
     ( (complex_type*)buffer_fp32_complex,  (complex_type*)device_pointer_fp32_complex, LP.mem_offsets, workspace);
     postcheck
+
+    is_in_buffer_memory = false;
   }
   else
   {
@@ -787,6 +804,8 @@ void FourierTransformer::FFT_C2C_t( bool do_forward_transform )
     block_fft_kernel_C2C<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
     ( (complex_type*)device_pointer_fp32_complex,  (complex_type*)buffer_fp32_complex, LP.mem_offsets, workspace);
     postcheck
+
+    is_in_buffer_memory = true;
   }
   
 
@@ -800,7 +819,7 @@ void FourierTransformer::FFT_C2C( bool do_forward_transform )
   GetCudaDeviceArch( device, arch );
 
 
-  switch (dims_in.x)
+  switch (dims_out.y)
   {
     case 64: {
       switch (arch)
@@ -902,6 +921,8 @@ void FourierTransformer::FFT_C2R_Transposed_t()
 	block_fft_kernel_C2R_Transformed<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, FFT::shared_memory_size, cudaStreamPerThread>> >
 	( (complex_type*)buffer_fp32_complex, (scalar_type*)device_pointer_fp32, LP.mem_offsets, workspace);
   postcheck
+
+  is_in_buffer_memory = false;
 }
 
 void FourierTransformer::FFT_C2R_Transposed()
@@ -912,7 +933,7 @@ void FourierTransformer::FFT_C2R_Transposed()
   int device, arch;
   GetCudaDeviceArch( device, arch );
 
-  switch (dims_in.x)
+  switch (dims_out.y)
   {
     case 64: {
       switch (arch)
