@@ -614,6 +614,7 @@ void FourierTransformer::FFT_C2C_WithPadding_t()
 
   LaunchParams LP = SetLaunchParameters(elements_per_thread_complex);
 
+  bool swap_real_space_quadrants = true;
 
 	using complex_type = typename FFT::value_type;
   cudaError_t error_code = cudaSuccess;
@@ -626,7 +627,7 @@ void FourierTransformer::FFT_C2C_WithPadding_t()
   // When it is the output dims being smaller, may need a logical or different method
   precheck
   block_fft_kernel_C2C_WithPadding<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
-  ( (complex_type*)buffer_fp32_complex,  (complex_type*)device_pointer_fp32_complex, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
+  ( (complex_type*)buffer_fp32_complex,  (complex_type*)device_pointer_fp32_complex, LP.mem_offsets, LP.twiddle_in,LP.Q,swap_real_space_quadrants, workspace);
   postcheck
 
   is_in_buffer_memory = false;
@@ -705,7 +706,7 @@ void FourierTransformer::FFT_C2C_WithPadding()
 
 template<class FFT, class ComplexType>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2C_WithPadding(ComplexType* input_values, ComplexType* output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace)
+void block_fft_kernel_C2C_WithPadding(ComplexType* input_values, ComplexType* output_values, Offsets mem_offsets, float twiddle_in, int Q, bool swap_real_space_quadrants, typename FFT::workspace_type workspace)
 {
 
 //	// Initialize the shared memory, assuming everyting matches the input data X size in
@@ -734,8 +735,8 @@ void block_fft_kernel_C2C_WithPadding(ComplexType* input_values, ComplexType* ou
 	// In the first FFT the modifying twiddle factor is 1 so the data are reeal
 	FFT().execute(thread_data, shared_mem, workspace);
 
-	io<FFT>::store(thread_data,shared_output,output_MAP);
-
+	// io<FFT>::store(thread_data,shared_output,output_MAP);
+  io<FFT>::store_and_swap_quadrants(thread_data,shared_output,output_MAP,64);
     // For the other fragments we need the initial twiddle
 	for (int sub_fft = 1; sub_fft < Q; sub_fft++)
 	{
@@ -753,7 +754,9 @@ void block_fft_kernel_C2C_WithPadding(ComplexType* input_values, ComplexType* ou
 
 		FFT().execute(thread_data, shared_mem, workspace);
 
-		io<FFT>::store(thread_data,shared_output,output_MAP);
+		// io<FFT>::store(thread_data,shared_output,output_MAP);
+      io<FFT>::store_and_swap_quadrants(thread_data,shared_output,output_MAP,64);
+
 
 	}
 
@@ -779,6 +782,7 @@ void FourierTransformer::FFT_C2C_t( bool do_forward_transform )
   
   if (do_forward_transform)
   {   
+    bool swap_real_space_quadrants = true;
     using FFT = decltype( FFT_nodir() + Direction<fft_direction::forward>() );
     using complex_type = typename FFT::value_type;
     using scalar_type    = typename complex_type::value_type;
@@ -787,13 +791,14 @@ void FourierTransformer::FFT_C2C_t( bool do_forward_transform )
     int shared_mem = FFT::shared_memory_size;
     precheck
     block_fft_kernel_C2C<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
-    ( (complex_type*)buffer_fp32_complex,  (complex_type*)device_pointer_fp32_complex, LP.mem_offsets, workspace);
+    ( (complex_type*)buffer_fp32_complex,  (complex_type*)device_pointer_fp32_complex, LP.mem_offsets, swap_real_space_quadrants, workspace);
     postcheck
 
     is_in_buffer_memory = false;
   }
   else
   {
+    bool swap_real_space_quadrants = false;
     using FFT = decltype( FFT_nodir() + Direction<fft_direction::inverse>() );
     using complex_type = typename FFT::value_type;
     using scalar_type    = typename complex_type::value_type;
@@ -802,7 +807,7 @@ void FourierTransformer::FFT_C2C_t( bool do_forward_transform )
     int shared_mem = FFT::shared_memory_size;
     precheck
     block_fft_kernel_C2C<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
-    ( (complex_type*)device_pointer_fp32_complex,  (complex_type*)buffer_fp32_complex, LP.mem_offsets, workspace);
+    ( (complex_type*)device_pointer_fp32_complex,  (complex_type*)buffer_fp32_complex, LP.mem_offsets, swap_real_space_quadrants, workspace);
     postcheck
 
     is_in_buffer_memory = true;
@@ -882,7 +887,7 @@ void FourierTransformer::FFT_C2C( bool do_forward_transform )
 
 template<class FFT, class ComplexType>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2C(ComplexType* input_values, ComplexType* output_values, Offsets mem_offsets, typename FFT::workspace_type workspace)
+void block_fft_kernel_C2C(ComplexType* input_values, ComplexType* output_values, Offsets mem_offsets, bool phase_swap, typename FFT::workspace_type workspace)
 {
 
 //	// Initialize the shared memory, assuming everyting matches the input data X size in
