@@ -100,7 +100,8 @@ void const_image_test(short4 input_size, short4 output_size)
   FT.SetToConstant<float>(host_output, host_output_memory_allocated, 2.0f);
   
   // This method will call the regular FFT kernels given the input/output dimensions are equal when the class is instantiated.
-  FT.FwdFFT();
+  bool swap_real_space_quadrants = false;
+  FT.FwdFFT(swap_real_space_quadrants);
   
   // in buffer, do not deallocate, do not unpin memory
   FT.CopyDeviceToHost(host_output, false, false);
@@ -242,7 +243,8 @@ void unit_impulse_test(short4 input_size, short4 output_size)
   FT.SetToConstant<float>(host_output, host_output_memory_allocated, 2.0f);
   
   // This method will call the regular FFT kernels given the input/output dimensions are equal when the class is instantiated.
-  FT.FwdFFT();
+  bool swap_real_space_quadrants = true;
+  FT.FwdFFT(swap_real_space_quadrants);
   
   // do not deallocate, do not unpin memory
 

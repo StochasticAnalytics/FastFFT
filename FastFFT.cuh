@@ -74,13 +74,17 @@ template<class FFT, class ComplexType = typename FFT::value_type, class ScalarTy
 __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_R2C_WithPadding_Transposed(ScalarType* input_values, ComplexType* output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 
-template<class FFT, class ComplexType = typename FFT::value_type>
+template<class FFT, class ComplexType = typename FFT::value_typem>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2C_WithPadding(ComplexType* input_values, ComplexType* output_values, Offsets mem_offsets, float twiddle_in, int Q, bool phase_swap, typename FFT::workspace_type workspace);
+void block_fft_kernel_C2C_WithPadding(ComplexType* input_values, ComplexType* output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
+
+template<class FFT, class ComplexType = typename FFT::value_typem>
+__launch_bounds__(FFT::max_threads_per_block) __global__
+void block_fft_kernel_C2C_WithPadding_SwapRealSpaceQuadrants(ComplexType* input_values, ComplexType* output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 
 template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2C(ComplexType* input_values, ComplexType* output_values, Offsets mem_offsets, bool phase_swap, typename FFT::workspace_type workspace);
+void block_fft_kernel_C2C(ComplexType* input_values, ComplexType* output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
 
 template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
@@ -297,24 +301,24 @@ struct io
   }
   
 
-  static inline __device__ void store_and_swap_quadrants(const complex_type* thread_data,
-                                 complex_type*       output,
-                                 int*				         source_idx,
-                                 int				         first_negative_index) 
-  {
-    const unsigned int  stride = stride_size();
-    complex_type phase_shift;
-    int logical_y;
-    for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
-    {
-      // If no kernel based changes are made to source_idx, this will be the same as the original index value
-      phase_shift = thread_data[i];
-      logical_y = source_idx[i];
-      if ( logical_y >= first_negative_index ) logical_y -= 2*first_negative_index;
-      if ( (int(blockIdx.y) + logical_y) % 2 != 0) phase_shift *= -1.f; 
-      output[source_idx[i]] = phase_shift;
-    }
-  } // store_and_swap_quadrants
+  // static inline __device__ void store_and_swap_quadrants(const complex_type* thread_data,
+  //                                complex_type*       output,
+  //                                int*				         source_idx,
+  //                                int				         first_negative_index) 
+  // {
+  //   const unsigned int  stride = stride_size();
+  //   complex_type phase_shift;
+  //   int logical_y;
+  //   for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+  //   {
+  //     // If no kernel based changes are made to source_idx, this will be the same as the original index value
+  //     phase_shift = thread_data[i];
+  //     logical_y = source_idx[i];
+  //     if ( logical_y >= first_negative_index) logical_y -= 2*first_negative_index;
+  //     if ( (int(blockIdx.y) + logical_y) % 2 != 0) phase_shift *= -1.f; 
+  //     output[source_idx[i]] = phase_shift;
+  //   }
+  // } // store_and_swap_quadrants
 
 
 
