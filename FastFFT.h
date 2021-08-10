@@ -113,6 +113,12 @@ public:
       exit(-1);
     }
   }
+
+// TODO move back to private and provide method to return a pointer to the memory if requested.
+    float* device_pointer_fp32; float2* device_pointer_fp32_complex;
+  float* buffer_fp32; float2* buffer_fp32_complex;
+  __half* device_pointer_fp16; __half2* device_pointer_fp16_complex;
+
 private:
 
 
@@ -150,9 +156,7 @@ private:
   float* host_pointer;
   float* pinnedPtr;
 
-  float* device_pointer_fp32; float2* device_pointer_fp32_complex;
-  float* buffer_fp32; float2* buffer_fp32_complex;
-  __half* device_pointer_fp16; __half2* device_pointer_fp16_complex;
+
 
   void Deallocate();
   void UnPinHostMemory();

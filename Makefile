@@ -23,10 +23,10 @@ SRCS=test.cu
 TARGETS=test
 
 $(TARGETS): %: %.cu
-	$(NVCC) -o $@.app $< $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -lfftw3f
+	$(NVCC) -o $@.app $< $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -lfftw3f -lcufft
 
 $(NVRTC_TARGETS): %: %.cu
-	$(NVCC) -o $@ $< $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) $(NVRTC_DEFINES) -lnvrtc -lcuda 
+	$(NVCC) -o $@ $< $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) $(NVRTC_DEFINES) -lnvrtc -lcuda -lcufft
 
 .PHONY: all clean
 

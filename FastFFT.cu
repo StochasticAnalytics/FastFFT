@@ -324,11 +324,13 @@ void FourierTransformer::InvFFT()
     case none: {
       FFT_C2C(false);
       FFT_C2R_Transposed();
+      fft_status = 0;
       break;
     }
     case increase: {
       FFT_C2C(false);
       FFT_C2R_Transposed();
+      fft_status = 0;
       break;
     }
     case decrease: {
