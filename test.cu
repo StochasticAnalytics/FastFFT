@@ -79,7 +79,7 @@ void const_image_test(short4 input_size, short4 output_size)
   // ensures faster transfer. If false, it will be pinned for you.
   FT.SetInputPointer(&host_output[0], false);
   sum = ReturnSumOfReal(host_output, output_size);
-  MyFFTDebugAssertTestTrue( sum == input_size.x*input_size.y*input_size.z,"Unit impulse Init ");
+  MyFFTDebugAssertTestTrue( sum == output_size.x*output_size.y*output_size.z,"Unit impulse Init ");
   
   // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
   FT.CopyHostToDevice();
@@ -104,7 +104,7 @@ void const_image_test(short4 input_size, short4 output_size)
   FT.FwdFFT(swap_real_space_quadrants);
   
   // in buffer, do not deallocate, do not unpin memory
-  FT.CopyDeviceToHost(host_output, false, false);
+  FT.CopyDeviceToHost( false, false);
   test_passed = true;
   for (long index = 1; index < host_output_memory_allocated/2; index++)
   {
@@ -117,7 +117,7 @@ void const_image_test(short4 input_size, short4 output_size)
   
 
   FT.InvFFT();
-  FT.CopyDeviceToHost(host_output, true, true);
+  FT.CopyDeviceToHost( true, true);
   
   // Assuming the outputs are always even dimensions, padding_jump_val is always 2.
   sum = ReturnSumOfReal(host_output, output_size);
@@ -236,7 +236,6 @@ void unit_impulse_test(short4 input_size, short4 output_size)
   fftw_epsilon = ReturnSumOfComplexAmplitudes(host_output_complex, host_output_memory_allocated/2);  
 
   fftw_epsilon -= (host_output_memory_allocated/2 );
-  std::cout << "fftw_epsilon = " << fftw_epsilon << std::endl;
   MyFFTDebugAssertTestTrue( std::abs(fftw_epsilon < 1e-8) , "FFTW unit impulse forward FFT");
   
   // Just to make sure we don't get a false positive, set the host memory to some undesired value.
@@ -252,23 +251,22 @@ void unit_impulse_test(short4 input_size, short4 output_size)
 
   // for (int i = 0; i < host_output_memory_allocated/2; i++){ 
   //   if (host_output_complex[i].x != 0.0f || host_output_complex[i].y != 0.0f){ std::cout << "Value at " << i <<  " is " << host_output_complex[i].x << " " << host_output_complex[i].y << std::endl; }
+  // // }
+  // for (int x = 0; x < 128; x++)
+  // {
+  //   int n=0;
+  //   std::cout << x << "[ ";
+  //   for (int y = 0; y < 65; y++)
+  //   {  
+  //     std::cout << host_output_complex[x + y*128].x << "," << host_output_complex[x + y*128].y << " ";
+  //     if (host_output_complex[x + y*128].x == 3) { n++;}
+  //   }
+  //   std::cout << "] " << n << std::endl;
   // }
-  for (int x = 0; x < 128; x++)
-  {
-    int n=0;
-    std::cout << x << "[ ";
-    for (int y = 0; y < 65; y++)
-    {  
-      std::cout << host_output_complex[x + y*128].x << "," << host_output_complex[x + y*128].y << " ";
-      if (host_output_complex[x + y*128].x == 3) { n++;}
-    }
-    std::cout << "] " << n << std::endl;
-  }
 
   sum = ReturnSumOfComplexAmplitudes(host_output_complex, host_output_memory_allocated/2); 
   sum -= (host_output_memory_allocated/2 );
 
-  std::cout << "sum = " << sum << std::endl;
 
   
   MyFFTDebugAssertTestTrue( abs(sum - fftw_epsilon) < 1e-8, "FastFFT unit impulse forward FFT");
@@ -277,21 +275,18 @@ void unit_impulse_test(short4 input_size, short4 output_size)
 
   FT.InvFFT();
   FT.CopyDeviceToHost(host_output, true, true);
-  for (int x = 0; x < 128; x++)
-  {
-    int n=0;
-    std::cout << x << "[ ";
-    for (int y = 0; y < 128; y++)
-    {  
-      std::cout << host_output[x + y*130]<< " ";
-    }
-    std::cout << "] " << n << std::endl;
-  }
+  // for (int x = 0; x < 128; x++)
+  // {
+  //   int n=0;
+  //   std::cout << x << "[ ";
+  //   for (int y = 0; y < 128; y++)
+  //   {  
+  //     std::cout << host_output[x + y*130]<< " ";
+  //   }
+  //   std::cout << "] " << n << std::endl;
+  // }
   // Assuming the outputs are always even dimensions, padding_jump_val is always 2.
   sum = ReturnSumOfReal(host_output, output_size);
-  std::cout << "sum = " << sum << std::endl;
-  std::cout << output_size.x*output_size.y*output_size.z << std::endl;
-  std::cout << output_size.x << " " << output_size.y << " " << output_size.z << std::endl;
   MyFFTDebugAssertTestTrue( sum == output_size.x*output_size.y*output_size.z,"FastFFT unit impulse round trip FFT");
   
 
@@ -314,15 +309,15 @@ int main(int argc, char** argv) {
 
   constexpr const int n_tests = 4;
   int test_size[n_tests] = {64, 128, 256, 512};
-  // for (int iSize = 0; iSize < n_tests; iSize++) {
+  for (int iSize = 0; iSize < n_tests; iSize++) {
 
-  //   std::cout << std::endl << "Testing " << test_size[iSize] << " x" << std::endl;
-  //   input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
-  //   output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+    std::cout << std::endl << "Testing " << test_size[iSize] << " x" << std::endl;
+    input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+    output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
 
-  //   const_image_test(input_size, output_size);
+    const_image_test(input_size, output_size);
 
-  // }
+  }
 
   for (int iSize = 0; iSize < n_tests - 1; iSize++) {
     int oSize = iSize + 1;
@@ -334,7 +329,7 @@ int main(int argc, char** argv) {
   
       unit_impulse_test(input_size, output_size);
       oSize++;
-      exit(0);
+
     }
 
 

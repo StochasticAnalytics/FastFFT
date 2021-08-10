@@ -294,7 +294,6 @@ void FourierTransformer::UnPinHostMemory()
 void FourierTransformer::FwdFFT(bool swap_real_space_quadrants)
 {
   CheckDimensions();
-  std::cout << "FwdFFT" << " swap quds is " << swap_real_space_quadrants << std::endl;
   switch (size_change_type)
   {
     case none: {
@@ -441,13 +440,6 @@ void block_fft_kernel_R2C_Transposed(ScalarType* input_values, ComplexType* outp
 	// Memory used by FFT
   complex_type thread_data[FFT::storage_size];
 
-  // To re-map the thread index to the data ... these really could be short ints, but I don't know how that will perform. TODO benchmark
-  // It is also questionable whether storing these vs, recalculating makes more sense.
-  int input_MAP[FFT::storage_size];
-  // To re-map the decomposed frequency to the full output frequency
-  int output_MAP[FFT::storage_size];
-  // For a given decomposed fragment
-  float twiddle_factor_args[FFT::storage_size];
 
   // No need to __syncthreads as each thread only accesses its own shared mem anyway
   // multiply Q*dims_out.w because x maps to y in the output transposed FFT
@@ -466,8 +458,6 @@ void FourierTransformer::FFT_R2C_WithPadding_Transposed_t()
 {
 
   LaunchParams LP = SetLaunchParameters(elements_per_thread_complex);
-
-  std::cout << " IN .x = 3.14; R2C with padding transpose" << std::endl;
 
   using complex_type = typename FFT::value_type;
   using scalar_type = typename complex_type::value_type;
@@ -626,7 +616,6 @@ void FourierTransformer::FFT_C2C_WithPadding_t(bool swap_real_space_quadrants)
   // When it is the output dims being smaller, may need a logical or different method
   if (swap_real_space_quadrants)
   {
-    std::cout << "Swapping quadrants" << std::endl;
     precheck
     block_fft_kernel_C2C_WithPadding_SwapRealSpaceQuadrants<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
     ( (complex_type*)buffer_fp32_complex,  (complex_type*)device_pointer_fp32_complex, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
@@ -634,7 +623,6 @@ void FourierTransformer::FFT_C2C_WithPadding_t(bool swap_real_space_quadrants)
   }
   else
   {
-    std::cout << "Not swapping quadrants" << std::endl;
     precheck
     block_fft_kernel_C2C_WithPadding<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
     ( (complex_type*)buffer_fp32_complex,  (complex_type*)device_pointer_fp32_complex, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);

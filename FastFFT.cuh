@@ -53,8 +53,8 @@ void GetCudaDeviceArch( int &device, int &arch ) {
 // Base FFT kerenel types, direction (r2c, c2r, c2c) and direction are ommited, to be applied in the method calling afull kernel
 using namespace cufftdx;
 
-constexpr const int elements_per_thread_real = 8;
-constexpr const int elements_per_thread_complex = 8;
+constexpr const int elements_per_thread_real = 16;
+constexpr const int elements_per_thread_complex = 16;
 constexpr const uint device_arch = 700;
 
 // All transforms are 
@@ -374,7 +374,6 @@ struct io
 
     const unsigned int stride = stride_size();
     unsigned int       index  =  offset + threadIdx.x;
-    unsigned int phase_shift;
     for (unsigned int i = 0; i < FFT::elements_per_thread; i++)
     {
       global_output[index] = shared_output[index] ;
