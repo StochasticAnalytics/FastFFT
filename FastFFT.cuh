@@ -301,24 +301,24 @@ struct io
   }
   
 
-  // static inline __device__ void store_and_swap_quadrants(const complex_type* thread_data,
-  //                                complex_type*       output,
-  //                                int*				         source_idx,
-  //                                int				         first_negative_index) 
-  // {
-  //   const unsigned int  stride = stride_size();
-  //   complex_type phase_shift;
-  //   int logical_y;
-  //   for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
-  //   {
-  //     // If no kernel based changes are made to source_idx, this will be the same as the original index value
-  //     phase_shift = thread_data[i];
-  //     logical_y = source_idx[i];
-  //     if ( logical_y >= first_negative_index) logical_y -= 2*first_negative_index;
-  //     if ( (int(blockIdx.y) + logical_y) % 2 != 0) phase_shift *= -1.f; 
-  //     output[source_idx[i]] = phase_shift;
-  //   }
-  // } // store_and_swap_quadrants
+  static inline __device__ void store_and_swap_quadrants(const complex_type* thread_data,
+                                 complex_type*       output,
+                                 int*				         source_idx,
+                                 int				         first_negative_index) 
+  {
+    const unsigned int  stride = stride_size();
+    complex_type phase_shift;
+    int logical_y;
+    for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+    {
+      // If no kernel based changes are made to source_idx, this will be the same as the original index value
+      phase_shift = thread_data[i];
+      logical_y = source_idx[i];
+      if ( logical_y >= first_negative_index) logical_y -= 2*first_negative_index;
+      if ( (int(blockIdx.y) + logical_y) % 2 != 0) phase_shift *= -1.f; 
+      output[source_idx[i]] = phase_shift;
+    }
+  } // store_and_swap_quadrants
 
 
 
