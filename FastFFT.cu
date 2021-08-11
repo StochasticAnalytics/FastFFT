@@ -19,8 +19,6 @@ namespace FastFFT {
 FourierTransformer::FourierTransformer(DataType wanted_calc_data_type) 
 {
 
-
-  MyFFTPrint( "Initializing FourierTrasnformer...");
   calc_data_type = wanted_calc_data_type;
   // Plan to allow fp16 and bf16
   MyFFTDebugAssertTrue(calc_data_type == DataType::fp32, "Only F32 is supported at the moment");
@@ -411,12 +409,12 @@ void FourierTransformer::FFT_R2C_Transposed()
       }
       break; } 
 
-    case 4096: {
+    case 2048: {
       switch (arch)
       {
-        case 700: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_Transposed_t<FFT>(); break;}
-        case 750: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_R2C_Transposed_t<FFT>(); break;}
-        case 800: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_Transposed_t<FFT>(); break;}
+        case 700: { using FFT = decltype(FFT_base()  + Size<2048>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_Transposed_t<FFT>(); break;}
+        // case 750: { using FFT = decltype(FFT_base()  + Size<2048>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_R2C_Transposed_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<2048>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_Transposed_t<FFT>(); break;}
       }
       break; }  
 
@@ -525,12 +523,12 @@ void FourierTransformer::FFT_R2C_WithPadding_Transposed()
       }
       break; } 
 
-    case 4096: {
+    case 2048: {
       switch (arch)
       {
-        case 700: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_WithPadding_Transposed_t<FFT>(); break;}
-        case 750: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_R2C_WithPadding_Transposed_t<FFT>(); break;}
-        case 800: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_WithPadding_Transposed_t<FFT>(); break;}
+        case 700: { using FFT = decltype(FFT_base()  + Size<2048>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_WithPadding_Transposed_t<FFT>(); break;}
+        // case 750: { using FFT = decltype(FFT_base()  + Size<2048>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_R2C_WithPadding_Transposed_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<2048>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_WithPadding_Transposed_t<FFT>(); break;}
       }
       break; }  
 
@@ -689,12 +687,12 @@ void FourierTransformer::FFT_C2C_WithPadding(bool swap_real_space_quadrants)
       }
       break; } 
 
-    case 4096: {
+    case 2048: {
       switch (arch)
       {
-        case 700: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_C2C_WithPadding_t<FFT>(swap_real_space_quadrants); break;}
-        case 750: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_C2C_WithPadding_t<FFT>(swap_real_space_quadrants); break;}
-        case 800: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_C2C_WithPadding_t<FFT>(swap_real_space_quadrants); break;}
+        case 700: { using FFT = decltype(FFT_base()  + Size<2048>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_C2C_WithPadding_t<FFT>(swap_real_space_quadrants); break;}
+        // case 750: { using FFT = decltype(FFT_base()  + Size<2048>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_C2C_WithPadding_t<FFT>(swap_real_space_quadrants); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<2048>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_C2C_WithPadding_t<FFT>(swap_real_space_quadrants); break;}
       }
       break; }  
 
@@ -936,12 +934,12 @@ void FourierTransformer::FFT_C2C( bool do_forward_transform )
       }
       break; } 
 
-    case 4096: {
+    case 2048: {
       switch (arch)
       {
-        case 700: { using FFT = decltype(FFT_base()  + Size<4096>() + Type<fft_type::c2c>() + SM<700>());  FFT_C2C_t<FFT>(do_forward_transform); break;}
-        case 750: { using FFT = decltype(FFT_base()  + Size<4096>() + Type<fft_type::c2c>() + SM<750>());  FFT_C2C_t<FFT>(do_forward_transform); break;}
-        case 800: { using FFT = decltype(FFT_base()  + Size<4096>() + Type<fft_type::c2c>() + SM<800>());  FFT_C2C_t<FFT>(do_forward_transform); break;}
+        case 700: { using FFT = decltype(FFT_base()  + Size<2048>() + Type<fft_type::c2c>() + SM<700>());  FFT_C2C_t<FFT>(do_forward_transform); break;}
+        // case 750: { using FFT = decltype(FFT_base()  + Size<2048>() + Type<fft_type::c2c>() + SM<750>());  FFT_C2C_t<FFT>(do_forward_transform); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<2048>() + Type<fft_type::c2c>() + SM<800>());  FFT_C2C_t<FFT>(do_forward_transform); break;}
       }
       break; }  
 
@@ -1050,12 +1048,12 @@ void FourierTransformer::FFT_C2R_Transposed()
       }
       break; } 
       
-    case 4096: {
+    case 2048: {
       switch (arch)
       {
-        case 700: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2r>() + SM<700>());  FFT_C2R_Transposed_t<FFT>(); break;}
-        case 750: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2r>() + SM<750>());  FFT_C2R_Transposed_t<FFT>(); break;}
-        case 800: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2r>() + SM<800>());  FFT_C2R_Transposed_t<FFT>(); break;}
+        case 700: { using FFT = decltype(FFT_base()  + Size<2048>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2r>() + SM<700>());  FFT_C2R_Transposed_t<FFT>(); break;}
+        // case 750: { using FFT = decltype(FFT_base()  + Size<2048>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2r>() + SM<750>());  FFT_C2R_Transposed_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<2048>() + Direction<fft_direction::inverse>()+ Type<fft_type::c2r>() + SM<800>());  FFT_C2R_Transposed_t<FFT>(); break;}
       }
       break; }  
 

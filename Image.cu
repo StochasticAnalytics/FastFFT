@@ -9,6 +9,8 @@ Image<wanted_real_type, wanted_complex_type>::Image(short4 wanted_size)
   if (wanted_size.x % 2 == 0) padding_jump_value = 2;
   else padding_jump_value = 1;
 
+  size.w = (size.x + padding_jump_value) / 2;
+
   is_in_memory = false;
   is_in_real_space = true;
   is_cufft_planned = false;
@@ -21,17 +23,68 @@ Image<wanted_real_type, wanted_complex_type>::Image(short4 wanted_size)
 template < class wanted_real_type, class wanted_complex_type >
 Image<wanted_real_type, wanted_complex_type>::~Image()
 {
-  if (is_in_memory) fftwf_free(real_values);
+  if (is_in_memory) 
+  {
+    fftwf_free(real_values);
+     is_in_memory = false;
+  } 
   if (is_fftw_planned)
   {
     fftwf_destroy_plan(plan_fwd);
     fftwf_destroy_plan(plan_bwd);
+    is_fftw_planned = false;
   }
   if (is_cufft_planned)
   {
-    (cufftDestroy(cuda_plan_inverse));
-    (cufftDestroy(cuda_plan_forward));
+    cudaErr_img(cufftDestroy(cuda_plan_inverse));
+    cudaErr_img(cufftDestroy(cuda_plan_forward));
+    is_cufft_planned = false;
   }
+
+  if (is_set_clip_into_mask)
+  {
+    cudaErr_img(cudaFree(clipIntoMask));
+    is_set_clip_into_mask = false;
+  }
+}
+
+template < class wanted_real_type, class wanted_complex_type >
+void Image<wanted_real_type, wanted_complex_type>::SetClipIntoMask(short4 input_size, short4 output_size)
+{
+  // Allocate the mask
+  int pjv;
+  int address = 0;
+  int n_values = output_size.w*2*output_size.y;
+  bool* tmpMask = new bool[n_values];
+
+  precheck_img
+  cudaErr_img(cudaMalloc(&clipIntoMask, (n_values)*sizeof(bool)));
+  postcheck_img
+
+  if (output_size.x % 2 == 0) pjv = 2;
+  else pjv = 1;
+
+  for (int j = 0 ; j < output_size.y ; j++)
+  {
+    for (int i = 0 ; i < output_size.x ; i++)
+    {
+      if (i < input_size.x && j < input_size.y) tmpMask[address] = true;
+      else tmpMask[address] = false;
+      address++;
+    }
+    tmpMask[address] = false; 
+    address++;
+    if (pjv > 1) {tmpMask[address] = false;  address++;}
+  }
+
+
+  cudaErr_img(cudaMemcpyAsync(clipIntoMask, tmpMask, n_values*sizeof(bool),cudaMemcpyHostToDevice,cudaStreamPerThread));
+  cudaStreamSynchronize(cudaStreamPerThread);
+
+  delete [] tmpMask;
+  is_set_clip_into_mask = true;
+
+
 }
 
 // template < class wanted_real_type, class wanted_complex_type >
@@ -92,8 +145,6 @@ void Image<wanted_real_type, wanted_complex_type>::MakeCufftPlan()
 
   // TODO for alternate precisions.
 
-  std::cout << "Allocating a 2d cufft Plan" << std::endl;
-
   cufftCreate(&cuda_plan_forward);
   cufftCreate(&cuda_plan_inverse);
 
@@ -126,4 +177,75 @@ void Image<wanted_real_type, wanted_complex_type>::MakeCufftPlan()
     delete [] onembed;
 
     is_cufft_planned = true;
+}
+
+typedef struct _CB_realLoadAndClipInto_params
+{
+  bool* mask;
+	cufftReal*	target;
+
+} CB_realLoadAndClipInto_params;
+
+
+static __device__ cufftReal CB_realLoadAndClipInto(void* dataIn, size_t offset, void* callerInfo, void* sharedPtr);
+
+static __device__ cufftReal CB_realLoadAndClipInto(void* dataIn, size_t offset, void* callerInfo, void* sharedPtr)
+{
+
+	 CB_realLoadAndClipInto_params* my_params = (CB_realLoadAndClipInto_params *)callerInfo;
+
+  if (my_params->mask[offset])
+  {
+    return my_params->target[offset];
+
+  }
+  else
+  {
+    return 0.0f;
+  }
+
+
+
+}
+
+__device__ cufftCallbackLoadR d_realLoadAndClipInto = CB_realLoadAndClipInto;
+
+template < class wanted_real_type, class wanted_complex_type >
+void Image<wanted_real_type, wanted_complex_type>::SetClipIntoCallback(cufftReal* image_to_insert, int image_to_insert_size_x, int image_to_insert_size_y,int image_to_insert_pitch)
+{
+
+
+  // // First make the mask
+  short4 wanted_size = make_short4(image_to_insert_size_x, image_to_insert_size_y, 1, image_to_insert_pitch);
+  SetClipIntoMask(wanted_size, size );
+
+  if (!is_cufft_planned) {std::cout << "Cufft plan must be made before setting callback function." << std::endl; exit(-1);}
+
+  cufftCallbackLoadR h_realLoadAndClipInto;
+  CB_realLoadAndClipInto_params* d_params;
+  CB_realLoadAndClipInto_params h_params;
+
+  precheck_img
+  h_params.target = (cufftReal *)image_to_insert;
+  h_params.mask = (bool*) clipIntoMask;
+  cudaErr_img(cudaMalloc((void **)&d_params,sizeof(CB_realLoadAndClipInto_params)));
+  postcheck_img
+
+  precheck_img
+  cudaErr_img(cudaMemcpyAsync(d_params, &h_params, sizeof(CB_realLoadAndClipInto_params), cudaMemcpyHostToDevice, cudaStreamPerThread));
+  postcheck_img
+
+  precheck_img
+  cudaErr_img(cudaMemcpyFromSymbol(&h_realLoadAndClipInto,d_realLoadAndClipInto, sizeof(h_realLoadAndClipInto)));
+  postcheck_img
+
+  precheck_img
+  cudaErr_img(cudaStreamSynchronize(cudaStreamPerThread));
+  postcheck_img
+
+  precheck_img
+  cudaErr_img(cufftXtSetCallback(cuda_plan_forward, (void **)&h_realLoadAndClipInto, CUFFT_CB_LD_REAL, (void **)&d_params));
+  postcheck_img
+
+
 }

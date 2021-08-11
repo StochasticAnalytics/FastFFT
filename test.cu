@@ -182,24 +182,23 @@ void unit_impulse_test(short4 input_size, short4 output_size)
   host_output.FwdFFT();
   
   host_output.fftw_epsilon = ReturnSumOfComplexAmplitudes(host_output.complex_values, host_output.real_memory_allocated/2);  
+  std::cout << "host" << host_output.fftw_epsilon << " " << host_output.real_memory_allocated<< std::endl;
 
   host_output.fftw_epsilon -= (host_output.real_memory_allocated/2 );
-  MyFFTDebugAssertTestTrue( std::abs(host_output.fftw_epsilon < 1e-8) , "FFTW unit impulse forward FFT");
+  MyFFTDebugAssertTestTrue( std::abs(host_output.fftw_epsilon) < 1e-8 , "FFTW unit impulse forward FFT");
   
   // Just to make sure we don't get a false positive, set the host memory to some undesired value.
   FT.SetToConstant<float>(host_output.real_values, host_output.real_memory_allocated, 2.0f);
   
   // This method will call the regular FFT kernels given the input/output dimensions are equal when the class is instantiated.
-  bool swap_real_space_quadrants = false;
+  bool swap_real_space_quadrants = true;
   FT.FwdFFT(swap_real_space_quadrants);
   
   // do not deallocate, do not unpin memory
 
   FT.CopyDeviceToHost(host_output.real_values, false, false);
 
-  // for (int i = 0; i < host_output_memory_allocated/2; i++){ 
-  //   if (host_output_complex[i].x != 0.0f || host_output_complex[i].y != 0.0f){ std::cout << "Value at " << i <<  " is " << host_output_complex[i].x << " " << host_output_complex[i].y << std::endl; }
-  // // }
+
   // for (int x = 0; x < 128; x++)
   // {
   //   int n=0;
@@ -213,10 +212,12 @@ void unit_impulse_test(short4 input_size, short4 output_size)
   // }
 
   sum = ReturnSumOfComplexAmplitudes(host_output.complex_values, host_output.real_memory_allocated/2); 
+  std::cout << sum << " " << host_output.real_memory_allocated<< std::endl;
+
   sum -= (host_output.real_memory_allocated/2 );
 
 
-  
+  std::cout << "FFT Unit Impulse Forward FFT: " << sum <<  " epsilon" << host_output.fftw_epsilon << std::endl;
   MyFFTDebugAssertTestTrue( abs(sum - host_output.fftw_epsilon) < 1e-8, "FastFFT unit impulse forward FFT");
   FT.SetToConstant<float>(host_output.real_values, host_output.real_memory_allocated, 2.0f);
   
@@ -245,7 +246,8 @@ void unit_impulse_test(short4 input_size, short4 output_size)
 void compare_libraries(short4 input_size, short4 output_size)
 {
 
-
+  bool set_padding_callback = true;
+  if (input_size.x == output_size.x && input_size.y == output_size.y && input_size.z == output_size.z) set_padding_callback = false;
   bool test_passed = true;
   long address = 0;
 
@@ -267,8 +269,8 @@ void compare_libraries(short4 input_size, short4 output_size)
   FT_input.real_memory_allocated = FT.ReturnPaddedMemorySize(input_size);
   FT_output.real_memory_allocated = FT.ReturnPaddedMemorySize(output_size);
   
-  cuFFT_input.real_memory_allocated = FT.ReturnPaddedMemorySize(input_size);
-  cuFFT_output.real_memory_allocated = FT.ReturnPaddedMemorySize(output_size);
+  cuFFT_input.real_memory_allocated = cuFFT.ReturnPaddedMemorySize(input_size);
+  cuFFT_output.real_memory_allocated = cuFFT.ReturnPaddedMemorySize(output_size);
 
   bool set_fftw_plan = false;
   FT_input.Allocate(set_fftw_plan);
@@ -291,7 +293,7 @@ void compare_libraries(short4 input_size, short4 output_size)
 
   // Set a unit impulse at the center of the input array.
   FT.SetToConstant<float>(FT_input.real_values, FT_input.real_memory_allocated, 1.0f);
-  FT.SetToConstant<float>(cuFFT_input.real_values, cuFFT_output.real_memory_allocated, 1.0f);
+  FT.SetToConstant<float>(cuFFT_input.real_values, cuFFT_input.real_memory_allocated, 1.0f);
 
 
   
@@ -314,18 +316,31 @@ void compare_libraries(short4 input_size, short4 output_size)
   }
   cuFFT_output.record_stop();
   cuFFT_output.synchronize();
-  cuFFT_output.print_time();
+  cuFFT_output.print_time("FastFFT");
 
+  if (set_padding_callback) 
+  {
+    precheck
+    cufftReal* overlap_pointer;
+    overlap_pointer = cuFFT.device_pointer_fp32;
+    cuFFT_output.SetClipIntoCallback(overlap_pointer, cuFFT_input.size.x, cuFFT_input.size.y, cuFFT_input.size.w*2);
+    postcheck
+  }
 
   cuFFT_output.record_start();
   for (int i = 0; i < n_loops; ++i)
   {
+    precheck
     cudaErr(cufftExecR2C(cuFFT_output.cuda_plan_forward, (cufftReal*)cuFFT.device_pointer_fp32, (cufftComplex*)cuFFT.device_pointer_fp32_complex));
+    postcheck
+
+    precheck
     cudaErr(cufftExecC2R(cuFFT_output.cuda_plan_inverse, (cufftComplex*)cuFFT.device_pointer_fp32_complex, (cufftReal*)cuFFT.device_pointer_fp32));
+    postcheck
   }
   cuFFT_output.record_stop();
   cuFFT_output.synchronize();
-  cuFFT_output.print_time();
+  cuFFT_output.print_time("cuFFT");
 
 }
 
@@ -338,8 +353,8 @@ int main(int argc, char** argv) {
   short4 input_size;
   short4 output_size;
 
-  constexpr const int n_tests = 4;
-  const int test_size[n_tests] = {64, 128, 256, 512};
+  constexpr const int n_tests = 5;
+  const int test_size[n_tests] = {64, 128, 256, 512, 2048};
   for (int iSize = 0; iSize < n_tests; iSize++) {
 
     std::cout << std::endl << "Testing constant image size " << test_size[iSize] << " x" << std::endl;
@@ -373,6 +388,19 @@ int main(int argc, char** argv) {
 
     compare_libraries(input_size, output_size);
 
+  }
+  cudaErr(cudaSetDevice(0));
+  for (int iSize = 0; iSize < n_tests - 1; iSize++) {
+    int oSize = iSize + 1;
+    while (oSize < n_tests)
+    {
+      std::cout << std::endl << "Testing padding from  " << test_size[iSize] << " to " << test_size[oSize] << std::endl;
+      input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+      output_size = make_short4(test_size[oSize],test_size[oSize],1,0);
+  
+      compare_libraries(input_size, output_size);
+      oSize++;
+    }
   }
   
 }

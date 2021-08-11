@@ -17,6 +17,7 @@
 // A simple class to represent image objects needed for testing FastFFT. 
 
 
+
 template<class wanted_real_type, class wanted_complex_type >
 class Image {
 
@@ -28,6 +29,7 @@ class Image {
 
     wanted_real_type* real_values;
     wanted_complex_type* complex_values;
+    bool* clipIntoMask;
 
     short4 size;
     int real_memory_allocated;
@@ -69,8 +71,11 @@ class Image {
     inline void record_start() { cudaEventRecord( startEvent ); }
     inline void record_stop()  { cudaEventRecord( stopEvent ); }
     inline void synchronize() { cudaEventSynchronize( stopEvent ); }
-    inline void print_time() {  cudaEventElapsedTime( &elapsed_gpu_ms, startEvent, stopEvent ) ; std::printf( "Time on FastFFT %0.2f ms\n", elapsed_gpu_ms ); }
+    inline void print_time(std::string msg) {  cudaEventElapsedTime( &elapsed_gpu_ms, startEvent, stopEvent ) ; std::cout << "Time on " << msg << " " << elapsed_gpu_ms << " ms" << std::endl; }
     void MakeCufftPlan();
+    void SetClipIntoMask(short4 input_size, short4 output_size); bool is_set_clip_into_mask = false;
+    void SetClipIntoCallback(cufftReal* image_to_insert, int image_to_insert_size_x, int image_to_insert_size_y,int image_to_insert_pitch);
+
 
   
 
@@ -202,3 +207,18 @@ void ClipInto(const float* array_to_paste, float* array_to_paste_into, short4 si
 
 
 } // end of clip into
+
+//#define HEAVYERRORCHECKING_IMG
+
+
+// Note we are using std::cerr b/c the wxWidgets apps running in cisTEM are capturing std::cout
+#ifndef HEAVYERRORCHECKING_IMG
+#define postcheck_img
+#define cudaErr_img(error) { auto status = static_cast<cudaError_t>(error); {;} };
+#define precheck_img
+#else
+#define MyFFTPrintWithDetails(...)	{std::cerr << __VA_ARGS__  << " From: " << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl;}
+#define postcheck_img { cudaError_t error = cudaStreamSynchronize(cudaStreamPerThread); if (error != cudaSuccess) { std::cerr << cudaGetErrorString(error) << std::endl; MyFFTPrintWithDetails("");} };
+#define cudaErr_img(error) { auto status = static_cast<cudaError_t>(error); if (status != cudaSuccess) { std::cerr << cudaGetErrorString(status) << std::endl; MyFFTPrintWithDetails("");} };
+#define precheck_img { cudaErr_img(cudaGetLastError()); }
+#endif
