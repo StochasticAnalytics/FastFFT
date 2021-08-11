@@ -9,8 +9,7 @@
 // 1 - basic checks without blocking
 // 2 - full checks, including blocking
 
-
-// #define HEAVYERRORCHECKING_FFT 
+ #define HEAVYERRORCHECKING_FFT 
 
 // #ifdef DEBUG
 #define MyFFTPrint(...)	{std::cerr << __VA_ARGS__  << std::endl;}

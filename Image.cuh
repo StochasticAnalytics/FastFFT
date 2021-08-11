@@ -11,6 +11,8 @@
 
 #include <cuda_runtime_api.h>
 #include <cufftdx.hpp>
+#include <cufft.h>
+#include <cufftXt.h>
 
 // A simple class to represent image objects needed for testing FastFFT. 
 
@@ -37,6 +39,8 @@ class Image {
     bool is_in_memory;
     bool is_fftw_planned;
     bool is_in_real_space;
+    bool is_cufft_planned;
+
 
     void Allocate(bool is_fftw_planned = false);
     void FwdFFT();
@@ -47,6 +51,26 @@ class Image {
     // In cisTEM we almost always use MKL, so this might be worth testing. I always used exhaustive in Matlab/emClarity.
     fftwf_plan plan_fwd = NULL;
     fftwf_plan plan_bwd = NULL;
+
+    cufftHandle cuda_plan_forward;
+    cufftHandle cuda_plan_inverse;
+    size_t	cuda_plan_worksize_forward;
+    size_t	cuda_plan_worksize_inverse;
+  
+    cudaEvent_t startEvent { nullptr };
+    cudaEvent_t stopEvent { nullptr };
+    float       elapsed_gpu_ms {};
+
+    inline void create_timing_events() {   
+      cudaEventCreate( &startEvent, cudaEventBlockingSync);
+      cudaEventCreate( &stopEvent, cudaEventBlockingSync );
+    }
+
+    inline void record_start() { cudaEventRecord( startEvent ); }
+    inline void record_stop()  { cudaEventRecord( stopEvent ); }
+    inline void synchronize() { cudaEventSynchronize( stopEvent ); }
+    inline void print_time() {  cudaEventElapsedTime( &elapsed_gpu_ms, startEvent, stopEvent ) ; std::printf( "Time on FastFFT %0.2f ms\n", elapsed_gpu_ms ); }
+    void MakeCufftPlan();
 
   
 

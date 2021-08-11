@@ -11,6 +11,9 @@ Image<wanted_real_type, wanted_complex_type>::Image(short4 wanted_size)
 
   is_in_memory = false;
   is_in_real_space = true;
+  is_cufft_planned = false;
+  is_fftw_planned = false;
+
 
 
 }
@@ -23,6 +26,11 @@ Image<wanted_real_type, wanted_complex_type>::~Image()
   {
     fftwf_destroy_plan(plan_fwd);
     fftwf_destroy_plan(plan_bwd);
+  }
+  if (is_cufft_planned)
+  {
+    (cufftDestroy(cuda_plan_inverse));
+    (cufftDestroy(cuda_plan_forward));
   }
 }
 
@@ -76,4 +84,46 @@ void Image<wanted_real_type, wanted_complex_type>::InvFFT()
   else {std::cout << "Error: FFTW plan not set up." << std::endl; exit(1);}
 
   is_in_real_space = true;
+}
+
+template < class wanted_real_type, class wanted_complex_type >
+void Image<wanted_real_type, wanted_complex_type>::MakeCufftPlan()
+{
+
+  // TODO for alternate precisions.
+
+  std::cout << "Allocating a 2d cufft Plan" << std::endl;
+
+  cufftCreate(&cuda_plan_forward);
+  cufftCreate(&cuda_plan_inverse);
+
+  cufftSetStream(cuda_plan_forward, cudaStreamPerThread);
+  cufftSetStream(cuda_plan_inverse, cudaStreamPerThread);
+
+  int rank = 2; int iBatch = 1;
+  long long int* fftDims = new long long int[rank];
+  long long int*inembed = new long long int[rank];
+  long long int*onembed = new long long int[rank];
+
+  fftDims[0] = size.y;
+  fftDims[1] = size.x;
+
+  inembed[0] = size.y;
+  inembed[1] = size.w;
+
+  onembed[0] = size.y;
+  onembed[1] = size.w;
+
+  (cufftXtMakePlanMany(cuda_plan_forward, rank, fftDims,
+    NULL, NULL, NULL, CUDA_R_32F,
+    NULL, NULL, NULL, CUDA_C_32F, iBatch, &cuda_plan_worksize_forward, CUDA_C_32F));
+    (cufftXtMakePlanMany(cuda_plan_inverse, rank, fftDims,
+    NULL, NULL, NULL, CUDA_C_32F,
+    NULL, NULL, NULL, CUDA_R_32F, iBatch, &cuda_plan_worksize_inverse, CUDA_R_32F));
+
+    delete [] fftDims;
+    delete [] inembed;
+    delete [] onembed;
+
+    is_cufft_planned = true;
 }
