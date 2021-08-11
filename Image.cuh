@@ -12,6 +12,48 @@
 #include <cuda_runtime_api.h>
 #include <cufftdx.hpp>
 
+// A simple class to represent image objects needed for testing FastFFT. 
+
+
+template<class wanted_real_type, class wanted_complex_type >
+class Image {
+
+  public:
+
+    Image();
+    Image(short4 wanted_size);
+    ~Image();
+
+    wanted_real_type* real_values;
+    wanted_complex_type* complex_values;
+
+    short4 size;
+    int real_memory_allocated;
+    int padding_jump_value;
+  
+    float fftw_epsilon;
+
+
+    bool is_in_memory;
+    bool is_fftw_planned;
+    bool is_in_real_space;
+
+    void Allocate(bool is_fftw_planned = false);
+    void FwdFFT();
+    void InvFFT();
+
+    // Make FFTW plans for comparing CPU to GPU xforms.
+    // This is nearly verbatim from cisTEM::Image::Allocate - I do not know if FFTW_ESTIMATE is the best option.
+    // In cisTEM we almost always use MKL, so this might be worth testing. I always used exhaustive in Matlab/emClarity.
+    fftwf_plan plan_fwd = NULL;
+    fftwf_plan plan_bwd = NULL;
+
+  
+
+  private:
+
+};
+
 
 // To print a message and some number n_to_print complex values to stdout
 void print_values_complex(float* input, std::string msg, int n_to_print)
