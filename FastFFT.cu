@@ -1147,6 +1147,113 @@ void block_fft_kernel_C2R_Transformed(const ComplexType* __restrict__  input_val
 
 } // end of block_fft_kernel_C2R_Transposed
 
+
+void FourierTransformer::ClipIntoTopLeft()
+{
+  // TODO add some checks and logic.
+
+  // Assuming we are calling this from R2C_Transposed and that the launch bounds are not set.
+  dim3 threadsPerBlock;
+  dim3 gridDims;
+
+  threadsPerBlock = dim3(512,1,1);
+  gridDims = dim3( (dims_out.x + threadsPerBlock.x - 1) / threadsPerBlock.x, 1, 1);
+
+  const short4 area_to_clip_from = make_short4(dims_in.x, dims_in.y, dims_in.w*2, dims_out.w*2);
+
+  precheck
+  clip_into_top_left_kernel<float, float><< < gridDims, threadsPerBlock, 0, cudaStreamPerThread >> >
+  (device_pointer_fp32, device_pointer_fp32, area_to_clip_from);
+  postcheck
+}
+ 
+template<typename InputType, typename OutputType>
+__global__ void clip_into_top_left_kernel(InputType*  input_values, OutputType* output_values, short4 dims )
+{
+
+  int x = blockIdx.x*blockDim.x + threadIdx.x;
+  if (x > dims.w) return; // Out of bounds. 
+
+  // dims.w is the pitch of the output array
+  if (blockIdx.y > dims.y) { output_values[blockIdx.y * dims.w + x] = OutputType(0); return; }
+
+  if (threadIdx.x > dims.x) { output_values[blockIdx.y * dims.w + x] = OutputType(0); return; }
+  else 
+  {
+    // dims.z is the pitch of the output array
+    output_values[blockIdx.y * dims.w + x] = input_values[blockIdx.y * dims.z + x];
+    return;
+  }
+} // end of clip_into_top_left_kernel
+
+
+void FourierTransformer::ClipIntoReal(int wanted_coordinate_of_box_center_x, int wanted_coordinate_of_box_center_y, int wanted_coordinate_of_box_center_z)
+{
+  // TODO add some checks and logic.
+
+  // Assuming we are calling this from R2C_Transposed and that the launch bounds are not set.
+  dim3 threadsPerBlock;
+  dim3 gridDims;
+  int3 wanted_center = make_int3(wanted_coordinate_of_box_center_x, wanted_coordinate_of_box_center_y, wanted_coordinate_of_box_center_z);
+  threadsPerBlock = dim3(32,32,1);
+  gridDims = dim3( (dims_out.x + threadsPerBlock.x - 1) / threadsPerBlock.x, 
+                   (dims_out.y + threadsPerBlock.y - 1) / threadsPerBlock.y, 
+                   1);
+
+  const short4 area_to_clip_from = make_short4(dims_in.x, dims_in.y, dims_in.w*2, dims_out.w*2);
+  float wanted_padding_value = 0.f;
+  
+  precheck
+  clip_into_real_kernel<float, float><< < gridDims, threadsPerBlock, 0, cudaStreamPerThread >> >
+  (device_pointer_fp32, device_pointer_fp32, dims_in, dims_out,wanted_center, wanted_padding_value);
+  postcheck
+
+}
+// Modified from GpuImage::ClipIntoRealKernel
+template<typename InputType, typename OutputType>
+__global__ void clip_into_real_kernel(InputType* real_values_gpu,
+                                      OutputType* other_image_real_values_gpu,
+                                      short4 dims, 
+                                      short4 other_dims,
+                                      int3 wanted_coordinate_of_box_center, 
+                                      OutputType wanted_padding_value)
+{
+  int3 other_coord = make_int3(blockIdx.x*blockDim.x + threadIdx.x,
+                               blockIdx.y*blockDim.y + threadIdx.y,
+                               blockIdx.z);
+
+  int3 coord = make_int3(0, 0, 0); 
+
+  if (other_coord.x < other_dims.x &&
+      other_coord.y < other_dims.y &&
+      other_coord.z < other_dims.z)
+  {
+
+    coord.z = dims.z/2 + wanted_coordinate_of_box_center.z + 
+    other_coord.z - other_dims.z/2;
+
+    coord.y = dims.y/2 + wanted_coordinate_of_box_center.y + 
+    other_coord.y - other_dims.y/2;
+
+    coord.x = dims.x + wanted_coordinate_of_box_center.x + 
+    other_coord.x - other_dims.x;
+
+    if (coord.z < 0 || coord.z >= dims.z || 
+        coord.y < 0 || coord.y >= dims.y ||
+        coord.x < 0 || coord.x >= dims.x)
+    {
+      other_image_real_values_gpu[ d_ReturnReal1DAddressFromPhysicalCoord(other_coord, other_dims) ] = wanted_padding_value;
+    }
+    else
+    {
+      other_image_real_values_gpu[ d_ReturnReal1DAddressFromPhysicalCoord(other_coord, other_dims) ] = 
+      real_values_gpu[ d_ReturnReal1DAddressFromPhysicalCoord(coord, dims) ];
+    }
+
+  } // end of bounds check
+
+} // end of ClipIntoRealKernel
+
 } // namespace fast_FFT
 
 

@@ -36,6 +36,12 @@
 
 namespace FastFFT {
 
+  __device__ __forceinline__ int
+  d_ReturnReal1DAddressFromPhysicalCoord(int3 coords, short4 img_dims)
+  {
+    return ( (((int)coords.z*(int)img_dims.y + coords.y) * (int)img_dims.w * 2)  + (int)coords.x) ;
+  }
+
 // GetCudaDeviceArch from https://github.com/mnicely/cufft_examples/blob/master/Common/cuda_helper.h
 void GetCudaDeviceArch( int &device, int &arch ) {
   int major;
@@ -89,7 +95,17 @@ template<class FFT, class ComplexType = typename FFT::value_type, class ScalarTy
 __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_C2R_Transformed(const ComplexType*  __restrict__ input_values, ScalarType*  __restrict__ output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
 
+template<class InputType, class OutputType> 
+ __global__ void clip_into_top_left_kernel( InputType*  input_values, OutputType*  output_values, const short4 dims );
 
+ // Modified from GpuImage::ClipIntoRealKernel
+template<typename InputType, typename OutputType>
+__global__ void clip_into_real_kernel(InputType* real_values_gpu,
+                                      OutputType* other_image_real_values_gpu,
+                                      short4 dims, 
+                                      short4 other_dims,
+                                      int3 wanted_coordinate_of_box_center, 
+                                      OutputType wanted_padding_value);
 
 //////////////////////////////////////////////
 // IO functions adapted from the cufftdx examples
@@ -430,6 +446,7 @@ struct io
     }
   }
 }; // struct io}
+
 
 
 } // namespace FastFFT

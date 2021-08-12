@@ -320,6 +320,7 @@ void compare_libraries(short4 input_size, short4 output_size)
   cuFFT_output.synchronize();
   cuFFT_output.print_time("FastFFT");
 
+  set_padding_callback = false;
   if (set_padding_callback) 
   {
     precheck
@@ -332,6 +333,9 @@ void compare_libraries(short4 input_size, short4 output_size)
   cuFFT_output.record_start();
   for (int i = 0; i < n_loops; ++i)
   {
+    cuFFT.ClipIntoTopLeft();
+    // cuFFT.ClipIntoReal(input_size.x/2, input_size.y/2, input_size.z/2);
+
     precheck
     cudaErr(cufftExecR2C(cuFFT_output.cuda_plan_forward, (cufftReal*)cuFFT.device_pointer_fp32, (cufftComplex*)cuFFT.device_pointer_fp32_complex));
     postcheck

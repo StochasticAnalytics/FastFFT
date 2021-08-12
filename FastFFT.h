@@ -85,6 +85,9 @@ public:
 
   void FwdFFT(bool swap_real_space_quadrants = false);
   void InvFFT();
+  void ClipIntoTopLeft();
+  void ClipIntoReal(int wanted_coordinate_of_box_center_x, int wanted_coordinate_of_box_center_y, int wanted_coordinate_of_box_center_z);
+
   
   inline int ReturnPaddedMemorySize(short4 & wanted_dims) 
   {
