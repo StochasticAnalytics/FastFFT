@@ -330,8 +330,9 @@ void compare_libraries(short4 input_size, short4 output_size)
   cuFFT_output.record_start();
   for (int i = 0; i < n_loops; ++i)
   {
-    FT.FwdFFT();
-    FT.InvFFT();
+    // FT.FwdFFT();
+    // FT.InvFFT();
+    FT.CrossCorrelate(targetFT.device_pointer_fp32_complex, false);
   }
   cuFFT_output.record_stop();
   cuFFT_output.synchronize();
@@ -386,40 +387,40 @@ int main(int argc, char** argv) {
 
   constexpr const int n_tests = 5;
   const int test_size[n_tests] = {64, 128, 256, 512, 4096};
-  for (int iSize = 0; iSize < n_tests; iSize++) {
+  // for (int iSize = 0; iSize < n_tests; iSize++) {
 
-    std::cout << std::endl << "Testing constant image size " << test_size[iSize] << " x" << std::endl;
-    input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
-    output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+  //   std::cout << std::endl << "Testing constant image size " << test_size[iSize] << " x" << std::endl;
+  //   input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+  //   output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
 
-    const_image_test(input_size, output_size);
+  //   const_image_test(input_size, output_size);
 
-  }
+  // }
 
 
-  for (int iSize = 0; iSize < n_tests - 1; iSize++) {
-    int oSize = iSize + 1;
-    while (oSize < n_tests)
-    {
-      std::cout << std::endl << "Testing padding from  " << test_size[iSize] << " to " << test_size[oSize] << std::endl;
-      input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
-      output_size = make_short4(test_size[oSize],test_size[oSize],1,0);
+  // for (int iSize = 0; iSize < n_tests - 1; iSize++) {
+  //   int oSize = iSize + 1;
+  //   while (oSize < n_tests)
+  //   {
+  //     std::cout << std::endl << "Testing padding from  " << test_size[iSize] << " to " << test_size[oSize] << std::endl;
+  //     input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+  //     output_size = make_short4(test_size[oSize],test_size[oSize],1,0);
   
-      unit_impulse_test(input_size, output_size);
-      oSize++;
-    }
-  }
+  //     unit_impulse_test(input_size, output_size);
+  //     oSize++;
+  //   }
+  // }
 
 
-  for (int iSize = 0; iSize < n_tests; iSize++) {
+  // for (int iSize = 0; iSize < n_tests; iSize++) {
 
-    std::cout << std::endl << "Testing cufft comparison " << test_size[iSize] << " x" << std::endl;
-    input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
-    output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+  //   std::cout << std::endl << "Testing cufft comparison " << test_size[iSize] << " x" << std::endl;
+  //   input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+  //   output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
 
-    compare_libraries(input_size, output_size);
+  //   compare_libraries(input_size, output_size);
 
-  }
+  // }
 
   for (int iSize = 0; iSize < n_tests - 1; iSize++) {
     int oSize = iSize + 1;

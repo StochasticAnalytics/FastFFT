@@ -354,7 +354,7 @@ void FourierTransformer::CrossCorrelate(float2* image_to_search, bool swap_real_
 
       FFT_C2C_WithPadding_ConjMul_C2C(image_to_search, swap_real_space_quadrants);
 
-      FFT_C2R_Transposed();
+      // FFT_C2R_Transposed();
       fft_status = 0;
       break;
     }
@@ -681,6 +681,10 @@ void FourierTransformer::FFT_C2C_WithPadding_ConjMul_C2C_t(float2* image_to_sear
     // block_fft_kernel_C2C_WithPadding_ConjMul_C2C_SwapRealSpaceQuadrants<FFT,invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
     // ( (complex_type*) image_to_search, (complex_type*)  buffer_fp32_complex,  (complex_type*) device_pointer_fp32_complex, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
     // postcheck
+    precheck
+    block_fft_kernel_C2C_WithPadding_ConjMul_C2C<FFT, invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
+    (  (complex_type*) image_to_search, (complex_type*)  buffer_fp32_complex,  (complex_type*) device_pointer_fp32_complex, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
+    postcheck
   }
   else
   {
@@ -1179,22 +1183,24 @@ void block_fft_kernel_C2C_WithPadding_ConjMul_C2C(const ComplexType* __restrict_
 	__syncthreads();
 
 
-  // // Now we need to read in the image to search (cross-correlate). First reset the outputMAP
-  // for (int i = 0; i < FFT::elements_per_thread; i++)
-  // {
-  //   output_MAP[i] -= (Q-1);
-  // }
+  // Now we need to read in the image to search (cross-correlate). First reset the outputMAP
+  for (int i = 0; i < FFT::elements_per_thread; i++)
+  {
+    output_MAP[i] -= (Q-1);
+  }
 
-  // for (int sub_fft = 0; sub_fft < Q; sub_fft++)
-	// {
-  //   io<FFT>::load_shared_an_conj_multiply(&image_to_search[blockIdx.y*mem_offsets.pixel_pitch_input], shared_output, thread_data, output_MAP);
-  //   output_MAP[i]++;
-  // }
+  for (int sub_fft = 0; sub_fft < Q; sub_fft++)
+	{
+    // output_MAP is incremented inside this call.
+    io<FFT>::load_shared_an_conj_multiply(&image_to_search[blockIdx.y*mem_offsets.pixel_pitch_input], shared_output, thread_data, output_MAP);
+  }
 
-  // // TODO confirm this is needed
-  // __syncthreads():
+  // TODO confirm this is needed
+  __syncthreads();
 
-  // FFT().execute(thread_data, shared_mem, workspace);
+  invFFT().execute(thread_data, shared_mem, workspace);
+
+  io<invFFT>::store(thread_data,&output_values[blockIdx.y * mem_offsets.pixel_pitch_output]);
 
 	// // Now that the memory output can be coalesced send to global
   // // FIXME is this actually coalced?
@@ -1616,7 +1622,7 @@ void FourierTransformer::FFT_C2R_Transposed_t()
 	using scalar_type    = typename complex_type::value_type;
   cudaError_t error_code = cudaSuccess;
   auto workspace = make_workspace<FFT>(error_code);
-
+  cudaErr(error_code);
 
 	precheck
 	block_fft_kernel_C2R_Transformed<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, FFT::shared_memory_size, cudaStreamPerThread>> >
@@ -1634,7 +1640,7 @@ void FourierTransformer::FFT_C2R_Transposed()
   int device, arch;
   GetCudaDeviceArch( device, arch );
 
-  switch (dims_out.y)
+  switch (dims_out.x)
   {
     case 64: {
       switch (arch)

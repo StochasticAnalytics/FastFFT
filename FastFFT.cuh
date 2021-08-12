@@ -12,7 +12,7 @@
 // 1 - basic checks without blocking
 // 2 - full checks, including blocking
 
-//#define HEAVYERRORCHECKING_FFT 
+#define HEAVYERRORCHECKING_FFT 
 
 // #ifdef DEBUG
 #define MyFFTPrint(...)	{std::cerr << __VA_ARGS__  << std::endl;}
@@ -47,7 +47,7 @@ namespace FastFFT {
 
   // Complex a * conj b multiplication
   template <typename ComplexType, typename ScalarType>
-  static __device__ __host__ inline auto ComplexConjMulAndScale(ComplexType a, ComplexType b, ScalarType s) -> decltype(b)
+  static __device__ __host__ inline auto ComplexConjMulAndScale(const ComplexType a, const ComplexType b, ScalarType s) -> decltype(b)
   {
       ComplexType c;
       c.x = s * (a.x * b.x + a.y * b.y);
@@ -71,13 +71,12 @@ void GetCudaDeviceArch( int &device, int &arch ) {
 // Base FFT kerenel types, direction (r2c, c2r, c2c) and direction are ommited, to be applied in the method calling afull kernel
 using namespace cufftdx;
 
+// TODO this probably needs to depend on the size of the xform, at least small vs large.
 constexpr const int elements_per_thread_real = 8;
 constexpr const int elements_per_thread_complex = 8;
-constexpr const uint device_arch = 700;
 
 // All transforms are 
 using FFT_base   = decltype(Block() + Precision<float>() + ElementsPerThread<elements_per_thread_complex>()  + FFTsPerBlock<1>()  );
-
 
 
 //////////////////////////////
@@ -264,7 +263,8 @@ struct io
     for (unsigned int i = 0; i < FFT::elements_per_thread; i++)
     {
       // a * conj b
-      thread_data[i] = ComplexConjMulAndScale<complex_type, scalar_type>(shared_output[output_MAP[i]], image_to_search[output_MAP[i]]);
+      thread_data[i] = ComplexConjMulAndScale<complex_type, scalar_type>(shared_output[output_MAP[i]], image_to_search[output_MAP[i]], 1.0f);
+      output_MAP[i]++;
     }
   } // copy_from_shared
 
