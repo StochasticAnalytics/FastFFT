@@ -85,6 +85,7 @@ public:
 
   void FwdFFT(bool swap_real_space_quadrants = false);
   void InvFFT();
+  void CrossCorrelate(float2* image_to_search);
   void ClipIntoTopLeft();
   void ClipIntoReal(int wanted_coordinate_of_box_center_x, int wanted_coordinate_of_box_center_y, int wanted_coordinate_of_box_center_z);
 
@@ -230,12 +231,15 @@ private:
   void FFT_C2C_WithPadding(bool swap_real_space_quadrants = false);
   void FFT_C2C( bool do_forward_transform );
   void FFT_C2R_Transposed();
+  void FFT_C2C_WithPadding_ConjMul_C2C(bool swap_real_space_quadrants = false);
+
 
   template<class FFT> void FFT_R2C_Transposed_t();
   template<class FFT> void FFT_R2C_WithPadding_Transposed_t();
   template<class FFT> void FFT_C2C_WithPadding_t(bool swap_real_space_quadrants);
   template<class FFT> void FFT_C2C_t( bool do_forward_transform );
   template<class FFT> void FFT_C2R_Transposed_t();
+  template<class FFT, class invFFT> void FFT_C2C_WithPadding_ConjMul_C2C_t(bool swap_real_space_quadrants);
 
 
 

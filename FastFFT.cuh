@@ -1,6 +1,9 @@
 // Utilites for FastFFT.cu that we don't need the host to know about (FastFFT.h)
 #include "FastFFT.h"
 
+#ifndef Fast_FFT_cuh_
+#define Fast_FFT_cuh_
+
 // “This software contains source code provided by NVIDIA Corporation.” Much of it is modfied as noted at relevant function definitions.
 
 
@@ -42,6 +45,16 @@ namespace FastFFT {
     return ( (((int)coords.z*(int)img_dims.y + coords.y) * (int)img_dims.w * 2)  + (int)coords.x) ;
   }
 
+  // Complex a * conj b multiplication
+  template <typename ComplexType, typename ScalarType>
+  static __device__ __host__ inline auto ComplexConjMulAndScale(ComplexType a, ComplexType b, ScalarType s) -> decltype(b)
+  {
+      ComplexType c;
+      c.x = s * (a.x * b.x + a.y * b.y);
+      c.y = s * (a.y * b.x - a.x * b.y) ;
+      return c;
+  }
+
 // GetCudaDeviceArch from https://github.com/mnicely/cufft_examples/blob/master/Common/cuda_helper.h
 void GetCudaDeviceArch( int &device, int &arch ) {
   int major;
@@ -79,13 +92,21 @@ template<class FFT, class ComplexType = typename FFT::value_type, class ScalarTy
 __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_R2C_WithPadding_Transposed(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 
-template<class FFT, class ComplexType = typename FFT::value_typem>
+template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_C2C_WithPadding(const ComplexType* __restrict__  input_values, ComplexType*  __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 
-template<class FFT, class ComplexType = typename FFT::value_typem>
+template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_C2C_WithPadding_SwapRealSpaceQuadrants(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
+
+template<class FFT, class invFFT, class ComplexType = typename FFT::value_type>
+__launch_bounds__(FFT::max_threads_per_block) __global__
+void block_fft_kernel_C2C_WithPadding_ConjMul_C2C( const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
+
+template<class FFT, class invFFT, class ComplexType = typename FFT::value_type>
+__launch_bounds__(FFT::max_threads_per_block) __global__
+void block_fft_kernel_C2C_WithPadding_ConjMul_C2C_SwapRealSpaceQuadrants( const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 
 template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
@@ -232,6 +253,18 @@ struct io
     for (unsigned int i = 0; i < FFT::elements_per_thread; i++)
     {
       thread_data[i] = shared_input_complex[input_map[i]];
+    }
+  } // copy_from_shared
+
+  static inline __device__ void load_shared_an_conj_multiply(const complex_type*  image_to_search,
+                                                             const complex_type*  shared_output,
+                                                             complex_type*  thread_data,
+                                                             int*				    output_MAP)
+  {
+    for (unsigned int i = 0; i < FFT::elements_per_thread; i++)
+    {
+      // a * conj b
+      thread_data[i] = ComplexConjMulAndScale<complex_type, scalar_type>(shared_input_complex[output_MAP[i]], image_to_search[output_MAP[i]]);
     }
   } // copy_from_shared
 
@@ -452,3 +485,4 @@ struct io
 } // namespace FastFFT
 
 
+#endif // Fast_FFT_cuh_

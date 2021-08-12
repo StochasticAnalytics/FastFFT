@@ -1,4 +1,5 @@
 #include "Image.cuh"
+#include "FastFFT.cuh"
 
 template < class wanted_real_type, class wanted_complex_type >
 Image<wanted_real_type, wanted_complex_type>::Image(short4 wanted_size)
@@ -36,14 +37,14 @@ Image<wanted_real_type, wanted_complex_type>::~Image()
   }
   if (is_cufft_planned)
   {
-    cudaErr_img(cufftDestroy(cuda_plan_inverse));
-    cudaErr_img(cufftDestroy(cuda_plan_forward));
+    cudaErr(cufftDestroy(cuda_plan_inverse));
+    cudaErr(cufftDestroy(cuda_plan_forward));
     is_cufft_planned = false;
   }
 
   if (is_set_clip_into_mask)
   {
-    cudaErr_img(cudaFree(clipIntoMask));
+    cudaErr(cudaFree(clipIntoMask));
     is_set_clip_into_mask = false;
   }
 }
@@ -57,9 +58,9 @@ void Image<wanted_real_type, wanted_complex_type>::SetClipIntoMask(short4 input_
   int n_values = output_size.w*2*output_size.y;
   bool* tmpMask = new bool[n_values];
 
-  precheck_img
-  cudaErr_img(cudaMalloc(&clipIntoMask, (n_values)*sizeof(bool)));
-  postcheck_img
+  precheck
+  cudaErr(cudaMalloc(&clipIntoMask, (n_values)*sizeof(bool)));
+  postcheck
 
   if (output_size.x % 2 == 0) pjv = 2;
   else pjv = 1;
@@ -78,7 +79,7 @@ void Image<wanted_real_type, wanted_complex_type>::SetClipIntoMask(short4 input_
   }
 
 
-  cudaErr_img(cudaMemcpyAsync(clipIntoMask, tmpMask, n_values*sizeof(bool),cudaMemcpyHostToDevice,cudaStreamPerThread));
+  cudaErr(cudaMemcpyAsync(clipIntoMask, tmpMask, n_values*sizeof(bool),cudaMemcpyHostToDevice,cudaStreamPerThread));
   cudaStreamSynchronize(cudaStreamPerThread);
 
   delete [] tmpMask;
@@ -210,6 +211,9 @@ static __device__ cufftReal CB_realLoadAndClipInto(void* dataIn, size_t offset, 
 
 __device__ cufftCallbackLoadR d_realLoadAndClipInto = CB_realLoadAndClipInto;
 
+
+
+
 template < class wanted_real_type, class wanted_complex_type >
 void Image<wanted_real_type, wanted_complex_type>::SetClipIntoCallback(cufftReal* image_to_insert, int image_to_insert_size_x, int image_to_insert_size_y,int image_to_insert_pitch)
 {
@@ -225,27 +229,62 @@ void Image<wanted_real_type, wanted_complex_type>::SetClipIntoCallback(cufftReal
   CB_realLoadAndClipInto_params* d_params;
   CB_realLoadAndClipInto_params h_params;
 
-  precheck_img
+  precheck
   h_params.target = (cufftReal *)image_to_insert;
   h_params.mask = (bool*) clipIntoMask;
-  cudaErr_img(cudaMalloc((void **)&d_params,sizeof(CB_realLoadAndClipInto_params)));
-  postcheck_img
+  cudaErr(cudaMalloc((void **)&d_params,sizeof(CB_realLoadAndClipInto_params)));
+  postcheck
 
-  precheck_img
-  cudaErr_img(cudaMemcpyAsync(d_params, &h_params, sizeof(CB_realLoadAndClipInto_params), cudaMemcpyHostToDevice, cudaStreamPerThread));
-  postcheck_img
+  precheck
+  cudaErr(cudaMemcpyAsync(d_params, &h_params, sizeof(CB_realLoadAndClipInto_params), cudaMemcpyHostToDevice, cudaStreamPerThread));
+  postcheck
 
-  precheck_img
-  cudaErr_img(cudaMemcpyFromSymbol(&h_realLoadAndClipInto,d_realLoadAndClipInto, sizeof(h_realLoadAndClipInto)));
-  postcheck_img
+  precheck
+  cudaErr(cudaMemcpyFromSymbol(&h_realLoadAndClipInto,d_realLoadAndClipInto, sizeof(h_realLoadAndClipInto)));
+  postcheck
 
-  precheck_img
-  cudaErr_img(cudaStreamSynchronize(cudaStreamPerThread));
-  postcheck_img
+  precheck
+  cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
+  postcheck
 
-  precheck_img
-  cudaErr_img(cufftXtSetCallback(cuda_plan_forward, (void **)&h_realLoadAndClipInto, CUFFT_CB_LD_REAL, (void **)&d_params));
-  postcheck_img
+  precheck
+  cudaErr(cufftXtSetCallback(cuda_plan_forward, (void **)&h_realLoadAndClipInto, CUFFT_CB_LD_REAL, (void **)&d_params));
+  postcheck
 
 
 }
+
+struct CB_complexConjMulLoad_params
+{
+	cufftComplex* target;
+	cufftReal 	scale;
+} ;
+
+
+static __device__ cufftComplex CB_complexConjMulLoad_32f(void* dataIn, size_t offset, void* callerInfo, void* sharedPtr) 
+ {
+	CB_complexConjMulLoad_params* my_params = (CB_complexConjMulLoad_params *)callerInfo;
+	return (cufftComplex)FastFFT::ComplexConjMulAndScale<cufftComplex, cufftReal>(my_params->target[offset],((cufftComplex *)dataIn)[offset],my_params->scale);
+ };
+ __device__ cufftCallbackLoadC d_complexConjMulLoad_32f = CB_complexConjMulLoad_32f;
+
+template < class wanted_real_type, class wanted_complex_type >
+void Image<wanted_real_type, wanted_complex_type>::SetComplexConjMultiplyAndLoadCallBack(cufftComplex* search_image_FT, 
+                                                                                         cufftReal FT_normalization_factor)
+{
+  cufftCallbackStoreC h_complexConjMulLoad;
+  cufftCallbackStoreR h_mipCCGStore;
+  CB_complexConjMulLoad_params* d_params;
+  CB_complexConjMulLoad_params h_params;
+
+  h_params.scale = FT_normalization_factor*FT_normalization_factor;
+  h_params.target = (cufftComplex *)search_image_FT;
+
+  cudaErr(cudaMalloc( (void **)&d_params,sizeof(CB_complexConjMulLoad_params)));
+  cudaErr(cudaMemcpyAsync(d_params, &h_params, sizeof(CB_complexConjMulLoad_params), cudaMemcpyHostToDevice, cudaStreamPerThread));
+  cudaErr(cudaMemcpyFromSymbol(&h_complexConjMulLoad,d_complexConjMulLoad_32f, sizeof(h_complexConjMulLoad)));
+  
+  cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
+  cudaErr(cufftXtSetCallback(cuda_plan_inverse, (void **)&h_complexConjMulLoad, CUFFT_CB_LD_COMPLEX, (void **)&d_params));
+}
+

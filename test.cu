@@ -249,6 +249,7 @@ void compare_libraries(short4 input_size, short4 output_size)
 {
 
   bool set_padding_callback = true;
+  bool set_conjMult_callback = true;
   if (input_size.x == output_size.x && input_size.y == output_size.y && input_size.z == output_size.z) set_padding_callback = false;
   bool test_passed = true;
   long address = 0;
@@ -261,18 +262,24 @@ void compare_libraries(short4 input_size, short4 output_size)
   Image< float, float2 > cuFFT_input(input_size);
   Image< float, float2 > cuFFT_output(output_size);
 
+  Image< float, float2> target_search_image(output_size);
+
 
    // We just make one instance of the FourierTransformer class, with calc type float.
   // For the time being input and output are also float. TODO calc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
   FastFFT::FourierTransformer FT(FastFFT::FourierTransformer::DataType::fp32);
     // Create an instance to copy memory also for the cufft tests.
   FastFFT::FourierTransformer cuFFT(FastFFT::FourierTransformer::DataType::fp32);
+  FastFFT::FourierTransformer targetFT(FastFFT::FourierTransformer::DataType::fp32);
+
 
   FT_input.real_memory_allocated = FT.ReturnPaddedMemorySize(input_size);
   FT_output.real_memory_allocated = FT.ReturnPaddedMemorySize(output_size);
   
   cuFFT_input.real_memory_allocated = cuFFT.ReturnPaddedMemorySize(input_size);
   cuFFT_output.real_memory_allocated = cuFFT.ReturnPaddedMemorySize(output_size);
+
+  target_search_image.real_memory_allocated = targetFT.ReturnPaddedMemorySize(output_size);
 
   bool set_fftw_plan = false;
   FT_input.Allocate(set_fftw_plan);
@@ -281,27 +288,37 @@ void compare_libraries(short4 input_size, short4 output_size)
   cuFFT_input.Allocate(set_fftw_plan);
   cuFFT_output.Allocate(set_fftw_plan);
 
+  target_search_image.Allocate(set_fftw_plan);
+  
+
 
 
   // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
   FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
   FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
   cuFFT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
-  cuFFT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);  
+  cuFFT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
+  
+  targetFT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
+  targetFT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
+
   // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
   // ensures faster transfer. If false, it will be pinned for you.
   FT.SetInputPointer(FT_input.real_values, false);
   cuFFT.SetInputPointer(cuFFT_input.real_values, false);
+  targetFT.SetInputPointer(target_search_image.real_values, false);
 
   // Set a unit impulse at the center of the input array.
   FT.SetToConstant<float>(FT_input.real_values, FT_input.real_memory_allocated, 1.0f);
   FT.SetToConstant<float>(cuFFT_input.real_values, cuFFT_input.real_memory_allocated, 1.0f);
+  FT.SetToConstant<float>(target_search_image.real_values, target_search_image.real_memory_allocated, 1.0f);
 
 
   
   // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
   FT.CopyHostToDevice();
   cuFFT.CopyHostToDevice();
+  targetFT.CopyHostToDevice();
 
   cuFFT_output.create_timing_events();
   
@@ -327,6 +344,14 @@ void compare_libraries(short4 input_size, short4 output_size)
     cufftReal* overlap_pointer;
     overlap_pointer = cuFFT.device_pointer_fp32;
     cuFFT_output.SetClipIntoCallback(overlap_pointer, cuFFT_input.size.x, cuFFT_input.size.y, cuFFT_input.size.w*2);
+    postcheck
+  }
+
+  if (set_conjMult_callback)
+  {
+    precheck
+    // FIXME scaling factor
+    cuFFT_output.SetComplexConjMultiplyAndLoadCallBack( (cufftComplex *) targetFT.device_pointer_fp32_complex, 1.0f);
     postcheck
   }
 
