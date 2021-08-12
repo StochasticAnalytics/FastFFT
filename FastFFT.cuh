@@ -264,7 +264,7 @@ struct io
     for (unsigned int i = 0; i < FFT::elements_per_thread; i++)
     {
       // a * conj b
-      thread_data[i] = ComplexConjMulAndScale<complex_type, scalar_type>(shared_input_complex[output_MAP[i]], image_to_search[output_MAP[i]]);
+      thread_data[i] = ComplexConjMulAndScale<complex_type, scalar_type>(shared_output[output_MAP[i]], image_to_search[output_MAP[i]]);
     }
   } // copy_from_shared
 

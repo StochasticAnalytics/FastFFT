@@ -273,7 +273,6 @@ void Image<wanted_real_type, wanted_complex_type>::SetComplexConjMultiplyAndLoad
                                                                                          cufftReal FT_normalization_factor)
 {
   cufftCallbackStoreC h_complexConjMulLoad;
-  cufftCallbackStoreR h_mipCCGStore;
   CB_complexConjMulLoad_params* d_params;
   CB_complexConjMulLoad_params h_params;
 
