@@ -175,7 +175,7 @@ private:
         L.threadsPerBlock = dim3(dims_in.x/ept, 1, 1);
         L.gridDims = dim3(1, dims_in.y, 1); 
         L.mem_offsets.shared_input = dims_in.x;
-        L.mem_offsets.shared_output = 0;
+        L.mem_offsets.shared_output = dims_out.w; // used in bounds check.
         L.mem_offsets.pixel_pitch_input = dims_in.w*2; // scalar type, natural 
         L.mem_offsets.pixel_pitch_output = dims_out.y; // complex type, transposed
         L.twiddle_in = -2*PIf/dims_out.x;

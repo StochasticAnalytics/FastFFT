@@ -28,7 +28,7 @@
 #define cudaErr(error) { auto status = static_cast<cudaError_t>(error); {;} };
 #define precheck
 #else
-#define postcheck { cudaError_t error = cudaStreamSynchronize(cudaStreamPerThread); if (error != cudaSuccess) { std::cerr << cudaGetErrorString(error) << std::endl; MyFFTPrintWithDetails("");} };
+#define postcheck { cudaError_t error = cudaStreamSynchronize(cudaStreamPerThread); if (error != cudaSuccess) { std::cerr << cudaGetErrorString(error) << std::endl; MyFFTPrintWithDetails(""); exit(-1);} };
 #define cudaErr(error) { auto status = static_cast<cudaError_t>(error); if (status != cudaSuccess) { std::cerr << cudaGetErrorString(status) << std::endl; MyFFTPrintWithDetails("");} };
 #define precheck { cudaErr(cudaGetLastError()); }
 #endif
@@ -262,6 +262,31 @@ struct io
     }
   } // store_r2c_transposed
 
+  static inline __device__ void store_r2c_transposed(const complex_type* thread_data,
+                                                      complex_type*       output,
+                                                      int*	              output_MAP,
+                                                      int                 pixel_pitch,
+                                                      int                 memory_limit) 
+  {
+    const unsigned int stride = stride_size();
+    for (unsigned int i = 0; i <= FFT::elements_per_thread / 2; i++) 
+    {
+      // output map is thread local, so output_MAP[i] gives the x-index in the non-transposed array and blockIdx.y gives the y-index
+      // if (blockIdx.y == 1) printf("index, pitch, blcok, address %i, %i, %i, %i\n", output_MAP[i], pixel_pitch, memory_limit, output_MAP[i]*pixel_pitch + blockIdx.y);
+
+      if (output_MAP[i] < memory_limit) output[output_MAP[i]*pixel_pitch + blockIdx.y] = thread_data[i];
+      // if (blockIdx.y == 32) printf("from store transposed %i , val %f %f\n", output_MAP[i], thread_data[i].x, thread_data[i].y);
+
+    }
+    // constexpr unsigned int threads_per_fft        = cufftdx::size_of<FFT>::value / FFT::elements_per_thread;
+    // constexpr unsigned int output_values_to_store = (cufftdx::size_of<FFT>::value / 2) + 1;
+    // constexpr unsigned int values_left_to_store = threads_per_fft == 1 ? 1 : (output_values_to_store % threads_per_fft);
+    // if (threadIdx.x < values_left_to_store)
+    // {
+    //   printf("index, pitch, blcok, address %i, %i, %i, %i\n", output_MAP[FFT::elements_per_thread / 2], pixel_pitch, blockIdx.y, output_MAP[FFT::elements_per_thread / 2]*pixel_pitch + blockIdx.y);
+    //   if (output_MAP[FFT::elements_per_thread / 2] < memory_limit) output[output_MAP[FFT::elements_per_thread / 2]*pixel_pitch + blockIdx.y] =  thread_data[FFT::elements_per_thread / 2];
+    // }
+  } // store_r2c_transposed
 
   static inline __device__ void load_c2r_transposed(const complex_type* input,
                                                     complex_type*       thread_data,

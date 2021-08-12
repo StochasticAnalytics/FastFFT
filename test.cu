@@ -198,17 +198,19 @@ void unit_impulse_test(short4 input_size, short4 output_size)
 
   FT.CopyDeviceToHost(host_output.real_values, false, false);
 
-
-  // for (int x = 0; x < 128; x++)
+  // int n=0;
+  // for (int x = 0; x <  host_output.size.y ; x++)
   // {
-  //   int n=0;
+    
   //   std::cout << x << "[ ";
-  //   for (int y = 0; y < 65; y++)
+  //   for (int y = 0; y < host_output.size.w; y++)
   //   {  
-  //     std::cout << host_output_complex[x + y*128].x << "," << host_output_complex[x + y*128].y << " ";
-  //     if (host_output_complex[x + y*128].x == 3) { n++;}
+  //     std::cout << host_output.complex_values[x + y*host_output.size.y].x << "," << host_output.complex_values[x + y*host_output.size.y].y << " ";
+  //     n++;
+  //     if (n == 32) {n = 0; std::cout << std::endl ;} // line wrapping
   //   }
-  //   std::cout << "] " << n << std::endl;
+  //   std::cout << "] " << std::endl;
+  //   n = 0;
   // }
 
   sum = ReturnSumOfComplexAmplitudes(host_output.complex_values, host_output.real_memory_allocated/2); 
@@ -354,7 +356,7 @@ int main(int argc, char** argv) {
   short4 output_size;
 
   constexpr const int n_tests = 5;
-  const int test_size[n_tests] = {64, 128, 256, 512, 2048};
+  const int test_size[n_tests] = {64, 128, 256, 512, 4096};
   for (int iSize = 0; iSize < n_tests; iSize++) {
 
     std::cout << std::endl << "Testing constant image size " << test_size[iSize] << " x" << std::endl;
@@ -389,7 +391,7 @@ int main(int argc, char** argv) {
     compare_libraries(input_size, output_size);
 
   }
-  cudaErr(cudaSetDevice(0));
+
   for (int iSize = 0; iSize < n_tests - 1; iSize++) {
     int oSize = iSize + 1;
     while (oSize < n_tests)
