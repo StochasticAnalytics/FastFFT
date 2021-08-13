@@ -12,7 +12,7 @@
 // 1 - basic checks without blocking
 // 2 - full checks, including blocking
 
-#define HEAVYERRORCHECKING_FFT 
+// #define HEAVYERRORCHECKING_FFT 
 
 // #ifdef DEBUG
 #define MyFFTPrint(...)	{std::cerr << __VA_ARGS__  << std::endl;}
@@ -203,6 +203,37 @@ struct io
 
   } // load_shared
 
+  static inline __device__ void load_shared(const complex_type* input,
+                                            complex_type*       shared_input,
+                                            complex_type*       thread_data,
+                                            float* 	            twiddle_factor_args,
+                                            float				        twiddle_in,
+                                            int*				        input_map,
+                                            int*				        output_map,
+                                            int				          Q,
+                                            int                 number_of_elements)
+  {
+    const unsigned int stride = stride_size();
+    unsigned int       index  =  threadIdx.x;
+    for (unsigned int i = 0; i < FFT::elements_per_thread; i++)
+    {
+      if (index < number_of_elements)
+      {
+        input_map[i] = index;
+        output_map[i] = Q*index;
+        twiddle_factor_args[i] = twiddle_in * index;
+        thread_data[i] = input[index];
+        shared_input[index] = thread_data[i];
+        index += stride;
+      }
+      else
+      {
+        input_map[i] = -9999; // ignore this in subsequent ops
+      }
+    }
+
+  } // load_shared, MORE THREADS THAN ELEMENTS
+
   // Since we can make repeated use of the same shared memory for each sub-fft
   // we use this method to load into shared mem instead of directly to registers
   // TODO set this up for async mem load - alternatively, load to registers then copy but leave in register for firt compute
@@ -255,16 +286,17 @@ struct io
     }
   } // copy_from_shared
 
-  static inline __device__ void load_shared_an_conj_multiply(const complex_type*  image_to_search,
+  static inline __device__ void load_shared_and_conj_multiply(const complex_type*  image_to_search,
                                                              const complex_type*  shared_output,
-                                                             complex_type*  thread_data,
-                                                             int*				    output_MAP)
+                                                             complex_type*  thread_data)
   {
+    const unsigned int stride = stride_size();
+    unsigned int       index  = threadIdx.x;
     for (unsigned int i = 0; i < FFT::elements_per_thread; i++)
     {
       // a * conj b
-      thread_data[i] = ComplexConjMulAndScale<complex_type, scalar_type>(shared_output[output_MAP[i]], image_to_search[output_MAP[i]], 1.0f);
-      output_MAP[i]++;
+      thread_data[i] = ComplexConjMulAndScale<complex_type, scalar_type>(shared_output[index], image_to_search[index], 1.0f);
+      index += stride;
     }
   } // copy_from_shared
 
@@ -422,23 +454,18 @@ struct io
     }
   } // store
 
-  static inline __device__ void store(const complex_type* thread_data,
+  static inline __device__ void store_subset(const complex_type* thread_data,
                                       complex_type*       output,
-                                      int*				        source_idx,
-                                      int	                output_stride,
-                                      int				          memory_limit) 
+                                      int*				        source_idx)                                    
   {
-    //            const unsigned int offset = batch_offset(local_fft_id);
-    const unsigned int stride = stride_size();
-    //            unsigned int       index  = offset + threadIdx.x;
+    const unsigned int  stride = stride_size();
     for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
     {
       // If no kernel based changes are made to source_idx, this will be the same as the original index value
-      if (source_idx[i] < memory_limit) output[source_idx[i]*output_stride] = thread_data[i];
-      //                output[index] = thread_data[i];
-      //                index += stride;
+      if (source_idx[i] >= 0) output[source_idx[i]] = thread_data[i];
     }
-  } // store
+
+  } // store, MORE THREADS THAN ELEMENTS
 
   static inline __device__ void store_coalesced(const complex_type* shared_output,
                                                 complex_type*       global_output,

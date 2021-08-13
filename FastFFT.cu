@@ -354,7 +354,7 @@ void FourierTransformer::CrossCorrelate(float2* image_to_search, bool swap_real_
 
       FFT_C2C_WithPadding_ConjMul_C2C(image_to_search, swap_real_space_quadrants);
 
-      // FFT_C2R_Transposed();
+      FFT_C2R_Transposed();
       fft_status = 0;
       break;
     }
@@ -663,6 +663,8 @@ void FourierTransformer::FFT_C2C_WithPadding_ConjMul_C2C_t(float2* image_to_sear
 {
   
   LaunchParams LP = SetLaunchParameters(elements_per_thread_complex);
+  LP.threadsPerBlock = dim3(dims_out.y/elements_per_thread_complex, 1, 1); 
+
 
   // Assuming invFFT is >= in size to FFT and both are C2C
 	using complex_type = typename FFT::value_type;
@@ -1148,14 +1150,15 @@ void block_fft_kernel_C2C_WithPadding_ConjMul_C2C(const ComplexType* __restrict_
   float twiddle_factor_args[storage_size];
 
   // No need to __syncthreads as each thread only accesses its own shared mem anyway
-  io<FFT>::load_shared(&input_values[blockIdx.y*mem_offsets.pixel_pitch_input], shared_input_complex, thread_data, twiddle_factor_args, twiddle_in, input_MAP, output_MAP, Q);
+
+  io<FFT>::load_shared(&input_values[blockIdx.y*mem_offsets.pixel_pitch_input], shared_input_complex, thread_data, twiddle_factor_args, twiddle_in, input_MAP, output_MAP, Q, mem_offsets.pixel_pitch_input);
 
 
 	// In the first FFT the modifying twiddle factor is 1 so the data are reeal
 	FFT().execute(thread_data, shared_mem, workspace);
 
 	// 
-  io<FFT>::store(thread_data,shared_output,output_MAP);
+  io<FFT>::store_subset(thread_data,shared_output,output_MAP);
 
     // For the other fragments we need the initial twiddle
 	for (int sub_fft = 1; sub_fft < Q; sub_fft++)
@@ -1174,40 +1177,23 @@ void block_fft_kernel_C2C_WithPadding_ConjMul_C2C(const ComplexType* __restrict_
 
 		FFT().execute(thread_data, shared_mem, workspace);
 
-    io<FFT>::store(thread_data,shared_output,output_MAP);
+    io<FFT>::store_subset(thread_data,shared_output,output_MAP);
 
 
 	}
 
-  // TODO confirm this is needed
+  // In this kerenel, there are plent of threads that aren't doing much of anything so we need to make sure 
+  // that they are all in sync here.
 	__syncthreads();
 
 
-  // Now we need to read in the image to search (cross-correlate). First reset the outputMAP
-  for (int i = 0; i < FFT::elements_per_thread; i++)
-  {
-    output_MAP[i] -= (Q-1);
-  }
 
-  for (int sub_fft = 0; sub_fft < Q; sub_fft++)
-	{
-    // output_MAP is incremented inside this call.
-    io<FFT>::load_shared_an_conj_multiply(&image_to_search[blockIdx.y*mem_offsets.pixel_pitch_input], shared_output, thread_data, output_MAP);
-  }
-
-  // TODO confirm this is needed
-  __syncthreads();
+  io<invFFT>::load_shared_and_conj_multiply(&image_to_search[blockIdx.y*mem_offsets.pixel_pitch_input], shared_output, thread_data);
 
   invFFT().execute(thread_data, shared_mem, workspace);
 
   io<invFFT>::store(thread_data,&output_values[blockIdx.y * mem_offsets.pixel_pitch_output]);
 
-	// // Now that the memory output can be coalesced send to global
-  // // FIXME is this actually coalced?
-	// for (int sub_fft = 0; sub_fft < Q; sub_fft++)
-	// {
-  //   io<FFT>::store_coalesced(shared_output, &output_values[blockIdx.y * mem_offsets.pixel_pitch_output], sub_fft*mem_offsets.shared_input);
-	// }
 
 
 } // end of block_fft_kernel_C2C_WithPadding_ConjMul_C2C

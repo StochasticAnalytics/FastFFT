@@ -330,9 +330,9 @@ void compare_libraries(short4 input_size, short4 output_size)
   cuFFT_output.record_start();
   for (int i = 0; i < n_loops; ++i)
   {
-    // FT.FwdFFT();
-    // FT.InvFFT();
-    FT.CrossCorrelate(targetFT.device_pointer_fp32_complex, false);
+    FT.FwdFFT();
+    FT.InvFFT();
+    // FT.CrossCorrelate(targetFT.device_pointer_fp32_complex, false);
   }
   cuFFT_output.record_stop();
   cuFFT_output.synchronize();
