@@ -263,6 +263,7 @@ void compare_libraries(short4 input_size, short4 output_size)
   Image< float, float2 > cuFFT_output(output_size);
 
   Image< float, float2> target_search_image(output_size);
+  Image< float, float2> positive_control(output_size);
 
 
    // We just make one instance of the FourierTransformer class, with calc type float.
@@ -280,6 +281,8 @@ void compare_libraries(short4 input_size, short4 output_size)
   cuFFT_output.real_memory_allocated = cuFFT.ReturnPaddedMemorySize(output_size);
 
   target_search_image.real_memory_allocated = targetFT.ReturnPaddedMemorySize(output_size);
+  positive_control.real_memory_allocated = targetFT.ReturnPaddedMemorySize(output_size);
+
 
   bool set_fftw_plan = false;
   FT_input.Allocate(set_fftw_plan);
@@ -289,7 +292,7 @@ void compare_libraries(short4 input_size, short4 output_size)
   cuFFT_output.Allocate(set_fftw_plan);
 
   target_search_image.Allocate(true);
-  
+  positive_control.Allocate(true);
 
 
 
@@ -314,15 +317,36 @@ void compare_libraries(short4 input_size, short4 output_size)
   FT.SetToConstant<float>(FT_output.real_values, FT_input.real_memory_allocated, 0.0f);
   FT.SetToConstant<float>(cuFFT_output.real_values, cuFFT_input.real_memory_allocated, 0.0f);
   FT.SetToConstant<float>(target_search_image.real_values, target_search_image.real_memory_allocated, 0.0f);
+  FT.SetToConstant<float>(positive_control.real_values, target_search_image.real_memory_allocated, 0.0f);
+
 
   FT_input.real_values[0] = 3.f;
   cuFFT_input.real_values[0] = 3.f;
   target_search_image.real_values[target_search_image.size.w*2*target_search_image.size.y/2 + target_search_image.size.x/2] = 2.f;
+  positive_control.real_values[target_search_image.size.w*2*target_search_image.size.y/2 + target_search_image.size.x/2] = 3.f;
+
   target_search_image.FwdFFT();
-
-
-
+  positive_control.FwdFFT();
+  positive_control.MultiplyConjugateImage(target_search_image.complex_values);
+  positive_control.InvFFT();
   
+
+  int n=0;
+  for (int x = 0; x <  positive_control.size.x ; x++)
+  {
+    
+    std::cout << x << "[ ";
+    for (int y = 0; y < positive_control.size.y; y++)
+    {  
+      std::cout << positive_control.real_values[x + y*positive_control.size.w*2] << "," << positive_control.real_values[x + y*positive_control.size.w*2] << " ";
+      n++;
+      if (n == 32) {n = 0; std::cout << std::endl ;} // line wrapping
+    }
+    std::cout << "] " << std::endl;
+    n = 0;
+  }
+
+  exit(0);
   // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
   FT.CopyHostToDevice();
   cuFFT.CopyHostToDevice();

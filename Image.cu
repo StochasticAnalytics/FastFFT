@@ -141,6 +141,19 @@ void Image<wanted_real_type, wanted_complex_type>::InvFFT()
 }
 
 template < class wanted_real_type, class wanted_complex_type >
+void  Image<wanted_real_type, wanted_complex_type>::MultiplyConjugateImage( wanted_complex_type* other_image_complex_values) 
+{
+  wanted_complex_type tmp;
+  for (int iPixel = 0 ; iPixel < real_memory_allocated/2 ; iPixel++)  
+  {
+    
+    tmp.x = (complex_values[iPixel].x * other_image_complex_values[iPixel].x + complex_values[iPixel].y * other_image_complex_values[iPixel].y);
+    tmp.y = (complex_values[iPixel].y * other_image_complex_values[iPixel].x - complex_values[iPixel].x * other_image_complex_values[iPixel].y) ;
+    complex_values[iPixel] = tmp;
+  }
+}
+
+template < class wanted_real_type, class wanted_complex_type >
 void Image<wanted_real_type, wanted_complex_type>::MakeCufftPlan()
 {
 
