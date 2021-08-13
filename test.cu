@@ -288,7 +288,7 @@ void compare_libraries(short4 input_size, short4 output_size)
   cuFFT_input.Allocate(set_fftw_plan);
   cuFFT_output.Allocate(set_fftw_plan);
 
-  target_search_image.Allocate(set_fftw_plan);
+  target_search_image.Allocate(true);
   
 
 
@@ -309,9 +309,17 @@ void compare_libraries(short4 input_size, short4 output_size)
   targetFT.SetInputPointer(target_search_image.real_values, false);
 
   // Set a unit impulse at the center of the input array.
-  FT.SetToConstant<float>(FT_input.real_values, FT_input.real_memory_allocated, 1.0f);
-  FT.SetToConstant<float>(cuFFT_input.real_values, cuFFT_input.real_memory_allocated, 1.0f);
-  FT.SetToConstant<float>(target_search_image.real_values, target_search_image.real_memory_allocated, 1.0f);
+  FT.SetToConstant<float>(FT_input.real_values, FT_input.real_memory_allocated, 0.0f);
+  FT.SetToConstant<float>(cuFFT_input.real_values, cuFFT_input.real_memory_allocated, 0.0f);
+  FT.SetToConstant<float>(FT_output.real_values, FT_input.real_memory_allocated, 0.0f);
+  FT.SetToConstant<float>(cuFFT_output.real_values, cuFFT_input.real_memory_allocated, 0.0f);
+  FT.SetToConstant<float>(target_search_image.real_values, target_search_image.real_memory_allocated, 0.0f);
+
+  FT_input.real_values[0] = 3.f;
+  cuFFT_input.real_values[0] = 3.f;
+  target_search_image.real_values[target_search_image.size.w*2*target_search_image.size.y/2 + target_search_image.size.x/2] = 2.f;
+  target_search_image.FwdFFT();
+
 
 
   
@@ -325,14 +333,38 @@ void compare_libraries(short4 input_size, short4 output_size)
   cuFFT_input.MakeCufftPlan();
   cuFFT_output.MakeCufftPlan();
 
+  //////////////////////////////////////////
+  //////////////////////////////////////////
+  // Warm up and check for accuracy
+  std::cout << "FT val 0 is " << FT_output.real_values[target_search_image.size.w*2*target_search_image.size.y/2 + target_search_image.size.x/2] << std::endl;
+  FT.CrossCorrelate(targetFT.device_pointer_fp32_complex, true);
+  FT.CopyDeviceToHost(FT_output.real_values,false, false);
+  std::cout << "FT val 0 is " << FT_output.real_values[target_search_image.size.w*2*target_search_image.size.y/2 + target_search_image.size.x/2] << std::endl;
+  float tmpVal =  FT_output.real_values[target_search_image.size.w*2*target_search_image.size.y/2 + target_search_image.size.x/2] ;
+  //////////////////////////////////////////
+  // //////////////////////////////////////////
+  // int n=0;
+  // for (int x = 0; x <  FT_output.size.x ; x++)
+  // {
+    
+  //   std::cout << x << "[ ";
+  //   for (int y = 0; y < FT_output.size.y; y++)
+  //   {  
+  //     std::cout << FT_output.real_values[x + y*FT_output.size.w*2] << " ";
+  //     n++;
+  //     if (n == 32) {n = 0; std::cout << std::endl ;} // line wrapping
+  //   }
+  //   std::cout << "] " << std::endl;
+  //   n = 0;
+  // }
 
   const int n_loops = 10000;
   cuFFT_output.record_start();
   for (int i = 0; i < n_loops; ++i)
   {
-    FT.FwdFFT();
-    FT.InvFFT();
-    // FT.CrossCorrelate(targetFT.device_pointer_fp32_complex, false);
+    // FT.FwdFFT();
+    // FT.InvFFT();
+    FT.CrossCorrelate(targetFT.device_pointer_fp32_complex, false);
   }
   cuFFT_output.record_stop();
   cuFFT_output.synchronize();
@@ -355,6 +387,42 @@ void compare_libraries(short4 input_size, short4 output_size)
     cuFFT_output.SetComplexConjMultiplyAndLoadCallBack( (cufftComplex *) targetFT.device_pointer_fp32_complex, 1.0f);
     postcheck
   }
+
+
+  //////////////////////////////////////////
+  //////////////////////////////////////////
+  // Warm up and check for accuracy
+  cuFFT.ClipIntoTopLeft();
+  cuFFT.CopyDeviceToHost(cuFFT_output.real_values,false, false);
+  std::cout << "cuFFT val 0 is " << cuFFT_output.real_values[0] << std::endl;
+  // cuFFT.ClipIntoReal(input_size.x/2, input_size.y/2, input_size.z/2);
+  precheck
+  cudaErr(cufftExecR2C(cuFFT_output.cuda_plan_forward, (cufftReal*)cuFFT.device_pointer_fp32, (cufftComplex*)cuFFT.device_pointer_fp32_complex));
+  postcheck
+  precheck
+  cudaErr(cufftExecC2R(cuFFT_output.cuda_plan_inverse, (cufftComplex*)cuFFT.device_pointer_fp32_complex, (cufftReal*)cuFFT.device_pointer_fp32));
+  postcheck  
+  cuFFT.CopyDeviceToHost(cuFFT_output.real_values,false, false);
+  std::cout << "cuFFT val 0 is " << cuFFT_output.real_values[0] << std::endl;
+  std::cout << "FT val 0 is " <<  tmpVal << std::endl;
+  //////////////////////////////////////////
+  //////////////////////////////////////////
+
+  // n=0;
+  // for (int x = 0; x <  cuFFT_output.size.x ; x++)
+  // {
+    
+  //   std::cout << x << "[ ";
+  //   for (int y = 0; y < cuFFT_output.size.y; y++)
+  //   {  
+  //     std::cout << cuFFT_output.real_values[x + y*cuFFT_output.size.w*2] << "," << cuFFT_output.real_values[x + y*cuFFT_output.size.w*2] << " ";
+  //     n++;
+  //     if (n == 32) {n = 0; std::cout << std::endl ;} // line wrapping
+  //   }
+  //   std::cout << "] " << std::endl;
+  //   n = 0;
+  // }
+
 
   cuFFT_output.record_start();
   for (int i = 0; i < n_loops; ++i)

@@ -287,15 +287,14 @@ struct io
   } // copy_from_shared
 
   static inline __device__ void load_shared_and_conj_multiply(const complex_type*  image_to_search,
-                                                             const complex_type*  shared_output,
-                                                             complex_type*  thread_data)
+                                                              complex_type*  thread_data)
   {
     const unsigned int stride = stride_size();
     unsigned int       index  = threadIdx.x;
     for (unsigned int i = 0; i < FFT::elements_per_thread; i++)
     {
       // a * conj b
-      thread_data[i] = ComplexConjMulAndScale<complex_type, scalar_type>(shared_output[index], image_to_search[index], 1.0f);
+      thread_data[i] = ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
       index += stride;
     }
   } // copy_from_shared
@@ -404,7 +403,42 @@ struct io
       index += stride;
     }
   }
+
+    // this may benefit from asynchronous execution
+    static inline __device__ void load(const complex_type* input,
+                                       complex_type*       thread_data,
+                                       int	               last_index_to_load) 
+  {
+    const unsigned int stride = stride_size();
+    unsigned int       index  = threadIdx.x;
+    for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+    {
+      if (index < last_index_to_load) thread_data[i] = input[index];
+      else {thread_data[i].x = scalar_type(0); thread_data[i].y = scalar_type(0); } 
+      index += stride;
+    }
+  }
   
+
+  static inline __device__ void store_and_swap_quadrants(const complex_type* thread_data,
+                                                         complex_type*       output,
+                                                         int				         first_negative_index) 
+  {
+    const unsigned int  stride = stride_size();
+    unsigned int        index  = threadIdx.x;
+    complex_type phase_shift;
+    int logical_y;
+    for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+    {
+      // If no kernel based changes are made to source_idx, this will be the same as the original index value
+      phase_shift = thread_data[i];
+      logical_y = index;
+      if ( logical_y >= first_negative_index) logical_y -= 2*first_negative_index;
+      if ( (int(blockIdx.y) + logical_y) % 2 != 0) phase_shift *= -1.f; 
+      output[index] = phase_shift;
+      index += stride;
+    }
+  } // store_and_swap_quadrants
 
   static inline __device__ void store_and_swap_quadrants(const complex_type* thread_data,
                                  complex_type*       output,

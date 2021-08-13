@@ -217,6 +217,20 @@ private:
         L.mem_offsets.pixel_pitch_input = dims_out.y;
         L.mem_offsets.pixel_pitch_output = dims_out.w*2;      
         break;
+      case 4:
+      // Cross correlation case
+      // The added complexity, in instructions and shared memory usage outweigh the cost of just running the full length C2C on the forward.
+        L.threadsPerBlock = dim3(dims_out.y/ept, 1, 1); 
+        L.gridDims = dim3(1, dims_out.w, 1);
+        L.mem_offsets.shared_input = dims_in.y;
+        L.mem_offsets.shared_output = dims_out.y;
+        L.mem_offsets.pixel_pitch_input = dims_out.y;
+        L.mem_offsets.pixel_pitch_output = dims_out.y;
+
+        L.twiddle_in = -2*PIf/dims_out.y;
+        L.Q = dims_out.y / dims_in.y; // FIXME assuming for now this is already divisible
+
+        break;
       default:
         std::cerr << "ERROR: Unrecognized fft_status" << std::endl;
         exit(-1);
