@@ -1,5 +1,6 @@
 # FastFFT
 
+
 ## Broad strokes
 
 This project aims to accelerate a specific set of FFTs important for cryo-Electron Microscopy. It does so by taking advantage of the cufftdx library from Nvidia, currently in early access as well as algorithmic ideas from *Sorensen et. al* [[1]](#1). An additional experimental aspect is the development of the scientific manuscript "live" alongside the development of the code. 
@@ -29,7 +30,10 @@ The Fast Fourier transform is one of the most widely used and heavily optimized 
 
 ## Theory
 
-Fast Fourier Transform (FFT) is a mathematical operation that transforms a function $f(x)$ from the real-valued plane into the complex-valued plane. The function $f(x)$ is a function of $x$ and is often a function of the real-valued signal $x$ or a function of the complex-valued signal $x + i\cdot y$. The FFT is defined as: $f(x) = \sum_{k=0}^{N-1} f_k \exp\left( -2\pi i k x \right)$ where $f_k$ is the $k$-th term of the sequence.
+Fast Fourier Transform (FFT) is a mathematical operation that transforms a function $f(x)$ from the real-valued plane into the complex-valued plane. The function <img src="https://render.githubusercontent.com/render/math?math=f(x)"> is a function of <img src="https://render.githubusercontent.com/render/math?math=x"> and is often a function of the real-valued signal <img src="https://render.githubusercontent.com/render/math?math=x"> or a function of the complex-valued signal <img src="https://render.githubusercontent.com/render/math?math=x + i\cdot y">. The FFT is an optimized algorithm for copying the discrete Fourier transform (DFT) defined as: 
+
+<img src="https://render.githubusercontent.com/render/math?math=X(k) = \sum_{n=0}^{N-1} x(n) \exp\left( -2\pi i k n \right)">  &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Eq. (1)
+
 
 
 
