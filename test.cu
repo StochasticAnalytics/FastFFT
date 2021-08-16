@@ -85,10 +85,10 @@ void const_image_test(short4 input_size, short4 output_size)
   test_passed = true;
   for (long index = 1; index < host_output.real_memory_allocated/2; index++)
   {
-    if (host_output.complex_values[index].x != 0.0f && host_output.complex_values[index].y != 0.0f) test_passed = false;
+    if (host_output.complex_values[index].x != 0.0f && host_output.complex_values[index].y != 0.0f) {test_passed = false;} // std::cout << host_output.complex_values[index].x  << " " << host_output.complex_values[index].y << " " << std::endl;}
   }
   if (host_output.complex_values[0].x != (float)output_size.x * (float)output_size.y * (float)output_size.z) test_passed = false;
-  
+  std::cout << "FFTW unit " << host_output.complex_values[0].x << " " << host_output.complex_values[0].y << std::endl;
   MyFFTDebugAssertTestTrue( test_passed, "FastFFT unit impulse forward FFT");
   FT.SetToConstant<float>(host_input.real_values, host_input.real_memory_allocated, 2.0f);
   
@@ -549,42 +549,43 @@ int main(int argc, char** argv) {
   short4 input_size;
   short4 output_size;
 
-  constexpr const int n_tests = 5;
-  const int test_size[n_tests] = {64, 128, 256, 512, 4096};
-  // for (int iSize = 0; iSize < n_tests; iSize++) {
+  constexpr const int n_tests = 6;
+  const int test_size[n_tests] = {64, 128, 256, 512, 1024, 4096};
 
-  //   std::cout << std::endl << "Testing constant image size " << test_size[iSize] << " x" << std::endl;
-  //   input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
-  //   output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+  for (int iSize = 0; iSize < n_tests; iSize++) {
 
-  //   const_image_test(input_size, output_size);
+    std::cout << std::endl << "Testing constant image size " << test_size[iSize] << " x" << std::endl;
+    input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+    output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
 
-  // }
+    const_image_test(input_size, output_size);
+
+  }
 
 
-  // for (int iSize = 0; iSize < n_tests - 1; iSize++) {
-  //   int oSize = iSize + 1;
-  //   while (oSize < n_tests)
-  //   {
-  //     std::cout << std::endl << "Testing padding from  " << test_size[iSize] << " to " << test_size[oSize] << std::endl;
-  //     input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
-  //     output_size = make_short4(test_size[oSize],test_size[oSize],1,0);
+  for (int iSize = 0; iSize < n_tests - 1; iSize++) {
+    int oSize = iSize + 1;
+    while (oSize < n_tests)
+    {
+      std::cout << std::endl << "Testing padding from  " << test_size[iSize] << " to " << test_size[oSize] << std::endl;
+      input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+      output_size = make_short4(test_size[oSize],test_size[oSize],1,0);
   
-  //     unit_impulse_test(input_size, output_size);
-  //     oSize++;
-  //   }
-  // }
+      unit_impulse_test(input_size, output_size);
+      oSize++;
+    }
+  }
 
 
-  // for (int iSize = 0; iSize < n_tests; iSize++) {
+  for (int iSize = 0; iSize < n_tests; iSize++) {
 
-  //   std::cout << std::endl << "Testing cufft comparison " << test_size[iSize] << " x" << std::endl;
-  //   input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
-  //   output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+    std::cout << std::endl << "Testing cufft comparison " << test_size[iSize] << " x" << std::endl;
+    input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+    output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
 
-  //   compare_libraries(input_size, output_size);
+    compare_libraries(input_size, output_size);
 
-  // }
+  }
 
   for (int iSize = 0; iSize < n_tests - 1; iSize++) {
     int oSize = iSize + 1;
