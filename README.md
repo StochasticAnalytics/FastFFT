@@ -29,6 +29,10 @@ The Fast Fourier transform is one of the most widely used and heavily optimized 
 
 ## Theory
 
+Fast Fourier Transform (FFT) is a mathematical operation that transforms a function $f(x)$ from the real-valued plane into the complex-valued plane. The function $f(x)$ is a function of $x$ and is often a function of the real-valued signal $x$ or a function of the complex-valued signal $x + i\cdot y$. The FFT is defined as: $f(x) = \sum_{k=0}^{N-1} f_k \exp\left( -2\pi i k x \right)$ where $f_k$ is the $k$-th term of the sequence.
+
+
+
 ## Results
 
 - Movie alignment expense (Pre/post process and alignment percentages.)
