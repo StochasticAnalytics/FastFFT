@@ -693,6 +693,7 @@ void FourierTransformer::FFT_C2C_WithPadding_ConjMul_C2C_t(float2* image_to_sear
   }
 
   is_in_buffer_memory = false;
+
 }
 
 void FourierTransformer::FFT_C2C_WithPadding_ConjMul_C2C(float2* image_to_search, bool swap_real_space_quadrants)
@@ -832,12 +833,21 @@ void block_fft_kernel_C2C_WithPadding_ConjMul_C2C_SwapRealSpaceQuadrants(const C
 	// In the first FFT the modifying twiddle factor is 1 so the data are reeal
 	FFT().execute(thread_data, shared_mem, workspace);
 
+  // Swap real space quadrants using a phase shift by N/2 pixels 
+  const unsigned int  stride = io<invFFT>::stride_size();
+  int logical_y;
+  for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+  {
+    logical_y = threadIdx.x+ i*stride;
+    if ( logical_y >= mem_offsets.pixel_pitch_output/2) logical_y -= mem_offsets.pixel_pitch_output;
+    if ( (int(blockIdx.y) + logical_y) % 2 != 0) thread_data[i] *= -1.f; // FIXME TYPE
+  }
 
   io<invFFT>::load_shared_and_conj_multiply(&image_to_search[blockIdx.y*mem_offsets.pixel_pitch_input], thread_data);
 
   invFFT().execute(thread_data, shared_mem, workspace);
 
-  io<invFFT>::store_and_swap_quadrants(thread_data, &output_values[blockIdx.y * mem_offsets.pixel_pitch_output],mem_offsets.pixel_pitch_input/2);
+  io<invFFT>::store(thread_data, &output_values[blockIdx.y * mem_offsets.pixel_pitch_output]);
 
 
 
@@ -1260,7 +1270,6 @@ void FourierTransformer::FFT_C2R_Transposed_t()
     ( (complex_type*)buffer_fp32_complex, (scalar_type*)device_pointer_fp32, LP.mem_offsets, workspace);
     postcheck
     is_in_buffer_memory = false;
-
   }
   else
   {
@@ -1269,7 +1278,6 @@ void FourierTransformer::FFT_C2R_Transposed_t()
     ( (complex_type*)device_pointer_fp32, (scalar_type*)buffer_fp32_complex, LP.mem_offsets, workspace);
     postcheck
     is_in_buffer_memory = true;
-
   }
 
 

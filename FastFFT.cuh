@@ -291,10 +291,13 @@ struct io
   {
     const unsigned int stride = stride_size();
     unsigned int       index  = threadIdx.x;
+    complex_type c;
     for (unsigned int i = 0; i < FFT::elements_per_thread; i++)
     {
+      c.x =  (thread_data[i].x * image_to_search[index].x + thread_data[i].y * image_to_search[index].y);
+      c.y =  (thread_data[i].y * image_to_search[index].x - thread_data[i].x * image_to_search[index].y) ;
       // a * conj b
-      thread_data[i] = ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
+      thread_data[i] = c;//ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
       index += stride;
     }
   } // copy_from_shared
