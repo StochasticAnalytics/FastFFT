@@ -18,11 +18,11 @@ The Fast Fourier transform is one of the most widely used and heavily optimized 
 - What is the DFT and why is it used in cryoEM
 - What is the FFT and how does it accelerate (mem explanation as well.)
 - Reference Sorensen and give  a quick recap.
-- Pictorial explanation for the three major benefactors.
-- Movie alignment
-- 2D TM
-- 3D TM
-- Subtomogram averaging
+- Pictorial explanation for the major benefactors.
+  - Movie alignment
+  - 2D TM
+  - 3D TM
+  - Subtomogram averaging
 - In addition to reduced ops, there are also memory advantages to operating on transposed data (for all problems) and especially for points from (4) as a direct write of uncoalesced values can be reduced by carefully choosing the axis.
 - Possibility of half-precision (also how to get around excessive padding due to power of 2 constraint, and that cuFFTdx is limited to 4096)
 
