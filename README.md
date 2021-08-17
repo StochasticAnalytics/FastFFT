@@ -39,7 +39,42 @@ Fast Fourier Transform (FFT) is a mathematical operation that transforms a funct
 
 ## Results
 
+### Basic performance
+
+#### Comparing 2D FFTs using cufftdx w/o reordering
+
+By design, the cufft library from Nvidia returns an FFT in the natural order [TODO check term] which requires two transpose operations, which in many cases seem to be optimized to reduce global memory access via vector-radix transforms. This means that the numbers we compare here are not quite apples to apples, as the result from FastFFT is transposed in memory in the Fourier domain.
+
+##### Table 1: FFT/iFFT pairs
+
+| 2D square size | cufft/FastFFT runtime (10k iterations) |
+| --- | ---- |
+| 64 | 2.34 |
+| 128 | 2.39 |
+| 256 | 2.06 |
+| 512 | 1.20 |
+| 1024 | 0.92 |
+| 4096 | 1.17 | 
+
+:biohazard: None of the kernels are even remotely optimized at this point, they have only been assembled and tested to pass expected behavior for FFTs of constant functions, unit impulse functions, and basic convolution ops.
+
+#### Comparing 2D FFT based convolution 
+
+##### Table 2: zero padded convolution of 4096 pixel sq. image
+
+| 2D square size kernel size | cufft/FastFFT runtime (10k iterations) |
+| --- | ---- |
+| 64 | 2.79 |
+| 128 | 2.81 |
+| 256 | 2.71 |
+| 512 | 2.66 |
+| 1024 | 2.48 |
+
+:biohazard: None of the kernels are even remotely optimized at this point, they have only been assembled and tested to pass expected behavior for FFTs of constant functions, unit impulse functions, and basic convolution ops.
+
 - Movie alignment expense (Pre/post process and alignment percentages.)
+
+  :soon: 
 - Input movies are sparse (speed-up)
 - Peak search is limited, so IFFT is sped up
 - 2D template matching, 
