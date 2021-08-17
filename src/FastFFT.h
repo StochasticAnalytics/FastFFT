@@ -240,6 +240,7 @@ private:
   }
 
 
+  void FFT_R2C();
   void FFT_R2C_Transposed();
   void FFT_R2C_WithPadding_Transposed();
   void FFT_C2C_WithPadding(bool swap_real_space_quadrants = false);
@@ -247,7 +248,7 @@ private:
   void FFT_C2R_Transposed();
   void FFT_C2C_WithPadding_ConjMul_C2C(float2* image_to_search, bool swap_real_space_quadrants = false);
 
-
+  template<class FFT> void FFT_R2C_t();
   template<class FFT> void FFT_R2C_Transposed_t();
   template<class FFT> void FFT_R2C_WithPadding_Transposed_t();
   template<class FFT> void FFT_C2C_WithPadding_t(bool swap_real_space_quadrants);
