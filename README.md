@@ -37,24 +37,25 @@ The Fast Fourier transform is one of the most widely used and heavily optimized 
 
 ## Theory
 
-### The DFT and FFT
+#### The DFT and FFT
 
 Fast Fourier Transform (FFT) is a mathematical operation that transforms a function <img src="https://render.githubusercontent.com/render/math?math=X(n)"> from the real-valued plane into the complex-valued plane. The function <img src="https://render.githubusercontent.com/render/math?math=f(x)"> is a function of <img src="https://render.githubusercontent.com/render/math?math=x"> and is often a function of the real-valued signal <img src="https://render.githubusercontent.com/render/math?math=x"> or a function of the complex-valued signal <img src="https://render.githubusercontent.com/render/math?math=x + i\cdot y">. The FFT is an optimized algorithm for copying the discrete Fourier transform (DFT) defined as: 
 
 <img src="https://render.githubusercontent.com/render/math?math=X(k) = \sum_{n=0}^{N-1} x(n) \exp\left( -2\pi i k n \right)">  &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Eq. (1)
 
 ( I think this paragraph is probably belonging in the introduction )
-The FFT is useful in image analysis as it can help to isolate repetitive features of a given size. It is also useful in signal processing as it can be used to perform convolution operations. Multidimensional FFTs are fully seperable, such that in the simpliest case, FFTs in higher dimensions are composed of a sequence of 1D FFTs. For example, in two dimensions, the FFFT of a 2D image is composed of the 1D FFTs of the rows and columns. A naive implementation is compuatationally ineffecient due to the strided memory access pattern. One solution is to transpose the data after the FFT and then transpose the result back [cite]. This requires extra trips to and from main memory. Another solution is to decompose the 2D transform using vector-radix FFTs [cite].
 
-### Summary of GPU memory hierarchy as it pertains to this work
+The FFT is useful in image analysis as it can help to isolate repetitive features of a given size. It is also useful in signal processing as it can be used to perform convolution operations. Multidimensional FFTs are fully seperable, such that in the simpliest case, FFTs in higher dimensions are composed of a sequence of 1D FFTs. For example, in two dimensions, the FFT of a 2D image is composed of the 1D FFTs of the rows and columns. A naive implementation is compuatationally ineffecient due to the strided memory access pattern:exclamation:cite. One solution is to transpose the data after the FFT and then transpose the result back :exclamation:cite. This requires extra trips to and from main memory. Another solution is to decompose the 2D transform using vector-radix FFTs :exclamation:cite.
 
-### Graphic to illustrate how the implicit transpose and real-space shifting reduces memory access for forward padding
+#### Summary of GPU memory hierarchy as it pertains to this work
 
-### Maths for further reduced memory access and computation using transform decomposition on sparse inputs
+#### Graphic to illustrate how the implicit transpose and real-space shifting reduces memory access for forward padding
 
-### Maths for partial outputs
+#### Maths for further reduced memory access and computation using transform decomposition on sparse inputs
 
-### 
+#### Maths for partial outputs
+
+#### 
 
 
 
