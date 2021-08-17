@@ -12,7 +12,7 @@
 // 1 - basic checks without blocking
 // 2 - full checks, including blocking
 
-// #define HEAVYERRORCHECKING_FFT 
+#define HEAVYERRORCHECKING_FFT 
 
 // #ifdef DEBUG
 #define MyFFTPrint(...)	{std::cerr << __VA_ARGS__  << std::endl;}
@@ -28,13 +28,15 @@
 // Note we are using std::cerr b/c the wxWidgets apps running in cisTEM are capturing std::cout
 #ifndef HEAVYERRORCHECKING_FFT 
 #define postcheck
-#define cudaErr(error) { auto status = static_cast<cudaError_t>(error); {;} };
+#define cudaErr
 #define precheck
 #else
-#define postcheck { cudaError_t error = cudaStreamSynchronize(cudaStreamPerThread); if (error != cudaSuccess) { std::cerr << cudaGetErrorString(error) << std::endl; MyFFTPrintWithDetails(""); exit(-1);} };
-#define cudaErr(error) { auto status = static_cast<cudaError_t>(error); if (status != cudaSuccess) { std::cerr << cudaGetErrorString(status) << std::endl; MyFFTPrintWithDetails("");} };
+#define postcheck { cudaErr(cudaPeekAtLastError()); cudaError_t error = cudaStreamSynchronize(cudaStreamPerThread); cudaErr(error); };
+#define cudaErr(error) { auto status = static_cast<cudaError_t>(error); if (status != cudaSuccess) { std::cerr << cudaGetErrorString(status) << " :-> "; MyFFTPrintWithDetails("");} };
 #define precheck { cudaErr(cudaGetLastError()); }
 #endif
+
+
 
 
 namespace FastFFT {

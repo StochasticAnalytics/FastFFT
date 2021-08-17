@@ -145,6 +145,9 @@ private:
   bool is_fftw_padded_buffer;
 
   bool is_size_validated;
+  int  transform_dimension;
+  int  transform_size;
+  int  transform_divisor;
   enum SizeChangeType { increase, decrease, none };
   SizeChangeType size_change_type;
 
@@ -165,17 +168,56 @@ private:
   void SetDefaults();
   void CheckDimensions();
 
-  enum KernelType { r2c, r2c_transposed, c2c_padded, c2c, c2r_transposed, xcorr_transposed}; // Used to specify the origin of the data
+  inline void GetTransformSize(int input_dimension)
+  {
+    if ( abs(fmod(log2(float(input_dimension)), 1)) < 1e-6 ) 
+    {
+      transform_divisor = 1;
+      transform_size = input_dimension;
+      // TODO for larger sizes, below
+      // transform_size = input_dimension / transform_divisor;
+    }
+    else 
+    {
+      if ( abs(fmod(log2(float(input_dimension)/3), 1)) < 1e-6) 
+      {
+        transform_divisor = 3;
+        transform_size = input_dimension / transform_divisor;
+      }
+      else
+      {
+        std::cerr << "The input dimension must factor into powers of two, with at most one factor of three." << std::endl;
+        exit(-1);
+      }
+    }
+  };
 
+  enum KernelType { r2c, r2c_transposed, c2c_padded, c2c, c2r_transposed, xcorr_transposed}; // Used to specify the origin of the data
   inline LaunchParams SetLaunchParameters(const int& ept, KernelType kernel_type)
   {
+    std::cerr << " kernel_type " << kernel_type << std::endl;
     LaunchParams L;
     switch (kernel_type)
     {
+      case r2c:
+        int pow2; 
+
+
+      // The only read from the input array is in this blcok
+        L.threadsPerBlock = dim3(dims_in.x/ept, 1, 1);
+        L.gridDims = dim3(transform_divisor, dims_in.y, 1); 
+        L.mem_offsets.shared_input = dims_in.x;
+        L.mem_offsets.shared_output = dims_out.w; // used in bounds check.
+        L.mem_offsets.pixel_pitch_input = dims_in.w*2; // scalar type, natural 
+        L.mem_offsets.pixel_pitch_output = dims_out.w; // complex type, transposed
+        L.twiddle_in = -2*PIf/dims_out.x;
+        L.Q = dims_out.x / dims_in.x; 
+        break;
+
       case r2c_transposed:
         // The only read from the input array is in this blcok
         L.threadsPerBlock = dim3(dims_in.x/ept, 1, 1);
-        L.gridDims = dim3(1, dims_in.y, 1); 
+        L.gridDims = dim3(transform_divisor, dims_in.y, 1); 
         L.mem_offsets.shared_input = dims_in.x;
         L.mem_offsets.shared_output = dims_out.w; // used in bounds check.
         L.mem_offsets.pixel_pitch_input = dims_in.w*2; // scalar type, natural 
@@ -185,7 +227,7 @@ private:
         break;
       case c2c_padded:
         L.threadsPerBlock = dim3(dims_in.y/ept, 1, 1); 
-        L.gridDims = dim3(1, dims_out.w, 1);
+        L.gridDims = dim3(transform_divisor, dims_out.w, 1);
         L.mem_offsets.shared_input = dims_in.y;
         L.mem_offsets.shared_output = dims_out.y;
         L.mem_offsets.pixel_pitch_input = dims_out.y;
@@ -197,7 +239,7 @@ private:
         break;
       case c2c:
         L.threadsPerBlock = dim3(dims_out.y/ept, 1, 1); 
-        L.gridDims = dim3(1, dims_out.w, 1);
+        L.gridDims = dim3(transform_divisor, dims_out.w, 1);
         L.mem_offsets.shared_input = 0;
         L.mem_offsets.shared_output = 0;
         L.mem_offsets.pixel_pitch_input = dims_out.y;
@@ -209,7 +251,7 @@ private:
         L.twiddle_in = -2*PIf/dims_out.y;
         L.Q = 1; // Already full size - FIXME when working out limited number of output pixels  
         L.threadsPerBlock = dim3(dims_out.x/ept, 1, 1); 
-        L.gridDims = dim3(1, dims_out.y, 1);
+        L.gridDims = dim3(transform_divisor, dims_out.y, 1);
         L.mem_offsets.shared_input = 0;
         L.mem_offsets.shared_output = 0;
         L.mem_offsets.pixel_pitch_input = dims_out.y;
@@ -219,7 +261,7 @@ private:
       // Cross correlation case
       // The added complexity, in instructions and shared memory usage outweigh the cost of just running the full length C2C on the forward.
         L.threadsPerBlock = dim3(dims_out.y/ept, 1, 1); 
-        L.gridDims = dim3(1, dims_out.w, 1);
+        L.gridDims = dim3(transform_divisor, dims_out.w, 1);
         L.mem_offsets.shared_input = dims_in.y;
         L.mem_offsets.shared_output = dims_out.y;
         L.mem_offsets.pixel_pitch_input = dims_out.y;
