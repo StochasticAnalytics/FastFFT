@@ -1,5 +1,5 @@
 #include "Image.cuh"
-#include "FastFFT.cuh"
+#include "../src/FastFFT.cuh"
 
 template < class wanted_real_type, class wanted_complex_type >
 Image<wanted_real_type, wanted_complex_type>::Image(short4 wanted_size)
