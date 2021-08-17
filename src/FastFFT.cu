@@ -52,7 +52,6 @@ void FourierTransformer::SetDefaults()
 
   is_size_validated = false;
 
-  fft_status = 0;
 }
 
 void FourierTransformer::SetInputDimensionsAndType(size_t input_logical_x_dimension, 
@@ -322,13 +321,11 @@ void FourierTransformer::InvFFT()
     case none: {
       FFT_C2C(false);
       FFT_C2R_Transposed();
-      fft_status = 0;
       break;
     }
     case increase: {
       FFT_C2C(false);
       FFT_C2R_Transposed();
-      fft_status = 0;
       break;
     }
     case decrease: {
@@ -355,7 +352,6 @@ void FourierTransformer::CrossCorrelate(float2* image_to_search, bool swap_real_
       FFT_C2C_WithPadding_ConjMul_C2C(image_to_search, swap_real_space_quadrants);
 
       FFT_C2R_Transposed();
-      fft_status = 0;
       break;
     }
     case decrease: {
@@ -389,7 +385,7 @@ template<class FFT>
 void FourierTransformer::FFT_R2C_Transposed_t()
 {
 
-  LaunchParams LP = SetLaunchParameters(elements_per_thread_complex);
+  LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_transposed);
 
   using complex_type = typename FFT::value_type;
   using scalar_type = typename complex_type::value_type;
@@ -412,7 +408,6 @@ void FourierTransformer::FFT_R2C_Transposed_t()
 
 void FourierTransformer::FFT_R2C_Transposed()
 {
-  MyFFTDebugAssertTrue(fft_status == 0, "fft status must be 0 (real space) for R2C");
 
   int device, arch;
   GetCudaDeviceArch( device, arch );
@@ -509,7 +504,6 @@ void FourierTransformer::FFT_R2C_Transposed()
       }
       break; } 
   }
-  fft_status = 1;
 }
 
 template<class FFT, class ComplexType, class ScalarType>
@@ -544,7 +538,7 @@ template<class FFT>
 void FourierTransformer::FFT_R2C_WithPadding_Transposed_t()
 {
 
-  LaunchParams LP = SetLaunchParameters(elements_per_thread_complex);
+  LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_transposed);
 
   using complex_type = typename FFT::value_type;
   using scalar_type = typename complex_type::value_type;
@@ -563,7 +557,6 @@ void FourierTransformer::FFT_R2C_WithPadding_Transposed_t()
 
 void FourierTransformer::FFT_R2C_WithPadding_Transposed()
 {
-  MyFFTDebugAssertTrue(fft_status == 0, "fft status must be 0 (real space) for R2C");
 
   int device, arch;
   GetCudaDeviceArch( device, arch );
@@ -659,7 +652,6 @@ void FourierTransformer::FFT_R2C_WithPadding_Transposed()
       }
       break; } 
   }
-  fft_status = 1;
 }
 
 template<class FFT, class ComplexType, class ScalarType>
@@ -736,9 +728,7 @@ template<class FFT, class invFFT>
 void FourierTransformer::FFT_C2C_WithPadding_ConjMul_C2C_t(float2* image_to_search, bool swap_real_space_quadrants)
 {
   
-  fft_status = 4;
-  LaunchParams LP = SetLaunchParameters(elements_per_thread_complex);
-
+  LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, xcorr_transposed);
 
   // Assuming invFFT is >= in size to FFT and both are C2C
 	using complex_type = typename FFT::value_type;
@@ -777,7 +767,6 @@ void FourierTransformer::FFT_C2C_WithPadding_ConjMul_C2C(float2* image_to_search
 {
 
 	// This is the first set of 1d ffts when the input data are real valued, accessing the strided dimension. Since we need the full length, it will actually run a C2C xform
-  MyFFTDebugAssertTrue(fft_status == 1, "fft status must be 1 (partial forward)");
 
   int device, arch;
   GetCudaDeviceArch( device, arch );
@@ -892,7 +881,6 @@ void FourierTransformer::FFT_C2C_WithPadding_ConjMul_C2C(float2* image_to_search
   } // end of switch on dims_in.y
 
   // Relies on the debug assert above
-  fft_status =3;
 
 }
 
@@ -967,7 +955,7 @@ template <class FFT>
 void FourierTransformer::FFT_C2C_WithPadding_t(bool swap_real_space_quadrants)
 {
 
-  LaunchParams LP = SetLaunchParameters(elements_per_thread_complex);
+  LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_padded);
 
 
 	using complex_type = typename FFT::value_type;
@@ -1005,7 +993,6 @@ void FourierTransformer::FFT_C2C_WithPadding(bool swap_real_space_quadrants)
 {
 
 	// This is the first set of 1d ffts when the input data are real valued, accessing the strided dimension. Since we need the full length, it will actually run a C2C xform
-  MyFFTDebugAssertTrue(fft_status == 1, "fft status must be 1 (partial forward)");
 
   int device, arch;
   GetCudaDeviceArch( device, arch );
@@ -1102,8 +1089,6 @@ void FourierTransformer::FFT_C2C_WithPadding(bool swap_real_space_quadrants)
       break; }    
   }
 
-  // Relies on the debug assert above
-  fft_status = 2;
 
 }
 
@@ -1248,7 +1233,7 @@ void block_fft_kernel_C2C_WithPadding_SwapRealSpaceQuadrants(const ComplexType* 
 template<class FFT_nodir>
 void FourierTransformer::FFT_C2C_t( bool do_forward_transform )
 {
-  LaunchParams LP = SetLaunchParameters(elements_per_thread_complex);
+  LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c);
 
   
   if (do_forward_transform)
@@ -1288,10 +1273,8 @@ void FourierTransformer::FFT_C2C_t( bool do_forward_transform )
 void FourierTransformer::FFT_C2C( bool do_forward_transform )
 {
 
-  MyFFTDebugAssertTrue(fft_status == 1 || fft_status == 2, "For now, FFT_C2C only works for a full inverse transform along the transposed X dimension");
   int device, arch;
   GetCudaDeviceArch( device, arch );
-
 
   switch (dims_out.y)
   {
@@ -1386,9 +1369,7 @@ void FourierTransformer::FFT_C2C( bool do_forward_transform )
       break; }      
   }
 
-  // Relies on the debug assert above
-  if (fft_status == 1) fft_status = 2;
-  else fft_status = 3;
+
 }
 
 template<class FFT, class ComplexType>
@@ -1420,7 +1401,7 @@ void block_fft_kernel_C2C(const ComplexType*  __restrict__  input_values, Comple
 template <class FFT>
 void FourierTransformer::FFT_C2R_Transposed_t()
 {
-  LaunchParams LP = SetLaunchParameters(elements_per_thread_complex);
+  LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2r_transposed);
 
 	using complex_type = typename FFT::value_type;
 	using scalar_type    = typename complex_type::value_type;
@@ -1451,7 +1432,6 @@ void FourierTransformer::FFT_C2R_Transposed_t()
 void FourierTransformer::FFT_C2R_Transposed()
 {
 
-  MyFFTDebugAssertTrue(fft_status == 3, "status must be 3");
 
   int device, arch;
   GetCudaDeviceArch( device, arch );

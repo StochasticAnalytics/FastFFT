@@ -153,9 +153,6 @@ private:
 
   short4 dims_in;
   short4 dims_out;
-  short  fft_status; // 
-
-
 
   float* host_pointer;
   float* pinnedPtr;
@@ -168,13 +165,14 @@ private:
   void SetDefaults();
   void CheckDimensions();
 
+  enum KernelType { r2c, r2c_transposed, c2c_padded, c2c, c2r_transposed, xcorr_transposed}; // Used to specify the origin of the data
 
-  inline LaunchParams SetLaunchParameters(const int& ept)
+  inline LaunchParams SetLaunchParameters(const int& ept, KernelType kernel_type)
   {
     LaunchParams L;
-    switch (fft_status)
+    switch (kernel_type)
     {
-      case 0:
+      case r2c_transposed:
         // The only read from the input array is in this blcok
         L.threadsPerBlock = dim3(dims_in.x/ept, 1, 1);
         L.gridDims = dim3(1, dims_in.y, 1); 
@@ -185,7 +183,7 @@ private:
         L.twiddle_in = -2*PIf/dims_out.x;
         L.Q = dims_out.x / dims_in.x; 
         break;
-      case 1:
+      case c2c_padded:
         L.threadsPerBlock = dim3(dims_in.y/ept, 1, 1); 
         L.gridDims = dim3(1, dims_out.w, 1);
         L.mem_offsets.shared_input = dims_in.y;
@@ -197,7 +195,7 @@ private:
         L.Q = dims_out.y / dims_in.y; // FIXME assuming for now this is already divisible
 
         break;
-      case 2:
+      case c2c:
         L.threadsPerBlock = dim3(dims_out.y/ept, 1, 1); 
         L.gridDims = dim3(1, dims_out.w, 1);
         L.mem_offsets.shared_input = 0;
@@ -207,7 +205,7 @@ private:
         L.twiddle_in = -2*PIf/dims_out.y;
         L.Q = 1; // Already full size - FIXME when working out limited number of output pixels       
         break;
-      case 3:
+      case c2r_transposed:
         L.twiddle_in = -2*PIf/dims_out.y;
         L.Q = 1; // Already full size - FIXME when working out limited number of output pixels  
         L.threadsPerBlock = dim3(dims_out.x/ept, 1, 1); 
@@ -217,7 +215,7 @@ private:
         L.mem_offsets.pixel_pitch_input = dims_out.y;
         L.mem_offsets.pixel_pitch_output = dims_out.w*2;      
         break;
-      case 4:
+      case xcorr_transposed:
       // Cross correlation case
       // The added complexity, in instructions and shared memory usage outweigh the cost of just running the full length C2C on the forward.
         L.threadsPerBlock = dim3(dims_out.y/ept, 1, 1); 
