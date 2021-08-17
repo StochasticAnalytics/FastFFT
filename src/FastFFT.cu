@@ -312,7 +312,7 @@ void FourierTransformer::FwdFFT(bool swap_real_space_quadrants)
   switch (transform_dimension)
   {
     case 1: {
-      FFT_R2C();
+      FFT_R2C_decomposed();
       break;
     }
     case 2: {
@@ -434,10 +434,10 @@ void FourierTransformer::CrossCorrelate(float2* image_to_search, bool swap_real_
 ////////////////////////////////////////////////////
 
 
-template<class FFT> void FourierTransformer::FFT_R2C_t()
+template<class FFT> void FourierTransformer::FFT_R2C_decomposed_t()
 {
 
-  LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c);
+  LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_decomposed);
 
   using complex_type = typename FFT::value_type;
   using scalar_type = typename complex_type::value_type;
@@ -451,14 +451,14 @@ template<class FFT> void FourierTransformer::FFT_R2C_t()
   //  cudaFuncSetSharedMemConfig ( (void*)block_fft_kernel_R2C_Transposed<FFT,complex_type,scalar_type>, cudaSharedMemBankSizeEightByte );
 
   precheck
-  block_fft_kernel_R2C_Transposed<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
+  block_fft_kernel_R2C_decomposed<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
   ((scalar_type*) device_pointer_fp32,  (complex_type*) buffer_fp32_complex, LP.mem_offsets, workspace);
   postcheck
 
   is_in_buffer_memory = true;
 }
 
-void FourierTransformer::FFT_R2C()
+void FourierTransformer::FFT_R2C_decomposed()
 {
 
   int device, arch;
@@ -470,72 +470,72 @@ void FourierTransformer::FFT_R2C()
     case 64: {
       switch (arch)
       {
-        case 700: { using FFT = decltype(FFT_base()  + Size<64>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_t<FFT>(); break;}
-        case 750: { using FFT = decltype(FFT_base()  + Size<64>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_R2C_t<FFT>(); break;}
-        case 800: { using FFT = decltype(FFT_base()  + Size<64>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_t<FFT>(); break;}
+        case 700: { using FFT = decltype(FFT_base()  + Size<64>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_decomposed_t<FFT>(); break;}
+        case 750: { using FFT = decltype(FFT_base()  + Size<64>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_R2C_decomposed_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<64>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_decomposed_t<FFT>(); break;}
       }
       break; }
 
     case 128: {
       switch (arch)
       {
-        case 700: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_t<FFT>(); break;}
-        case 750: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_R2C_t<FFT>(); break;}
-        case 800: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_t<FFT>(); break;}
+        case 700: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_decomposed_t<FFT>(); break;}
+        case 750: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_R2C_decomposed_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<128>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_decomposed_t<FFT>(); break;}
       }
       break; }
 
     case 256: {
       switch (arch)
       {
-        case 700: { using FFT = decltype(FFT_base()  + Size<256>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_t<FFT>(); break;}
-        case 750: { using FFT = decltype(FFT_base()  + Size<256>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_R2C_t<FFT>(); break;}
-        case 800: { using FFT = decltype(FFT_base()  + Size<256>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_t<FFT>(); break;}
+        case 700: { using FFT = decltype(FFT_base()  + Size<256>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_decomposed_t<FFT>(); break;}
+        case 750: { using FFT = decltype(FFT_base()  + Size<256>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_R2C_decomposed_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<256>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_decomposed_t<FFT>(); break;}
       }
       break; } 
 
     case 512: {
       switch (arch)
       {
-        case 700: { using FFT = decltype(FFT_base()  + Size<512>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_t<FFT>(); break;}
-        case 750: { using FFT = decltype(FFT_base()  + Size<512>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_R2C_t<FFT>(); break;}
-        case 800: { using FFT = decltype(FFT_base()  + Size<512>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_t<FFT>(); break;}
+        case 700: { using FFT = decltype(FFT_base()  + Size<512>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_decomposed_t<FFT>(); break;}
+        case 750: { using FFT = decltype(FFT_base()  + Size<512>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_R2C_decomposed_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<512>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_decomposed_t<FFT>(); break;}
       }
       break; } 
 
     // case 768: {
     //   switch (arch)
     //   {
-    //     case 700: { using FFT = decltype(FFT_base()  + Size<768>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_t<FFT>(); break;}
-    //     case 750: { using FFT = decltype(FFT_base()  + Size<768>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_R2C_t<FFT>(); break;}
-    //     case 800: { using FFT = decltype(FFT_base()  + Size<768>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_t<FFT>(); break;}
+    //     case 700: { using FFT = decltype(FFT_base()  + Size<768>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_decomposed_t<FFT>(); break;}
+    //     case 750: { using FFT = decltype(FFT_base()  + Size<768>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_R2C_decomposed_t<FFT>(); break;}
+    //     case 800: { using FFT = decltype(FFT_base()  + Size<768>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_decomposed_t<FFT>(); break;}
     //   }
     // break; } 
 
     case 1024: {
       switch (arch)
       {
-        case 700: { using FFT = decltype(FFT_base()  + Size<1024>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_t<FFT>(); break;}
-        case 750: { using FFT = decltype(FFT_base()  + Size<1024>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_R2C_t<FFT>(); break;}
-        case 800: { using FFT = decltype(FFT_base()  + Size<1024>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_t<FFT>(); break;}
+        case 700: { using FFT = decltype(FFT_base()  + Size<1024>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_decomposed_t<FFT>(); break;}
+        case 750: { using FFT = decltype(FFT_base()  + Size<1024>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_R2C_decomposed_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<1024>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_decomposed_t<FFT>(); break;}
       }
     break; } 
 
     // case 1536: {
     //   switch (arch)
     //   {
-    //     case 700: { using FFT = decltype(FFT_base()  + Size<1536>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_t<FFT>(); break;}
-    //     // case 750: { using FFT = decltype(FFT_base()  + Size<1536>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_R2C_t<FFT>(); break;}
-    //     case 800: { using FFT = decltype(FFT_base()  + Size<1536>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_t<FFT>(); break;}
+    //     case 700: { using FFT = decltype(FFT_base()  + Size<1536>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_decomposed_t<FFT>(); break;}
+    //     // case 750: { using FFT = decltype(FFT_base()  + Size<1536>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_R2C_decomposed_t<FFT>(); break;}
+    //     case 800: { using FFT = decltype(FFT_base()  + Size<1536>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_decomposed_t<FFT>(); break;}
     //   }
     // break; }    
 
     case 2048: {
       switch (arch)
       {
-        case 700: { using FFT = decltype(FFT_base()  + Size<2048>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_t<FFT>(); break;}
-        case 750: { using FFT = decltype(FFT_base()  + Size<2048>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_R2C_t<FFT>(); break;}
-        case 800: { using FFT = decltype(FFT_base()  + Size<2048>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_t<FFT>(); break;}
+        case 700: { using FFT = decltype(FFT_base()  + Size<2048>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_decomposed_t<FFT>(); break;}
+        case 750: { using FFT = decltype(FFT_base()  + Size<2048>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_R2C_decomposed_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<2048>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_decomposed_t<FFT>(); break;}
       }
       break; } 
 
@@ -543,17 +543,17 @@ void FourierTransformer::FFT_R2C()
     case 4096: {
       switch (arch)
       {
-        case 700: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_t<FFT>(); break;}
-        // case 750: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_R2C_t<FFT>(); break;}
-        case 800: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_t<FFT>(); break;}
+        case 700: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_decomposed_t<FFT>(); break;}
+        // case 750: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<750>());  FFT_R2C_decomposed_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<4096>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_decomposed_t<FFT>(); break;}
       }
       break; }  
 
     case 8192: {
       switch (arch)
       {
-        case 700: { using FFT = decltype(FFT_base()  + Size<8192>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_t<FFT>(); break;}
-        case 800: { using FFT = decltype(FFT_base()  + Size<8192>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_t<FFT>(); break;}
+        case 700: { using FFT = decltype(FFT_base()  + Size<8192>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<700>());  FFT_R2C_decomposed_t<FFT>(); break;}
+        case 800: { using FFT = decltype(FFT_base()  + Size<8192>() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() + SM<800>());  FFT_R2C_decomposed_t<FFT>(); break;}
       }
       break; } 
   }
@@ -561,7 +561,7 @@ void FourierTransformer::FFT_R2C()
 
 template<class FFT, class ComplexType, class ScalarType>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_R2C(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace)
+void block_fft_kernel_R2C_decomposed(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace)
 {
   // Initialize the shared memory, assuming everyting matches the input data X size in
   using complex_type = ComplexType;
