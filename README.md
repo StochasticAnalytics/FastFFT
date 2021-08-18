@@ -1,15 +1,19 @@
 # FastFFT
 
 
-## Broad strokes
+## Project Summary
 
-This project aims to accelerate a specific set of FFTs important for cryo-Electron Microscopy. It does so by taking advantage of the cufftdx library from Nvidia, currently in early access as well as algorithmic ideas from *Sorensen et. al* [[1]](#1). An additional experimental aspect is the development of the scientific manuscript "live" alongside the development of the code. 
+#### Goals:
+This project aims to accelerate a specific subset of Fast Fourier Transforms (FFTs) especially important image processing, my particular flavor of which is  high-resolution phase-contrast cryo-Electron Microscopy. The gist is to take advantage of the cufftdx library from Nvidia, currently in early access, as well as algorithmic ideas from *Sorensen et. al* [[1]](#1). I became aware of [VkFFT](https://github.com/DTolm/VkFFT) after I had finished my initial [proof of principle](https://github.com/bHimes/cisTEM_downstream_bah/blob/DFT/src/gpu/DFTbyDecomposition.cu) experiments with cufftdx in Oct 2020. It may be entirely possible to do the same things using that library, though I haven't had a change to look through the source.
 
+An additional experiment tied to this project, is the development of the scientific manuscript "live" alongside the development of the code. While most of my projects are pretty safe from being scooped, this one is decidedly "scoopable" as it should have broad impact, and also shouldn't be to hard to implement once the info is presented.
+
+#### Design:
 
 The FourierTransformer class, in the FastFFT namespace may be used in your cpp/cuda project by including the *header.* The basic usage is as follows:
 
 - The input/output data pointers, size and type are set. (analagous to the cufftXtMakePlanMany)
-- Class methods are provided to handle memory allocation on the gpu as well as xfer to/from.
+- Class methods are provided to handle memory allocation on the gpu as well as transfer to/from host/device.
 - Simple methods for FwdFFT, InvFFT, CrossCorrelation etc. are public and call the correct combination of substranforms based on the data and padding/trimming wanted.
 
 
@@ -18,21 +22,39 @@ The FourierTransformer class, in the FastFFT namespace may be used in your cpp/c
 
 ## Abstract
 
-The Fast Fourier transform is one of the most widely used and heavily optimized algorithms in digital signal processing. cryoEM makes heavy use of the FFT as it can accelerate convolution operations and reconstruction algorithms operate most accurately in Fourier space thanks to the Fourier slice theorem. While FFT libraries like FFTW and cuFFT provide highly optimized generic multi-dimensional FFT, these plans ignore several scenarios in cryoEM where only a subset of the input or output points are required. We show here how the cuFFTdx header library can be used to accelerate several important algorithms by factors of 3-10x over Nvidia’s cuFFT library. These include movie alignment, 2d and 3d template matching and subtomogram averaging.
+The Fast Fourier transform is one of the most widely used and heavily optimized algorithms in digital signal processing. cryoEM makes heavy use of the FFT as it can accelerate convolution operations used for image alignment, and also in reconstruction algorithms that operate most accurately in Fourier space. While FFT libraries like FFTW and cuFFT provide routines for highly-optimized general purpose multi-dimensional FFTs; however, they overlook several use-cases where only a subset of the input or output points are required. We show here algorithms based on transform decomposition are well suited to the memory hierarchy on moden GPUs, and can be implemented using the cufftdx header library to accelerate several important algorithms by factors of 3-10x over Nvidia’s cuFFT library. These include movie-frame alignment, image resampling via Fourier cropping, 2d and 3d template matching, and subtomogram averaging and alignment.
 
 ## Introduction
 
+#### The Fourier Transform
 
-- What is the DFT and why is it used in cryoEM
-- What is the FFT and how does it accelerate (mem explanation as well.)
-- Reference Sorensen and give  a quick recap.
-- Pictorial explanation for the major benefactors.
+The Fourier Trasnform is a mathematical operation that converts a function between two dual spaces, for example, time and frequency, or position and momentum :exclamation:cite. A function that is well localized in postion (commonly "real" space) will be delocalized in momentum (commonly "Fourier" or "K" space) and vice-versa. Converting between different representations of the same function has many practical uses; of particular interest to the author is in image filtering. [:exclamation:Provide some examples, low/high pass, frequency marching algs etc.] [:exclamation: provide equation, maybe explain different conventions (wolfram is useful.)]
+
+#### The discrete Fourier Trasnform
+
+The discrete Fourier Transform (DFT) extends the operation of the Fourier Transform to a band-limited sequence of evenly spaced samples of a continous function :exclamation:cite. 
+  - equation
+  - list properties (And brief example with a few citations for where each is capitalized on.)
+    - linearity
+    - sinc interpolation
+    - Parsevals
+    - Convolution theorem
+    - Fourier Slice theorem
+
+#### the fast (discrete) Fourier Transform
+
+In looking at [:exclamation:DFT equation above] it is clear that the DFT requires O(n^2) complex exponential, multiplications and additions. The fast Fourier Transform (FFT) reduces the compuational complexity to O(Nlog_2(N)) with the most efficient algorithm, the split-radix FFT requiring just 4Nlog_2(N) -6N+8 operations :exclamation:cite. While discussions on the FFT center on computational complexity from the standpoint of floating point operations, on modern GPU hardware they are memory-bandwidth limited, with an estimated 80% of the computational run-time being dedicated to moving data on and off chip :exclamation:cite.
+
+#### exploiting zero values
+
+- Concept, reduce ops, but especially i/o
+- Mention pruning
+- Introduce transform decomposition (Sorensen)
+- Pictorial explanation for the major benefactors, also list estimate of ops. 
   - Movie alignment
   - 2D TM
   - 3D TM
   - Subtomogram averaging
-- In addition to reduced ops, there are also memory advantages to operating on transposed data (for all problems) and especially for points from (4) as a direct write of uncoalesced values can be reduced by carefully choosing the axis.
-- Possibility of half-precision (also how to get around excessive padding due to power of 2 constraint, and that cuFFTdx is limited to 4096)
 
 
 ## Theory
