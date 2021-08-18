@@ -79,7 +79,7 @@ constexpr const int elements_per_thread_complex = 8;
 
 // All transforms are 
 using FFT_base   = decltype(Block() + Precision<float>() + ElementsPerThread<elements_per_thread_complex>()  + FFTsPerBlock<1>()  );
-using FFT_thread_base = decltype(Thread() + Size<32>() + Precision<float>());
+using FFT_thread_base = decltype(Thread() + Size<16>() + Precision<float>());
 
 //////////////////////////////
 // Kernel definitions
@@ -745,15 +745,16 @@ struct io_thread
       if (index <  memory_limit)
       {
         thread_data[i] = input[index];
-        index += stride;
       }
       else
       {
         // assuming even dimension
         // FIXME shouldn't need to read in from global for an even stride
-        thread_data[i] = input[offset - index];
+        thread_data[i] = input[offset - index - 1];
         thread_data[i].y = -thread_data[i].y; // conjugate
       }
+      index += stride;
+
 
     }
   } // store_r2c_transposed
@@ -772,7 +773,6 @@ struct io_thread
     if (index <  memory_limit)
     {
       thread_data[i] = input[index*pixel_pitch + blockIdx.y];
-      index += stride;
     }
     else
     {
@@ -781,6 +781,7 @@ struct io_thread
       thread_data[i] = input[(offset - index)*pixel_pitch + blockIdx.y];
       thread_data[i].y = -thread_data[i].y; // conjugate
     }
+    index += stride;
 
   } // load c2r_transposed
 
@@ -795,6 +796,7 @@ struct io_thread
     twiddle_in *= threadIdx.x; // twiddle factor arg now just needs to multiplied by K = (index + i) 
     for (unsigned int i = 0; i < size_of<FFT>::value; i++)
     {
+      // printf("remap tid, index + i %i %i\n", threadIdx.x, index+i);
       __sincosf( twiddle_in * (index + i) ,&twiddle.y,&twiddle.x);
       twiddle *= thread_data[i];
       shared_output[index +  i] = scalar_type(twiddle.x); // assuming the output is real, only the real parts add, so don't bother with the complex
@@ -804,8 +806,11 @@ struct io_thread
     {
       // wrap around, 0 --> 1, Q-1 --> 0 etc.
       index = ((threadIdx.x + sub_fft) % Q) * size_of<FFT>::value;
-      for (unsigned int i = 0; i < FFT::elements_per_thread; i++)
+
+      for (unsigned int i = 0; i < size_of<FFT>::value; i++)
       {
+        // if (threadIdx.x == 32) printf("remap tid, subfft, q, index + i %i %i %i %i\n", threadIdx.x,sub_fft, Q, index+i);
+
       __sincosf( twiddle_in * (index + i) ,&twiddle.y,&twiddle.x);
       twiddle *= thread_data[i];
       shared_output[index +  i] += scalar_type(twiddle.x); // assuming the output is real, only the real parts add, so don't bother with the complex
