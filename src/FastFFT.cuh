@@ -778,7 +778,7 @@ struct io_thread
     {
       // assuming even dimension
       // FIXME shouldn't need to read in from global for an even stride
-      thread_data[i] = input[(offset - index)*pixel_pitch + blockIdx.y)];
+      thread_data[i] = input[(offset - index)*pixel_pitch + blockIdx.y];
       thread_data[i].y = -thread_data[i].y; // conjugate
     }
 

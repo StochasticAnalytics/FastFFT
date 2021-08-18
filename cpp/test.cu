@@ -540,12 +540,11 @@ void compare_libraries(short4 input_size, short4 output_size)
 
 }
 
-void run_oned(short4 input_size, short4 output_size)
+void run_oned(std::vector<int> size)
 {
 
   // Override the size to be one dimensional in x
-  input_size.y = 1; input_size.z = 1;
-  output_size.y = 1; output_size.z = 1;
+  std::cout << "Running one-dimensional tests\n" << std::endl;
 
   bool test_passed = true;
   long address = 0;
@@ -553,52 +552,67 @@ void run_oned(short4 input_size, short4 output_size)
   float sum;
   float2 sum_complex;
 
-  Image< float, float2 > FT_input(input_size);
-  Image< float, float2 > FT_output(output_size);
+  for (int n : size)
+  {
+    short4 input_size = make_short4(n,1,1,0);
+    short4 output_size = make_short4(n,1,1,0);
+
+    Image< float, float2 > FT_input(input_size);
+    Image< float, float2 > FT_output(output_size);
+
+    // We just make one instance of the FourierTransformer class, with calc type float.
+    // For the time being input and output are also float. TODO calc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
+    FastFFT::FourierTransformer FT(FastFFT::FourierTransformer::DataType::fp32);
+
+
+    FT_input.real_memory_allocated = FT.ReturnPaddedMemorySize(input_size);
+    FT_output.real_memory_allocated = FT.ReturnPaddedMemorySize(output_size);
+    
+
+    bool set_fftw_plan = true;
+    FT_input.Allocate(set_fftw_plan);
+    FT_output.Allocate(set_fftw_plan);
+
+    // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
+    FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
+    FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
+
+
+    // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
+    // ensures faster transfer. If false, it will be pinned for you.
+    FT.SetInputPointer(FT_input.real_values, false);
+
+    // Set a unit impulse at the center of the input array.
+    FT.SetToConstant<float>(FT_input.real_values, FT_input.real_memory_allocated, 1.0f);
+    FT.SetToConstant<float>(FT_output.real_values, FT_input.real_memory_allocated, 0.0f);
+
+    FT.CopyHostToDevice();
+    cudaErr(cudaStreamSynchronize(cudaStreamPerThread));  
+
+    FT_input.FwdFFT();
+    for (int i = 0; i < 3; ++i) std::cout << FT_input.real_values[i] << std::endl;
+    std::cout << std::endl;
+
+    bool transpose_output = false;
+    bool swap_real_space_quadrants = false;
+    FT.FwdFFT(swap_real_space_quadrants, transpose_output);
+    FT.CopyDeviceToHost(FT_output.real_values, false, false);
+
+    for (int i = 0; i < 3; ++i) std::cout << FT_output.real_values[i] << std::endl;
+
+    FT_input.InvFFT();
+    for (int i = 0; i < 5; ++i) {std::cout << "FFTW inv " << FT_input.real_values[i] << std::endl;}
+    std::cout << std::endl;
 
 
 
-   // We just make one instance of the FourierTransformer class, with calc type float.
-  // For the time being input and output are also float. TODO calc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
-  FastFFT::FourierTransformer FT(FastFFT::FourierTransformer::DataType::fp32);
+    FT.InvFFT(transpose_output);
+    FT.CopyDeviceToHost(FT_output.real_values, false, false);
+
+    for (int i = 0; i < 5; ++i) {std::cout << "Ft inv " << FT_output.real_values[i] << std::endl;}
 
 
-  FT_input.real_memory_allocated = FT.ReturnPaddedMemorySize(input_size);
-  FT_output.real_memory_allocated = FT.ReturnPaddedMemorySize(output_size);
-  
-
-  bool set_fftw_plan = true;
-  FT_input.Allocate(set_fftw_plan);
-  FT_output.Allocate(set_fftw_plan);
-
-  // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
-  FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
-  FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
-
-
-  // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
-  // ensures faster transfer. If false, it will be pinned for you.
-  FT.SetInputPointer(FT_input.real_values, false);
-
-  // Set a unit impulse at the center of the input array.
-  FT.SetToConstant<float>(FT_input.real_values, FT_input.real_memory_allocated, 1.0f);
-  FT.SetToConstant<float>(FT_output.real_values, FT_input.real_memory_allocated, 0.0f);
-
-  FT.CopyHostToDevice();
-  cudaErr(cudaStreamSynchronize(cudaStreamPerThread));  
-
-  FT_input.FwdFFT();
-  for (int i = 0; i < 10; ++i) std::cout << FT_input.real_values[i] << std::endl;
-  std::cout << std::endl;
-
-  bool transpose_output = false;
-  bool swap_real_space_quadrants = false;
-  FT.FwdFFT(swap_real_space_quadrants, transpose_output);
-  FT.CopyDeviceToHost(FT_output.real_values, false, false);
-
-  for (int i = 0; i < 10; ++i) std::cout << FT_output.real_values[i] << std::endl;
-
-
+  }
 
 
 }
@@ -617,19 +631,12 @@ int main(int argc, char** argv) {
   constexpr const int n_tests = 6;
   const int test_size[n_tests] = {384, 1536, 4480, 512, 1024, 4096};
 
-  if (run_validation_tests) {
+  std::vector<int> test_sizes =  {64,128,256,320,480,512,608,768,1024,1056,1536,2048,2560,3072,3584,4096,5120,6144};
 
-    for (int iSize = 0; iSize < n_tests; iSize++) {
+  if (run_validation_tests)  {
 
-      std::cout << std::endl << "Testing constant image size " << test_size[iSize] << " x" << std::endl;
-      input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
-      output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+    run_oned(test_sizes);
 
-      run_oned(input_size, output_size);
-      exit(-1) ; 
-
-    }
-    
 
     for (int iSize = 0; iSize < n_tests; iSize++) {
 

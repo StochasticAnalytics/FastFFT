@@ -204,7 +204,6 @@ private:
                     c2r_decomposed, c2r_decomposed_transposed,  xcorr_transposed}; // Used to specify the origin of the data
   inline LaunchParams SetLaunchParameters(const int& ept, KernelType kernel_type)
   {
-    std::cerr << " kernel_type " << kernel_type << std::endl;
     LaunchParams L;
     switch (kernel_type)
     {
@@ -329,6 +328,7 @@ private:
         exit(-1);
         
     }
+    std::cout << "Transform Divisor " << L.Q << " " << transform_divisor << std::endl;
     return L;
   }
 
