@@ -200,7 +200,7 @@ private:
   };
 
 
-  enum KernelType { r2c_decomposed, r2c_decomposed_transposed, r2c_transposed, c2c_padded, c2c, c2r_transposed, xcorr_transposed}; // Used to specify the origin of the data
+  enum KernelType { r2c_decomposed, r2c_decomposed_transposed, r2c_transposed, c2c_padded, c2c, c2c_decomposed, c2r_transposed, xcorr_transposed}; // Used to specify the origin of the data
   inline LaunchParams SetLaunchParameters(const int& ept, KernelType kernel_type)
   {
     std::cerr << " kernel_type " << kernel_type << std::endl;
@@ -264,6 +264,18 @@ private:
         L.twiddle_in = -2*PIf/dims_out.y;
         L.Q = 1; // Already full size - FIXME when working out limited number of output pixels       
         break;
+
+      case c2c_decomposed: 
+        L.threadsPerBlock = dim3(transform_divisor, 1, 1);
+        L.gridDims = dim3(1, dims_out.w, 1); 
+        L.mem_offsets.shared_input = 0;
+        L.mem_offsets.shared_output = dims_out.y; 
+        L.mem_offsets.pixel_pitch_input = dims_out.y; // scalar type, natural 
+        L.mem_offsets.pixel_pitch_output = dims_out.y; // complex type
+        L.twiddle_in = -2*PIf/dims_out.y ;
+        L.Q =  transform_divisor; //  (dims_in / transform size)
+      break;
+
       case c2r_transposed:
         L.twiddle_in = -2*PIf/dims_out.y;
         L.Q = 1; // Already full size - FIXME when working out limited number of output pixels  
@@ -302,6 +314,7 @@ private:
   void FFT_R2C_WithPadding(bool transpose_output = true) ;// non-transposed is not implemented and will fail at runtime.
   void FFT_C2C_WithPadding(bool swap_real_space_quadrants = false);
   void FFT_C2C( bool do_forward_transform );
+  void FFT_C2C_decomposed( bool do_forward_transform );
   void FFT_C2R_Transposed();
   void FFT_C2C_WithPadding_ConjMul_C2C(float2* image_to_search, bool swap_real_space_quadrants = false);
 
@@ -310,6 +323,7 @@ private:
   template<class FFT> void FFT_R2C_WithPadding_t(bool transpose_output);
   template<class FFT> void FFT_C2C_WithPadding_t(bool swap_real_space_quadrants);
   template<class FFT> void FFT_C2C_t( bool do_forward_transform );
+  template<class FFT> void FFT_C2C_decomposed_t( bool do_forward_transform );
   template<class FFT> void FFT_C2R_Transposed_t();
   template<class FFT, class invFFT> void FFT_C2C_WithPadding_ConjMul_C2C_t(float2* image_to_search, bool swap_real_space_quadrants);
 
