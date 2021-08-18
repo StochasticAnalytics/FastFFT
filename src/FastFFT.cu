@@ -1672,7 +1672,7 @@ void FourierTransformer::FFT_C2R_Transposed_t()
   if (is_in_buffer_memory)
   {
     precheck
-    block_fft_kernel_C2R_Transformed<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, FFT::shared_memory_size, cudaStreamPerThread>> >
+    block_fft_kernel_C2R_Transposed<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, FFT::shared_memory_size, cudaStreamPerThread>> >
     ( (complex_type*)buffer_fp32_complex, (scalar_type*)device_pointer_fp32, LP.mem_offsets, workspace);
     postcheck
     is_in_buffer_memory = false;
@@ -1680,7 +1680,7 @@ void FourierTransformer::FFT_C2R_Transposed_t()
   else
   {
     precheck
-    block_fft_kernel_C2R_Transformed<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, FFT::shared_memory_size, cudaStreamPerThread>> >
+    block_fft_kernel_C2R_Transposed<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, FFT::shared_memory_size, cudaStreamPerThread>> >
     ( (complex_type*)device_pointer_fp32, (scalar_type*)buffer_fp32_complex, LP.mem_offsets, workspace);
     postcheck
     is_in_buffer_memory = true;
@@ -1795,7 +1795,7 @@ void FourierTransformer::FFT_C2R_Transposed()
 
 template<class FFT, class ComplexType, class ScalarType>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2R_Transformed(const ComplexType* __restrict__  input_values, ScalarType*  __restrict__ output_values, Offsets mem_offsets, typename FFT::workspace_type workspace)
+void block_fft_kernel_C2R_Transposed(const ComplexType* __restrict__  input_values, ScalarType*  __restrict__ output_values, Offsets mem_offsets, typename FFT::workspace_type workspace)
 {
 
 	using complex_type = ComplexType;
@@ -1814,6 +1814,125 @@ void block_fft_kernel_C2R_Transformed(const ComplexType* __restrict__  input_val
   io<FFT>::store_c2r(thread_data, &output_values[blockIdx.y*mem_offsets.pixel_pitch_output]);
 
 } // end of block_fft_kernel_C2R_Transposed
+
+
+template <class FFT>
+void FourierTransformer::FFT_C2R_decomposed_t(bool transpose_output)
+{
+
+	using complex_type = typename FFT::value_type;
+	using scalar_type    = typename complex_type::value_type;
+
+  cudaErr(error_code);
+
+  complex_type* tmp_input_ptr;
+  scalar_type* tmp_output_ptr;
+
+  // Note TODO this in the C2R_Transposed
+  if (is_in_buffer_memory) 
+  {
+    tmp_input_ptr = (complex_type*)buffer_fp32_complex;
+    tmp_output_ptr = (scalar_type*)device_pointer_fp32;
+    is_in_buffer_memory = false;
+  }
+  else
+  {
+    tmp_input_ptr = (complex_type*)device_pointer_fp32_complex;
+    tmp_output_ptr = (scalar_type*)buffer_fp32;
+    is_in_buffer_memory = true;
+  }
+
+  thread_fft_kernel_C2R_decomposed_transposed
+  if (transpose_output)
+  {
+    LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2r_decomposed_transposed);
+    int shared_memory = LP.mem_offsets.shared_output * sizeof(scalar_type);
+
+    precheck
+    thread_fft_kernel_C2R_decomposed_transposed<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, FFT::shared_memory_size, cudaStreamPerThread>> >
+    ( tmp_input_ptr, tmp_output_ptr, LP.mem_offsets, LP.twiddle_in, LP.Q);
+    postcheck
+  }
+  else
+  {
+    LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2r_decomposed);
+    int shared_memory = LP.mem_offsets.shared_output * sizeof(scalar_type);
+    precheck
+    thread_fft_kernel_C2R_decomposed<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, FFT::shared_memory_size, cudaStreamPerThread>> >
+    ( tmp_input_ptr, tmp_output_ptr, LP.mem_offsets, LP.twiddle_in, LP.Q);
+    postcheck
+  }
+
+
+}
+
+void FourierTransformer::FFT_C2R_decomposed(bool transpose_output)
+{
+  int device, arch;
+  GetCudaDeviceArch( device, arch );
+
+  // Since we decompose, we need to use a c2c type.
+  switch (arch)
+  {
+    case 700: { using FFT = decltype(FFT_thread_base() + Direction<fft_direction::inverse>()+ Type<fft_type::c2c>() + SM<700>());  FFT_C2R_decomposed_t<FFT>(); break;}
+    case 750: { using FFT = decltype(FFT_thread_base() + Direction<fft_direction::inverse>()+ Type<fft_type::c2c>() + SM<750>());  FFT_C2R_decomposed_t<FFT>(); break;}
+    case 800: { using FFT = decltype(FFT_thread_base() + Direction<fft_direction::inverse>()+ Type<fft_type::c2c>() + SM<800>());  FFT_C2R_decomposed_t<FFT>(); break;}
+  }
+  break; }
+}
+
+template<class FFT, class ComplexType, class ScalarType>
+__global__
+void thread_fft_kernel_C2R_decomposed(const ComplexType*  __restrict__ input_values, ScalarType*  __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q)
+{
+  using complex_type = ComplexType;
+  using scalar_type  = ScalarType;
+
+  // The data store is non-coalesced, so don't aggregate the data in shared mem.
+	extern __shared__  complex_type shared_mem[];
+
+	// Memory used by FFT - for Thread() type, FFT::storage_size == FFT::elements_per_thread == size_of<FFT>::value
+  complex_type thread_data[FFT::storage_size];
+ 
+
+  io_thread<FFT>::load_c2r(&input_values[blockIdx.y*mem_offsets.pixel_pitch_input], thread_data, Q, mem_offsets.pixel_pitch_input);
+
+  // We then have Q FFTs of size size_of<FFT>::value (P in the paper)
+	FFT().execute(thread_data);
+
+  // Now we need to aggregate each of the Q transforms into each output block of size P
+  io_thread<FFT>::remap_decomposed_segments_c2r(thread_data, shared_mem, twiddle_in, Q);
+
+  io_thread<FFT>::store_c2r(shared_output, &output_values[blockIdx.y*mem_offsets.pixel_pitch_output],stride);
+}
+
+template<class FFT, class ComplexType, class ScalarType>
+__global__
+void thread_fft_kernel_C2R_decomposed_transposed(const ComplexType*  __restrict__ input_values, ScalarType*  __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q)
+{
+
+  using complex_type = ComplexType;
+  using scalar_type  = ScalarType;
+
+  // The data store is non-coalesced, so don't aggregate the data in shared mem.
+	extern __shared__  complex_type shared_mem[];
+
+	// Memory used by FFT - for Thread() type, FFT::storage_size == FFT::elements_per_thread == size_of<FFT>::value
+  complex_type thread_data[FFT::storage_size];
+ 
+
+  io_thread<FFT>::load_c2r_transposed(&input_values[blockIdx.], thread_data, Q, mem_offsets.pixel_pitch_input, mem_offsets.pixel_pitch_output/2);
+
+  // We then have Q FFTs of size size_of<FFT>::value (P in the paper)
+	FFT().execute(thread_data);
+
+  // Now we need to aggregate each of the Q transforms into each output block of size P
+  io_thread<FFT>::remap_decomposed_segments_c2r(thread_data, shared_mem, twiddle_in, Q);
+
+  io_thread<FFT>::store_c2r(shared_output, &output_values[blockIdx.y*mem_offsets.pixel_pitch_output],stride);
+
+}
+
 
 
 void FourierTransformer::ClipIntoTopLeft()

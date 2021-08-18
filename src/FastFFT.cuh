@@ -85,6 +85,12 @@ using FFT_thread_base = decltype(Thread() + Size<32>() + Precision<float>());
 // Kernel definitions
 //////////////////////////////
 
+
+
+/////////////
+// R2C
+/////////////
+
 template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
 __global__
 void thread_fft_kernel_R2C_decomposed(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q);
@@ -100,6 +106,11 @@ void block_fft_kernel_R2C(const ScalarType*  __restrict__ input_values, ComplexT
 template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_R2C_WithPadding(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
+
+
+/////////////
+// C2C
+/////////////
 
 template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
@@ -125,9 +136,23 @@ template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_C2C(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
 
+/////////////
+// C2R 
+/////////////
+
+template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
+__global__
+void thread_fft_kernel_C2R_decomposed(const ComplexType*  __restrict__ input_values, ScalarType*  __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q);
+
+template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
+__global__
+void thread_fft_kernel_C2R_decomposed_transposed(const ComplexType*  __restrict__ input_values, ScalarType*  __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q);
+
 template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2R_Transformed(const ComplexType*  __restrict__ input_values, ScalarType*  __restrict__ output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+void block_fft_kernel_C2R_Transposed(const ComplexType*  __restrict__ input_values, ScalarType*  __restrict__ output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+
+
 
 template<class InputType, class OutputType> 
  __global__ void clip_into_top_left_kernel( InputType*  input_values, OutputType*  output_values, const short4 dims );
@@ -690,6 +715,7 @@ struct io_thread
     {
       __sincosf( twiddle_in * (index + i) ,&twiddle.y,&twiddle.x);
       twiddle *= thread_data[i];
+      shared_output[index +  i] = twiddle;
     }  
 
     for (unsigned int sub_fft = 1; sub_fft < Q; sub_fft++)
@@ -700,13 +726,105 @@ struct io_thread
       {
         __sincosf( twiddle_in * (index + i) ,&twiddle.y,&twiddle.x);
         twiddle *= thread_data[i];
+        shared_output[index +  i] += twiddle;
       }
     }
   }  // remap_decomposed_segments (c2c specialized no explicit memory checks)  
 
-    
+ 
+  static inline __device__ void load_c2r(const complex_type* input,
+                                         complex_type*       thread_data,
+                                         const int           stride,
+                                         const int           memory_limit)   
+  {
+    // Each thread reads in the input data at stride = mem_offsets.Q
+    unsigned int index  = threadIdx.x;
+    unsigned int offset = (memory_limit - 1)*2;
+    for (unsigned int i = 0; i < size_of<FFT>::value; i++) 
+    {
+      if (index <  memory_limit)
+      {
+        thread_data[i] = input[index];
+        index += stride;
+      }
+      else
+      {
+        // assuming even dimension
+        // FIXME shouldn't need to read in from global for an even stride
+        thread_data[i] = input[offset - index];
+        thread_data[i].y = -thread_data[i].y; // conjugate
+      }
 
+    }
+  } // store_r2c_transposed
 
+  static inline __device__ void load_c2r_transposed(const complex_type* input,
+                                                    complex_type*       thread_data,
+                                                    int                 stride,
+                                                    int                 pixel_pitch,
+                                                    int                 memory_limit)   
+  {
+    // Each thread reads in the input data at stride = mem_offsets.Q
+    unsigned int index  = threadIdx.x;
+    unsigned int offset = (memory_limit - 1)*2;
+    for (unsigned int i = 0; i < size_of<FFT>::value; i++) 
+
+    if (index <  memory_limit)
+    {
+      thread_data[i] = input[index*pixel_pitch + blockIdx.y];
+      index += stride;
+    }
+    else
+    {
+      // assuming even dimension
+      // FIXME shouldn't need to read in from global for an even stride
+      thread_data[i] = input[(offset - index)*pixel_pitch + blockIdx.y)];
+      thread_data[i].y = -thread_data[i].y; // conjugate
+    }
+
+  } // load c2r_transposed
+
+  static inline __device__ void remap_decomposed_segments_c2r(const complex_type* thread_data,
+                                                              scalar_type*       shared_output,
+                                                              float               twiddle_in,
+                                                              int                 Q)  
+  {
+    // Unroll the first loop and initialize the shared mem. 
+    complex_type twiddle;
+    int index = threadIdx.x * size_of<FFT>::value;
+    twiddle_in *= threadIdx.x; // twiddle factor arg now just needs to multiplied by K = (index + i) 
+    for (unsigned int i = 0; i < size_of<FFT>::value; i++)
+    {
+      __sincosf( twiddle_in * (index + i) ,&twiddle.y,&twiddle.x);
+      twiddle *= thread_data[i];
+      shared_output[index +  i] = scalar_type(twiddle.x); // assuming the output is real, only the real parts add, so don't bother with the complex
+    }  
+
+    for (unsigned int sub_fft = 1; sub_fft < Q; sub_fft++)
+    {
+      // wrap around, 0 --> 1, Q-1 --> 0 etc.
+      index = ((threadIdx.x + sub_fft) % Q) * size_of<FFT>::value;
+      for (unsigned int i = 0; i < FFT::elements_per_thread; i++)
+      {
+      __sincosf( twiddle_in * (index + i) ,&twiddle.y,&twiddle.x);
+      twiddle *= thread_data[i];
+      shared_output[index +  i] += scalar_type(twiddle.x); // assuming the output is real, only the real parts add, so don't bother with the complex
+      }
+    }
+  }  // remap_decomposed_segments (c2c specialized no explicit memory checks)  
+
+  static inline __device__ void store_c2r(const scalar_type* shared_output,
+                                          scalar_type*       output,
+                                          const int           stride)   
+  {
+    // Each thread reads in the input data at stride = mem_offsets.Q
+    unsigned int index  = threadIdx.x;
+    for (unsigned int i = 0; i < size_of<FFT>::value; i++) 
+    {
+      output[index] = shared_output[index];
+      index += stride;
+    }
+  } // store_c2c
 
 }; // struct thread_io
 

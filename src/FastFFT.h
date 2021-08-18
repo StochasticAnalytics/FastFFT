@@ -200,7 +200,8 @@ private:
   };
 
 
-  enum KernelType { r2c_decomposed, r2c_decomposed_transposed, r2c_transposed, c2c_padded, c2c, c2c_decomposed, c2r_transposed, xcorr_transposed}; // Used to specify the origin of the data
+  enum KernelType { r2c_decomposed, r2c_decomposed_transposed, r2c_transposed, c2c_padded, c2c, c2c_decomposed, c2r_transposed,
+                    c2r_decomposed, c2r_decomposed_transposed,  xcorr_transposed}; // Used to specify the origin of the data
   inline LaunchParams SetLaunchParameters(const int& ept, KernelType kernel_type)
   {
     std::cerr << " kernel_type " << kernel_type << std::endl;
@@ -275,7 +276,7 @@ private:
         L.twiddle_in = -2*PIf/dims_out.y ;
         L.Q =  transform_divisor; //  (dims_in / transform size)
       break;
-
+      
       case c2r_transposed:
         L.twiddle_in = -2*PIf/dims_out.y;
         L.Q = 1; // Already full size - FIXME when working out limited number of output pixels  
@@ -286,6 +287,29 @@ private:
         L.mem_offsets.pixel_pitch_input = dims_out.y;
         L.mem_offsets.pixel_pitch_output = dims_out.w*2;      
         break;
+
+      case c2r_decomposed:
+        L.twiddle_in = -2*PIf/dims_out.x;
+        L.Q = transform_divisor; //  (dims_in / transform size)
+        L.threadsPerBlock = dim3(transform_divisor, 1, 1); 
+        L.gridDims = dim3(1, dims_out.y, 1);
+        L.mem_offsets.shared_input = 0;
+        L.mem_offsets.shared_output = dims_out.x;
+        L.mem_offsets.pixel_pitch_input = dims_out.w;
+        L.mem_offsets.pixel_pitch_output = dims_out.w*2;      
+      break; 
+      
+      case c2r_decomposed_transposed:
+        L.twiddle_in = -2*PIf/dims_out.x;
+        L.Q = 1; // Already full size - FIXME when working out limited number of output pixels  
+        L.threadsPerBlock = dim3(transform_divisor, 1, 1); 
+        L.gridDims = dim3(1, dims_out.y, 1);
+        L.mem_offsets.shared_input = 0;
+        L.mem_offsets.shared_output = dims_out.x;
+        L.mem_offsets.pixel_pitch_input = dims_out.y;
+        L.mem_offsets.pixel_pitch_output = dims_out.w*2;      
+      break; 
+
       case xcorr_transposed:
       // Cross correlation case
       // The added complexity, in instructions and shared memory usage outweigh the cost of just running the full length C2C on the forward.
@@ -316,6 +340,9 @@ private:
   void FFT_C2C( bool do_forward_transform );
   void FFT_C2C_decomposed( bool do_forward_transform );
   void FFT_C2R_Transposed();
+  void FFT_C2R_decomposed(bool transpose_output = true);
+
+
   void FFT_C2C_WithPadding_ConjMul_C2C(float2* image_to_search, bool swap_real_space_quadrants = false);
 
   template<class FFT> void FFT_R2C_decomposed_t(bool transpose_output);
@@ -325,6 +352,9 @@ private:
   template<class FFT> void FFT_C2C_t( bool do_forward_transform );
   template<class FFT> void FFT_C2C_decomposed_t( bool do_forward_transform );
   template<class FFT> void FFT_C2R_Transposed_t();
+  template<class FFT> void FFT_C2R_decomposed_t(bool transpose_output);
+
+
   template<class FFT, class invFFT> void FFT_C2C_WithPadding_ConjMul_C2C_t(float2* image_to_search, bool swap_real_space_quadrants);
 
 
