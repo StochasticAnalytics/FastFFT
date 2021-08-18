@@ -591,7 +591,9 @@ void run_oned(short4 input_size, short4 output_size)
   for (int i = 0; i < 10; ++i) std::cout << FT_input.real_values[i] << std::endl;
   std::cout << std::endl;
 
-  FT.FwdFFT();
+  bool transpose_output = false;
+  bool swap_real_space_quadrants = false;
+  FT.FwdFFT(swap_real_space_quadrants, transpose_output);
   FT.CopyDeviceToHost(FT_output.real_values, false, false);
 
   for (int i = 0; i < 10; ++i) std::cout << FT_output.real_values[i] << std::endl;
@@ -624,9 +626,9 @@ int main(int argc, char** argv) {
       output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
 
       run_oned(input_size, output_size);
-    
+      exit(-1) ; 
+
     }
-    exit(-1) ; 
     
 
     for (int iSize = 0; iSize < n_tests; iSize++) {

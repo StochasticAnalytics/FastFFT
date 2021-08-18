@@ -83,8 +83,8 @@ public:
   // 1:1 no resizing or anything fancy.
 
 
-  void FwdFFT(bool swap_real_space_quadrants = false);
-  void InvFFT();
+  void FwdFFT(bool swap_real_space_quadrants = false, bool transpose_output = true);
+  void InvFFT(bool transpose_output = true);
   void CrossCorrelate(float2* image_to_search, bool swap_real_space_quadrants);
   void ClipIntoTopLeft();
   void ClipIntoReal(int wanted_coordinate_of_box_center_x, int wanted_coordinate_of_box_center_y, int wanted_coordinate_of_box_center_z);
@@ -200,7 +200,7 @@ private:
   };
 
 
-  enum KernelType { r2c_decomposed, r2c_transposed, c2c_padded, c2c, c2r_transposed, xcorr_transposed}; // Used to specify the origin of the data
+  enum KernelType { r2c_decomposed, r2c_decomposed_transposed, r2c_transposed, c2c_padded, c2c, c2r_transposed, xcorr_transposed}; // Used to specify the origin of the data
   inline LaunchParams SetLaunchParameters(const int& ept, KernelType kernel_type)
   {
     std::cerr << " kernel_type " << kernel_type << std::endl;
@@ -212,12 +212,24 @@ private:
         L.threadsPerBlock = dim3(transform_divisor, 1, 1);
         L.gridDims = dim3(1, dims_in.y, 1); 
         L.mem_offsets.shared_input = 0;
-        L.mem_offsets.shared_output = dims_out.w; // used in bounds check.
+        L.mem_offsets.shared_output = dims_out.w; 
         L.mem_offsets.pixel_pitch_input = dims_in.w*2; // scalar type, natural 
         L.mem_offsets.pixel_pitch_output = dims_out.w; // complex type
         L.twiddle_in = -2*PIf/dims_in.x ;
         L.Q =  transform_divisor; //  (dims_in / transform size)
         break;
+
+        case r2c_decomposed_transposed: 
+
+        L.threadsPerBlock = dim3(transform_divisor, 1, 1);
+        L.gridDims = dim3(1, dims_in.y, 1); 
+        L.mem_offsets.shared_input = 0;  
+        L.mem_offsets.shared_output = dims_out.w;
+        L.mem_offsets.pixel_pitch_input = dims_in.w*2; // scalar type, natural 
+        L.mem_offsets.pixel_pitch_output = dims_out.y; // complex type
+        L.twiddle_in = -2*PIf/dims_in.x ;
+        L.Q =  transform_divisor; //  (dims_in / transform size)
+        break;        
 
       case r2c_transposed:
         // The only read from the input array is in this blcok
@@ -285,17 +297,17 @@ private:
   }
 
 
-  void FFT_R2C_decomposed();
-  void FFT_R2C_Transposed();
-  void FFT_R2C_WithPadding_Transposed();
+  void FFT_R2C_decomposed(bool transpose_output = true);
+  void FFT_R2C(bool transpose_output = true); // non-transposed is not implemented and will fail at runtime.
+  void FFT_R2C_WithPadding(bool transpose_output = true) ;// non-transposed is not implemented and will fail at runtime.
   void FFT_C2C_WithPadding(bool swap_real_space_quadrants = false);
   void FFT_C2C( bool do_forward_transform );
   void FFT_C2R_Transposed();
   void FFT_C2C_WithPadding_ConjMul_C2C(float2* image_to_search, bool swap_real_space_quadrants = false);
 
-  template<class FFT> void FFT_R2C_decomposed_t();
-  template<class FFT> void FFT_R2C_Transposed_t();
-  template<class FFT> void FFT_R2C_WithPadding_Transposed_t();
+  template<class FFT> void FFT_R2C_decomposed_t(bool transpose_output);
+  template<class FFT> void FFT_R2C_t(bool transpose_output);
+  template<class FFT> void FFT_R2C_WithPadding_t(bool transpose_output);
   template<class FFT> void FFT_C2C_WithPadding_t(bool swap_real_space_quadrants);
   template<class FFT> void FFT_C2C_t( bool do_forward_transform );
   template<class FFT> void FFT_C2R_Transposed_t();

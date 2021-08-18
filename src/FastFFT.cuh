@@ -90,12 +90,16 @@ __global__
 void thread_fft_kernel_R2C_decomposed(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q);
 
 template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
-__launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_R2C_Transposed(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+__global__
+void thread_fft_kernel_R2C_decomposed_transposed(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q);
 
 template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_R2C_WithPadding_Transposed(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
+void block_fft_kernel_R2C(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+
+template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
+__launch_bounds__(FFT::max_threads_per_block) __global__
+void block_fft_kernel_R2C_WithPadding(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 
 template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
@@ -548,9 +552,74 @@ struct io
       index += stride;
     }
   }
+
 }; // struct io}
 
 
+template<class FFT>
+struct io_thread 
+{
+  using complex_type = typename FFT::value_type;
+  using scalar_type  = typename complex_type::value_type;
+
+  static inline __device__ unsigned int stride_size() 
+  {
+    return cufftdx::size_of<FFT>::value / FFT::elements_per_thread;
+  }
+
+  static inline __device__ void load_r2c(const scalar_type* input,
+                                         complex_type*      thread_data,
+                                         const int          stride)  
+  {
+    unsigned int index  = threadIdx.x;
+    for (unsigned int i = 0; i < size_of<FFT>::value; i++) 
+    {
+      thread_data[i].x = input[index];
+      thread_data[i].y = scalar_type(0);
+      index += stride;
+    }
+  } // load_r2c
+
+
+  static inline __device__ void store_r2c(const complex_type* shared_output,
+                                          complex_type*       output,
+                                          const int           stride,
+                                          const int           memory_limit)   
+  {
+    // Each thread reads in the input data at stride = mem_offsets.Q
+    unsigned int index  = threadIdx.x;
+    for (unsigned int i = 0; i < size_of<FFT>::value/2; i++) 
+    {
+      output[index] = shared_output[index];
+      index += stride;
+    }
+    if (index < memory_limit)
+    {
+      output[index] = shared_output[index];
+    }
+  } // store_r2c
+
+  static inline __device__ void store_r2c_transposed(const complex_type* shared_output,
+                                                     complex_type*       output,
+                                                     int                 stride,
+                                                     int                 pixel_pitch,
+                                                     int                 memory_limit)   
+  {
+    // Each thread reads in the input data at stride = mem_offsets.Q
+    unsigned int index  = threadIdx.x;
+    for (unsigned int i = 0; i < size_of<FFT>::value/2; i++) 
+    {
+      output[index*pixel_pitch + blockIdx.y] = shared_output[index];
+      index += stride;
+    }
+    if (index < memory_limit)
+    {
+      output[index*pixel_pitch + blockIdx.y] = shared_output[index];
+    }
+  } // store_r2c_transposed
+
+
+}; // struct thread_io
 
 } // namespace FastFFT
 
