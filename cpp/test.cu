@@ -613,7 +613,7 @@ int main(int argc, char** argv) {
   short4 output_size;
 
   constexpr const int n_tests = 6;
-  const int test_size[n_tests] = {384, 128, 256, 512, 1024, 4096};
+  const int test_size[n_tests] = {384, 1536, 4480, 512, 1024, 4096};
 
   if (run_validation_tests) {
 
@@ -624,9 +624,9 @@ int main(int argc, char** argv) {
       output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
 
       run_oned(input_size, output_size);
-      exit(-1) ; 
+    
     }
-
+    exit(-1) ; 
     
 
     for (int iSize = 0; iSize < n_tests; iSize++) {

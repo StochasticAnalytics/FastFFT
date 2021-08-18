@@ -192,6 +192,14 @@ private:
     }
   };
 
+  inline void GetTransformSize_thread(int input_dimension, int thread_fft_size)
+  {
+    if (input_dimension % thread_fft_size != 0) { std::cerr << "Thread based decompositions must factor by thread_fft_size (" << thread_fft_size << ") in the current implmentations." << std::endl; exit(-1); }
+    transform_divisor = input_dimension / thread_fft_size;
+    transform_size = thread_fft_size;
+  };
+
+
   enum KernelType { r2c_decomposed, r2c_transposed, c2c_padded, c2c, c2r_transposed, xcorr_transposed}; // Used to specify the origin of the data
   inline LaunchParams SetLaunchParameters(const int& ept, KernelType kernel_type)
   {
@@ -201,15 +209,14 @@ private:
     {
       case r2c_decomposed: 
 
-      // The only read from the input array is in this blcok
-        L.threadsPerBlock = dim3(transform_size/ept, 1, 1);
-        L.gridDims = dim3(transform_divisor, dims_in.y, 1); 
-        L.mem_offsets.shared_input = dims_in.x;
+        L.threadsPerBlock = dim3(transform_divisor, 1, 1);
+        L.gridDims = dim3(1, dims_in.y, 1); 
+        L.mem_offsets.shared_input = 0;
         L.mem_offsets.shared_output = dims_out.w; // used in bounds check.
         L.mem_offsets.pixel_pitch_input = dims_in.w*2; // scalar type, natural 
-        L.mem_offsets.pixel_pitch_output = dims_out.w; // complex type, transposed
+        L.mem_offsets.pixel_pitch_output = dims_out.w; // complex type
         L.twiddle_in = -2*PIf/dims_in.x ;
-        L.Q =  dims_in.x / transform_size; 
+        L.Q =  transform_divisor; //  (dims_in / transform size)
         break;
 
       case r2c_transposed:
