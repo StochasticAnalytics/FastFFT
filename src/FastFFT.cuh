@@ -79,7 +79,7 @@ constexpr const int elements_per_thread_complex = 8;
 
 // All transforms are 
 using FFT_base   = decltype(Block() + Precision<float>() + ElementsPerThread<elements_per_thread_complex>()  + FFTsPerBlock<1>()  );
-using FFT_thread_base = decltype(Thread() + Size<16>() + Precision<float>());
+using FFT_thread_base = decltype(Thread() + Size<4>() + Precision<float>());
 
 //////////////////////////////
 // Kernel definitions
@@ -734,6 +734,7 @@ struct io_thread
  
   static inline __device__ void load_c2r(const complex_type* input,
                                          complex_type*       thread_data,
+                                         scalar_type*        shared_output,
                                          const int           stride,
                                          const int           memory_limit)   
   {
@@ -752,9 +753,8 @@ struct io_thread
         thread_data[i] = input[2*memory_limit - index - 2];
         thread_data[i].y = -thread_data[i].y; // conjugate
       }
+      shared_output[index] = scalar_type(0); // zero out shared memory.
       index += stride;
-
-
     }
   } // store_r2c_transposed
 
@@ -769,51 +769,40 @@ struct io_thread
     unsigned int index  = threadIdx.x;
     unsigned int offset = (memory_limit - 1)*2;
     for (unsigned int i = 0; i < size_of<FFT>::value; i++) 
-
-    if (index <  memory_limit)
     {
-      thread_data[i] = input[index*pixel_pitch + blockIdx.y];
-    }
-    else
-    {
-      // assuming even dimension
-      // FIXME shouldn't need to read in from global for an even stride
-      thread_data[i] = input[(offset - index)*pixel_pitch + blockIdx.y];
-      thread_data[i].y = -thread_data[i].y; // conjugate
-    }
-    index += stride;
-
+      if (index <  memory_limit)
+      {
+        thread_data[i] = input[index*pixel_pitch + blockIdx.y];
+      }
+      else
+      {
+        // assuming even dimension
+        // FIXME shouldn't need to read in from global for an even stride
+        thread_data[i] = input[(offset - index)*pixel_pitch + blockIdx.y];
+        thread_data[i].y = -thread_data[i].y; // conjugate
+      }
+      index += stride;
+    } 
   } // load c2r_transposed
 
   static inline __device__ void remap_decomposed_segments_c2r(const complex_type* thread_data,
                                                               scalar_type*       shared_output,
-                                                              float               twiddle_in,
-                                                              int                 Q)  
+                                                              scalar_type           twiddle_in,
+                                                              unsigned int                 Q)  
   {
     // Unroll the first loop and initialize the shared mem. 
     complex_type twiddle;
-    int index = threadIdx.x * size_of<FFT>::value;
-    twiddle_in *= threadIdx.x; // twiddle factor arg now just needs to multiplied by K = (index + i) 
-    for (unsigned int i = 0; i < size_of<FFT>::value; i++)
-    {
-      // printf("remap tid, index + i %i %i\n", threadIdx.x, index+i);
-      __sincosf( twiddle_in * (index + i) ,&twiddle.y,&twiddle.x);
-      twiddle *= thread_data[i];
-      shared_output[index +  i] = scalar_type(twiddle.x); // assuming the output is real, only the real parts add, so don't bother with the complex
-    }  
+    twiddle_in *= scalar_type(threadIdx.x); // twiddle factor arg now just needs to multiplied by K = (index + i) 
 
-    for (unsigned int sub_fft = 1; sub_fft < Q; sub_fft++)
+    unsigned int index;
+    for (unsigned int sub_fft = 0; sub_fft < Q; sub_fft++)
     {
       // wrap around, 0 --> 1, Q-1 --> 0 etc.
-      index = ((threadIdx.x + sub_fft) % Q) * size_of<FFT>::value;
-
+      index = ((threadIdx.x + sub_fft ) % Q) * size_of<FFT>::value;
       for (unsigned int i = 0; i < size_of<FFT>::value; i++)
       {
-        // if (threadIdx.x == 32) printf("remap tid, subfft, q, index + i %i %i %i %i\n", threadIdx.x,sub_fft, Q, index+i);
-
-      __sincosf( twiddle_in * (index + i) ,&twiddle.y,&twiddle.x);
-      twiddle *= thread_data[i];
-      shared_output[index +  i] += scalar_type(twiddle.x); // assuming the output is real, only the real parts add, so don't bother with the complex
+      __sincosf( twiddle_in * float(index + i) ,&twiddle.y,&twiddle.x);
+      atomicAdd_block(&shared_output[index +  i], scalar_type(twiddle.x*thread_data[i].x - twiddle.y*thread_data[i].y)); // assuming the output is real, only the real parts add, so don't bother with the complex
       }
     }
   }  // remap_decomposed_segments (c2c specialized no explicit memory checks)  

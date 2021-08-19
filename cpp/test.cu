@@ -609,7 +609,7 @@ void run_oned(std::vector<int> size)
     FT.InvFFT(transpose_output);
     FT.CopyDeviceToHost(FT_output.real_values, false, false);
 
-    for (int i = 0; i < 15; ++i) {std::cout << "Ft inv " << FT_output.real_values[i] << std::endl;}
+    for (int i = 0; i < n; ++i) {std::cout << "Ft inv " << i << ": " << FT_output.real_values[i] << std::endl;}
 
 
   }
@@ -631,7 +631,7 @@ int main(int argc, char** argv) {
   constexpr const int n_tests = 6;
   const int test_size[n_tests] = {384, 1536, 4480, 512, 1024, 4096};
 
-  std::vector<int> test_sizes =  {64,128,256,320,480,512,528,544,608,768,1024,1056,1536,2048,2560,3072,3584,4096,5120,6144};
+  std::vector<int> test_sizes =  {64,128,136};//256,320,480,512,528,544,608};//768,1024,1056,1536,2048,2560,3072,3584,4096,5120,6144};
 
   if (run_validation_tests)  {
 
