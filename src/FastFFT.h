@@ -202,7 +202,7 @@ private:
 
   enum KernelType { r2c_decomposed, r2c_decomposed_transposed, r2c_transposed, c2c_padded, c2c, c2c_decomposed, c2r_transposed,
                     c2r_decomposed, c2r_decomposed_transposed,  xcorr_transposed}; // Used to specify the origin of the data
-  inline LaunchParams SetLaunchParameters(const int& ept, KernelType kernel_type)
+  inline LaunchParams SetLaunchParameters(const int& ept, KernelType kernel_type, bool do_forward_transform = true)
   {
     LaunchParams L;
     switch (kernel_type)
@@ -249,8 +249,8 @@ private:
         L.mem_offsets.shared_output = dims_out.y;
         L.mem_offsets.pixel_pitch_input = dims_out.y;
         L.mem_offsets.pixel_pitch_output = dims_out.y;
-
-        L.twiddle_in = -2*PIf/dims_out.y;
+        if ( do_forward_transform) L.twiddle_in = -2*PIf/dims_in.y;
+        else L.twiddle_in = 2*PIf/dims_out.y;  
         L.Q = dims_out.y / dims_in.y; // FIXME assuming for now this is already divisible
 
         break;
@@ -261,7 +261,8 @@ private:
         L.mem_offsets.shared_output = 0;
         L.mem_offsets.pixel_pitch_input = dims_out.y;
         L.mem_offsets.pixel_pitch_output = dims_out.y;
-        L.twiddle_in = -2*PIf/dims_out.y;
+        if ( do_forward_transform) L.twiddle_in = -2*PIf/dims_out.y;
+        else L.twiddle_in = 2*PIf/dims_out.y;
         L.Q = 1; // Already full size - FIXME when working out limited number of output pixels       
         break;
 
@@ -272,12 +273,13 @@ private:
         L.mem_offsets.shared_output = dims_out.y; 
         L.mem_offsets.pixel_pitch_input = dims_out.y; // scalar type, natural 
         L.mem_offsets.pixel_pitch_output = dims_out.y; // complex type
-        L.twiddle_in = -2*PIf/dims_out.y ;
+        if ( do_forward_transform) L.twiddle_in = -2*PIf/dims_out.y ;
+        else L.twiddle_in = 2*PIf/dims_out.y;
         L.Q =  transform_divisor; //  (dims_in / transform size)
       break;
       
       case c2r_transposed:
-        L.twiddle_in = -2*PIf/dims_out.y;
+        L.twiddle_in = 2*PIf/dims_out.y;
         L.Q = 1; // Already full size - FIXME when working out limited number of output pixels  
         L.threadsPerBlock = dim3(transform_size/ept, 1, 1); 
         L.gridDims = dim3(transform_divisor, dims_out.y, 1);
@@ -288,7 +290,7 @@ private:
         break;
 
       case c2r_decomposed:
-        L.twiddle_in = -2*PIf/dims_out.x;
+        L.twiddle_in = 2*PIf/dims_out.x;
         L.Q = transform_divisor; //  (dims_in / transform size)
         L.threadsPerBlock = dim3(transform_divisor, 1, 1); 
         L.gridDims = dim3(1, dims_out.y, 1);
@@ -299,7 +301,7 @@ private:
       break; 
       
       case c2r_decomposed_transposed:
-        L.twiddle_in = -2*PIf/dims_out.x;
+        L.twiddle_in = 2*PIf/dims_out.x;
         L.Q = 1; // Already full size - FIXME when working out limited number of output pixels  
         L.threadsPerBlock = dim3(transform_divisor, 1, 1); 
         L.gridDims = dim3(1, dims_out.y, 1);

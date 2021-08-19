@@ -1407,7 +1407,7 @@ void block_fft_kernel_C2C_WithPadding_SwapRealSpaceQuadrants(const ComplexType* 
 template<class FFT_nodir>
 void FourierTransformer::FFT_C2C_t( bool do_forward_transform )
 {
-  LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c);
+  LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c, do_forward_transform);
 
   
   if (do_forward_transform)
@@ -1580,7 +1580,7 @@ void FourierTransformer::FFT_C2C_decomposed_t( bool do_forward_transform )
   // Note unlike block transforms, we get the transform size here, it must be before LaunchParams. TODO add logical checks
   GetTransformSize_thread(dims_in.y, size_of<FFT_nodir>::value);
 
-  LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_decomposed);
+  LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_decomposed, do_forward_transform);
 
 
 
