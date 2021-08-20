@@ -13,6 +13,7 @@ void const_image_test(short4 input_size, short4 output_size)
   bool test_passed = true;
   long address = 0;
   float sum;
+  const float acceptable_error = 1e-4;
   float2 sum_complex;
 
   Image< float, float2 > host_input(input_size);
@@ -70,7 +71,8 @@ void const_image_test(short4 input_size, short4 output_size)
     if (host_output.complex_values[index].x != 0.0f && host_output.complex_values[index].y != 0.0f) { std::cout << host_output.complex_values[index].x  << " " << host_output.complex_values[index].y << " " << std::endl; test_passed = false;}
   }
   if (host_output.complex_values[0].x != (float)output_size.x * (float)output_size.y * (float)output_size.z) test_passed = false;
-  
+  std::cout << "FFTW unit " << host_output.complex_values[0].x << " " << host_output.complex_values[0].y << std::endl;
+
   MyFFTDebugAssertTestTrue( test_passed, "FFTW unit impulse forward FFT");
   
   // Just to make sure we don't get a false positive, set the host memory to some undesired value.
@@ -88,7 +90,7 @@ void const_image_test(short4 input_size, short4 output_size)
     if (host_output.complex_values[index].x != 0.0f && host_output.complex_values[index].y != 0.0f) {test_passed = false;} // std::cout << host_output.complex_values[index].x  << " " << host_output.complex_values[index].y << " " << std::endl;}
   }
   if (host_output.complex_values[0].x != (float)output_size.x * (float)output_size.y * (float)output_size.z) test_passed = false;
-  std::cout << "FFTW unit " << host_output.complex_values[0].x << " " << host_output.complex_values[0].y << std::endl;
+  std::cout << "fastFFT unit " << host_output.complex_values[0].x << " " << host_output.complex_values[0].y << std::endl;
   MyFFTDebugAssertTestTrue( test_passed, "FastFFT unit impulse forward FFT");
   FT.SetToConstant<float>(host_input.real_values, host_input.real_memory_allocated, 2.0f);
   
@@ -583,7 +585,14 @@ void run_oned(std::vector<int> size)
     FT.SetInputPointer(FT_input.real_values, false);
 
     // Set a unit impulse at the center of the input array.
-    FT.SetToConstant<float>(FT_input.real_values, FT_input.real_memory_allocated, 1.0f);
+    // FT.SetToConstant<float>(FT_input.real_values, FT_input.real_memory_allocated, 1.0f);
+    float2 const_val = make_float2(1.0f,0.0f);
+    FT.SetToConstant<float2>(FT_input.complex_values, FT_input.real_memory_allocated/2, const_val);
+    for (int i=0; i<10; i++)
+    {
+      std::cout << FT_input.complex_values[i].x << ", " << FT_input.complex_values[i].y << std::endl;
+    }
+exit(0);
     FT.SetToConstant<float>(FT_output.real_values, FT_input.real_memory_allocated, 0.0f);
 
     FT.CopyHostToDevice();
@@ -635,6 +644,7 @@ int main(int argc, char** argv) {
 
   if (run_validation_tests)  {
 
+    // change onde these to just report the pass/fail.
     run_oned(test_sizes);
 
 
@@ -648,7 +658,7 @@ int main(int argc, char** argv) {
 
     }
 
-
+    exit(0);
     for (int iSize = 0; iSize < n_tests - 1; iSize++) {
       int oSize = iSize + 1;
       while (oSize < n_tests)

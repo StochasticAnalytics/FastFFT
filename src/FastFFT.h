@@ -31,7 +31,58 @@ namespace FastFFT {
   } LaunchParams;
 
 
+  template<T*, T*>
+  struct _DevicePointers {
+    std::cerr << "Input specializations have only been set for real/complex, single/half precision.\n" std::endl;
+    exit(-1);
+  }
 
+  // Input real, compute single-precision
+  template<float*, float*>
+  struct _DevicePointers {
+    float*  position_space;
+    float*  position_space_buffer;
+    float2* momentum_space;
+    float2* momentum_space_buffer;
+    bool calc_precision_is_half = false;
+
+  } DevicePointers;
+
+  // Input real, compute half-precision FP16
+  template<__half*, __half*>
+  struct _DevicePointers {
+    __half*  position_space;
+    __half*  position_space_buffer;
+    __half2* momentum_space;
+    __half2* momentum_space_buffer;
+    bool calc_precision_is_half = true;
+  } DevicePointers;
+
+  // Input complex, compute single-precision
+  template<float2*, float*>
+  struct _DevicePointers {
+    float2*  position_space;
+    float2*  position_space_buffer;
+    float2*  momentum_space;
+    float2*  momentum_space_buffer;
+    bool calc_precision_is_half = false;
+  } DevicePointers;
+
+  // Input complex, compute half-precision FP16
+  template<__half2*, __half*>
+  struct _DevicePointers {
+    __half2*  position_space;
+    __half2*  position_space_buffer;
+    __half2*  momentum_space;
+    __half2*  momentum_space_buffer;
+    bool calc_precision_is_half = true;
+
+  } DevicePointers;
+
+
+  
+
+template <class ComputeType = float, class InputType = float, class OutputType = float>
 class FourierTransformer 
   
 {
@@ -41,41 +92,42 @@ public:
   // Used to specify input/calc/output data types
   enum DataType { int4_2, uint8, int8, uint16, int16, fp16, bf16, tf32, uint32, int32, fp32};
   enum OriginType { natural, centered, quadrant_swapped}; // Used to specify the origin of the data
+
+
+
   short  padding_jump_val;
   int input_memory_allocated;
   int output_memory_allocated;
+  int compute_memory_allocated;
   int input_number_of_real_values;
   int output_number_of_real_values;
 
-  FourierTransformer(DataType wanted_calc_data_type);
+  FourierTransformer(bool input_is_real_valued = true);
   // FourierTransformer(const FourierTransformer &); // Copy constructor
   virtual ~FourierTransformer();
 
   // This is pretty similar to an FFT plan, I should probably make it align with CufftPlan
   void SetInputDimensionsAndType(size_t input_logical_x_dimension, 
-                                size_t input_logical_y_dimension, 
-                                size_t input_logical_z_dimension, 
-                                bool is_padded_input, 
-                                bool is_host_memory_pinned, 
-                                DataType input_data_type,
-                                OriginType input_origin_type);
+                                 size_t input_logical_y_dimension, 
+                                 size_t input_logical_z_dimension, 
+                                 bool is_padded_input, 
+                                 bool is_host_memory_pinned, 
+                                 OriginType input_origin_type);
   
   void SetOutputDimensionsAndType(size_t output_logical_x_dimension, 
                                   size_t output_logical_y_dimension, 
                                   size_t output_logical_z_dimension, 
                                   bool is_padded_output, 
-                                  DataType output_data_type,
                                   OriginType output_origin_type);
 
   // For the time being, the caller is responsible for having the memory allocated for any of these input/output pointers.
-  void SetInputPointer(float* input_pointer, bool is_input_on_device);
+  void SetInputPointer(InputType* input_pointer, bool is_input_on_device);
 
   void CopyHostToDevice();
   // By default we are blocking with a stream sync until complete for simplicity. This is overkill and should FIXME.
   void CopyDeviceToHost(bool free_gpu_memory, bool unpin_host_memory);
   // When the size changes, we need a new host pointer
-  void CopyDeviceToHost(float* output_pointer, bool free_gpu_memory = true, bool unpin_host_memory = true);
-
+  void CopyDeviceToHost(OutputType* output_pointer, bool free_gpu_memory = true, bool unpin_host_memory = true);
 
 
   // FFT calls
@@ -89,8 +141,8 @@ public:
   void ClipIntoTopLeft();
   void ClipIntoReal(int wanted_coordinate_of_box_center_x, int wanted_coordinate_of_box_center_y, int wanted_coordinate_of_box_center_z);
 
-  
-  inline int ReturnPaddedMemorySize(short4 & wanted_dims) 
+  // For all real valued inputs, assumed for any InputType that is not float2 or __half2
+  template <class is_real_type> inline int ReturnPaddedMemorySize(is_real_type T*, short4 & wanted_dims) 
   {
     int wanted_memory = 0;
     if (wanted_dims.x % 2 == 0) { padding_jump_val = 2; wanted_memory = wanted_dims.x / 2 + 1;}
@@ -99,6 +151,22 @@ public:
     wanted_memory *= wanted_dims.y * wanted_dims.z; // other dimensions
     wanted_memory *= 2; // room for complex
     wanted_dims.w = (wanted_dims.x + padding_jump_val) / 2; // number of complex elements in the X dimesnions after FFT.
+    compute_memory_allocated = 2 * wanted_memory; // scaling by 2 making room for the buffer.
+    return wanted_memory;
+  };
+
+  // Two specializations for complex inputs, which shouldn't have any padding values.
+  template < > inline int ReturnPaddedMemorySize(__half2*, short4 & wanted_dims) 
+  {
+    int wanted_memory = wanted_dims.x * wanted_dims.y * wanted_dims.z;
+    wanted_dims.w = wanted_dims.x; // pitch is constant
+    compute_memory_allocated = 4 * wanted_memory; // Because we don't save any memory real--->complex, we have to explicitly multiply by 2 to make room for the buffer memory.
+    return wanted_memory;
+  };
+  template < > inline int ReturnPaddedMemorySize(__float2*, short4 & wanted_dims) 
+  {
+    int wanted_memory = wanted_dims.x * wanted_dims.y * wanted_dims.z;
+    wanted_dims.w = wanted_dims.x; // pitch is constant
     return wanted_memory;
   };
 
@@ -118,17 +186,11 @@ public:
     }
   }
 
-// TODO move back to private and provide method to return a pointer to the memory if requested.
-    float* device_pointer_fp32; float2* device_pointer_fp32_complex;
-  float* buffer_fp32; float2* buffer_fp32_complex;
-  __half* device_pointer_fp16; __half2* device_pointer_fp16_complex;
+  // Input is real or complex inferred from InputType
+  DevicePointers<InputType, ComputeType> d_ptr;
 
 private:
 
-
-  DataType input_date_type;
-  DataType calc_data_type;
-  DataType output_data_type;
 
   OriginType input_origin_type;
   OriginType output_origin_type;
@@ -157,10 +219,8 @@ private:
   short4 dims_in;
   short4 dims_out;
 
-  float* host_pointer;
-  float* pinnedPtr;
-
-
+  InputType* host_pointer;
+  InputType* pinnedPtr;
 
   void Deallocate();
   void UnPinHostMemory();

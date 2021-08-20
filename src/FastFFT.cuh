@@ -759,6 +759,7 @@ struct io_thread
   {
     // Each thread reads in the input data at stride = mem_offsets.Q
     unsigned int index  = threadIdx.x;
+    unsigned int offset = 2*memory_limit - 2;
     for (unsigned int i = 0; i < size_of<FFT>::value; i++) 
     {
       if (index <  memory_limit)
@@ -769,7 +770,7 @@ struct io_thread
       {
         // assuming even dimension
         // FIXME shouldn't need to read in from global for an even stride
-        thread_data[i] = input[2*memory_limit - index - 2];
+        thread_data[i] = input[offset - index];
         thread_data[i].y = -thread_data[i].y; // conjugate
       }
       index += stride;
@@ -787,7 +788,7 @@ struct io_thread
   {
     // Each thread reads in the input data at stride = mem_offsets.Q
     unsigned int index  = threadIdx.x;
-    unsigned int offset = (memory_limit - 1)*2;
+    unsigned int offset = 2*memory_limit - 2;
     for (unsigned int i = 0; i < size_of<FFT>::value; i++) 
 
     if (index <  memory_limit)
@@ -796,6 +797,7 @@ struct io_thread
     }
     else
     {
+      input[2*memory_limit - index - 2];
       // assuming even dimension
       // FIXME shouldn't need to read in from global for an even stride
       thread_data[i] = input[(offset - index)*pixel_pitch + blockIdx.y];
