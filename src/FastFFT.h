@@ -30,62 +30,60 @@ namespace FastFFT {
     Offsets mem_offsets;
   } LaunchParams;
 
+  
 
-  template<T*, T*>
-  struct _DevicePointers {
-    std::cerr << "Input specializations have only been set for real/complex, single/half precision.\n" std::endl;
-    exit(-1);
-  }
+  template<typename I, typename C>
+  struct DevicePointers {
+    // Use this to catch unsupported input/ compute types and throw exception.
+    int* position_space = nullptr;
+    int* position_space_buffer = nullptr;
+    int* momentum_space = nullptr;
+    int* momentum_space_buffer = nullptr;
+  };
 
   // Input real, compute single-precision
-  template<float*, float*>
-  struct _DevicePointers {
+  template<>
+  struct DevicePointers<float*, float*> {
     float*  position_space;
     float*  position_space_buffer;
     float2* momentum_space;
     float2* momentum_space_buffer;
-    bool calc_precision_is_half = false;
 
-  } DevicePointers;
+  };
 
   // Input real, compute half-precision FP16
-  template<__half*, __half*>
-  struct _DevicePointers {
+  template<>
+  struct DevicePointers<__half*, __half*> {
     __half*  position_space;
     __half*  position_space_buffer;
     __half2* momentum_space;
     __half2* momentum_space_buffer;
-    bool calc_precision_is_half = true;
-  } DevicePointers;
+  };
 
   // Input complex, compute single-precision
-  template<float2*, float*>
-  struct _DevicePointers {
+  template<>
+  struct DevicePointers<float2*, float*> {
     float2*  position_space;
     float2*  position_space_buffer;
     float2*  momentum_space;
     float2*  momentum_space_buffer;
-    bool calc_precision_is_half = false;
-  } DevicePointers;
+  };
 
   // Input complex, compute half-precision FP16
-  template<__half2*, __half*>
-  struct _DevicePointers {
+  template<>
+  struct DevicePointers<__half2*, __half*> {
     __half2*  position_space;
     __half2*  position_space_buffer;
     __half2*  momentum_space;
     __half2*  momentum_space_buffer;
-    bool calc_precision_is_half = true;
 
-  } DevicePointers;
+  };
 
 
   
 
 template <class ComputeType = float, class InputType = float, class OutputType = float>
-class FourierTransformer 
-  
-{
+class FourierTransformer {
 
 public:
 
@@ -102,7 +100,7 @@ public:
   int input_number_of_real_values;
   int output_number_of_real_values;
 
-  FourierTransformer(bool input_is_real_valued = true);
+  FourierTransformer();
   // FourierTransformer(const FourierTransformer &); // Copy constructor
   virtual ~FourierTransformer();
 
@@ -138,37 +136,39 @@ public:
   void FwdFFT(bool swap_real_space_quadrants = false, bool transpose_output = true);
   void InvFFT(bool transpose_output = true);
   void CrossCorrelate(float2* image_to_search, bool swap_real_space_quadrants);
+  void CrossCorrelate(__half2* image_to_search, bool swap_real_space_quadrants);
+
   void ClipIntoTopLeft();
   void ClipIntoReal(int wanted_coordinate_of_box_center_x, int wanted_coordinate_of_box_center_y, int wanted_coordinate_of_box_center_z);
 
   // For all real valued inputs, assumed for any InputType that is not float2 or __half2
-  template <class is_real_type> inline int ReturnPaddedMemorySize(is_real_type T*, short4 & wanted_dims) 
-  {
-    int wanted_memory = 0;
-    if (wanted_dims.x % 2 == 0) { padding_jump_val = 2; wanted_memory = wanted_dims.x / 2 + 1;}
-    else { padding_jump_val = 1 ; wanted_memory = (wanted_dims.x - 1) / 2 + 1;}
 
-    wanted_memory *= wanted_dims.y * wanted_dims.z; // other dimensions
-    wanted_memory *= 2; // room for complex
-    wanted_dims.w = (wanted_dims.x + padding_jump_val) / 2; // number of complex elements in the X dimesnions after FFT.
-    compute_memory_allocated = 2 * wanted_memory; // scaling by 2 making room for the buffer.
-    return wanted_memory;
-  };
+  inline int ReturnPaddedMemorySize(short4 & wanted_dims)
+  {
+    if (std::is_same< InputType, __half2>::value || std::is_same< InputType,float2>::value)
+    {
+      int wanted_memory = wanted_dims.x * wanted_dims.y * wanted_dims.z;
+      wanted_dims.w = wanted_dims.x; // pitch is constant
+      compute_memory_allocated = 4 * wanted_memory; // Because we don't save any memory real--->complex, we have to explicitly multiply by 2 to make room for the buffer memory.
+      return wanted_memory;
+    }
+    else
+    {
+      int wanted_memory = 0;
+      if (wanted_dims.x % 2 == 0) { padding_jump_val = 2; wanted_memory = wanted_dims.x / 2 + 1;}
+      else { padding_jump_val = 1 ; wanted_memory = (wanted_dims.x - 1) / 2 + 1;}
+    
+      wanted_memory *= wanted_dims.y * wanted_dims.z; // other dimensions
+      wanted_memory *= 2; // room for complex
+      wanted_dims.w = (wanted_dims.x + padding_jump_val) / 2; // number of complex elements in the X dimesnions after FFT.
+      compute_memory_allocated = 2 * wanted_memory; // scaling by 2 making room for the buffer.
+      return wanted_memory;
+    }
 
-  // Two specializations for complex inputs, which shouldn't have any padding values.
-  template < > inline int ReturnPaddedMemorySize(__half2*, short4 & wanted_dims) 
-  {
-    int wanted_memory = wanted_dims.x * wanted_dims.y * wanted_dims.z;
-    wanted_dims.w = wanted_dims.x; // pitch is constant
-    compute_memory_allocated = 4 * wanted_memory; // Because we don't save any memory real--->complex, we have to explicitly multiply by 2 to make room for the buffer memory.
-    return wanted_memory;
-  };
-  template < > inline int ReturnPaddedMemorySize(__float2*, short4 & wanted_dims) 
-  {
-    int wanted_memory = wanted_dims.x * wanted_dims.y * wanted_dims.z;
-    wanted_dims.w = wanted_dims.x; // pitch is constant
-    return wanted_memory;
-  };
+  }
+
+
+
 
   template<typename T, bool is_on_host = true>
   void SetToConstant(T* input_pointer, int N_values, const T wanted_value)
@@ -187,7 +187,7 @@ public:
   }
 
   // Input is real or complex inferred from InputType
-  DevicePointers<InputType, ComputeType> d_ptr;
+  DevicePointers<InputType*, ComputeType*> d_ptr;
 
 private:
 

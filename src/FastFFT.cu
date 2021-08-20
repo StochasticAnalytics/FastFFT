@@ -14,21 +14,21 @@
 namespace FastFFT {
 
 
-
-
-FourierTransformer::FourierTransformer(bool input_is_real_valued) 
+template <class ComputeType, class InputType, class OutputType>
+FourierTransformer<ComputeType, InputType, OutputType>::FourierTransformer() 
 {
   SetDefaults();
 }
 
-FourierTransformer::~FourierTransformer() 
+template <class ComputeType, class InputType, class OutputType>
+FourierTransformer<ComputeType, InputType, OutputType>::~FourierTransformer() 
 {
   Deallocate();
   UnPinHostMemory();
 }
 
-
-void FourierTransformer::SetDefaults()
+template <class ComputeType, class InputType, class OutputType>
+void FourierTransformer<ComputeType, InputType, OutputType>::SetDefaults()
 {
 
   // booleans to track state, could be bit fields but that seem opaque to me.
@@ -48,8 +48,11 @@ void FourierTransformer::SetDefaults()
 
 }
 
+
+
+
 template <class ComputeType, class InputType, class OutputType>
-void FourierTransformer::SetInputDimensionsAndType(size_t input_logical_x_dimension, 
+void FourierTransformer<ComputeType, InputType, OutputType>::SetInputDimensionsAndType(size_t input_logical_x_dimension, 
                                                    size_t input_logical_y_dimension, 
                                                    size_t input_logical_z_dimension, 
                                                    bool is_padded_input, 
@@ -63,15 +66,15 @@ void FourierTransformer::SetInputDimensionsAndType(size_t input_logical_x_dimens
   MyFFTDebugAssertTrue(is_padded_input, "The input memory must be fftw padded");
 
   dims_in = make_short4(input_logical_x_dimension, input_logical_y_dimension, input_logical_z_dimension,0);
-  InputType* dummy_ptr; // Use to check if input is real valued.
-  input_memory_allocated = ReturnPaddedMemorySize(dummy_ptr, dims_in);
+  input_memory_allocated = ReturnPaddedMemorySize(dims_in);
   input_number_of_real_values = dims_in.x*dims_in.y*dims_in.z;
 
   this->input_origin_type = input_origin_type;
   is_set_input_params = true;
 }
 
-void FourierTransformer::SetOutputDimensionsAndType(size_t output_logical_x_dimension, 
+template <class ComputeType, class InputType, class OutputType>
+void FourierTransformer<ComputeType, InputType, OutputType>::SetOutputDimensionsAndType(size_t output_logical_x_dimension, 
                                                     size_t output_logical_y_dimension, 
                                                     size_t output_logical_z_dimension, 
                                                     bool is_padded_output, 
@@ -84,8 +87,7 @@ void FourierTransformer::SetOutputDimensionsAndType(size_t output_logical_x_dime
 
   dims_out = make_short4(output_logical_x_dimension, output_logical_y_dimension, output_logical_z_dimension,0);
 
-  InputType* dummy_ptr; // Use to check if input is real valued...if not, the output will also be complex.
-  output_memory_allocated = ReturnPaddedMemorySize(dummy_ptr, dims_out);
+  output_memory_allocated = ReturnPaddedMemorySize(dims_out);
   output_number_of_real_values = dims_out.x*dims_out.y*dims_out.z;
 
   this->output_origin_type = output_origin_type;
@@ -93,7 +95,7 @@ void FourierTransformer::SetOutputDimensionsAndType(size_t output_logical_x_dime
 }
 
 template <class ComputeType, class InputType, class OutputType>
-void FourierTransformer::CheckDimensions()
+void FourierTransformer<ComputeType, InputType, OutputType>::CheckDimensions()
 {
   // This should be run inside any public method call to ensure things ar properly setup.
   if ( ! is_size_validated )
@@ -141,7 +143,7 @@ void FourierTransformer::CheckDimensions()
 }
 
 template <class ComputeType, class InputType, class OutputType>
-void FourierTransformer::SetInputPointer(InputType* input_pointer, bool is_input_on_device) 
+void FourierTransformer<ComputeType, InputType, OutputType>::SetInputPointer(InputType* input_pointer, bool is_input_on_device) 
 { 
   MyFFTDebugAssertTrue(is_set_input_params, "Input parameters not set");
 
@@ -175,7 +177,7 @@ void FourierTransformer::SetInputPointer(InputType* input_pointer, bool is_input
 
 
 template <class ComputeType, class InputType, class OutputType>
-void FourierTransformer::CopyHostToDevice()
+void FourierTransformer<ComputeType, InputType, OutputType>::CopyHostToDevice()
 {
  
 	MyFFTDebugAssertTrue(is_in_memory_host_pointer, "Host memory not allocated");
@@ -185,18 +187,28 @@ void FourierTransformer::CopyHostToDevice()
   // MyFFTPrint(std::to_string(output_memory_allocated) + " bytes of host memory to device");
 	if ( ! is_in_memory_device_pointer )
 	{
+
+    using this_type = decltype(d_ptr.momentum_space);
     // Allocate enough for the out of place buffer as well.
     // MyFFTPrintWithDetails("Allocating device memory for input pointer");
     precheck
 		cudaErr(cudaMalloc(&d_ptr.position_space, compute_memory_allocated * sizeof(ComputeType)));
     postcheck
-    if (d_ptr.calc_precision_is_half) d_ptr.momentum_space = (__half2 *)d_ptr.position_space;
-    else d_ptr.momentum_space = (__float2 *)d_ptr.position_space;
-		
 
-    d_ptr.position_space_buffer = &d_ptr.position_space[output_memory_allocated];
-    if (d_ptr.calc_precision_is_half) d_ptr.momentum_space_buffer = (__half2 *)d_ptr.position_space_buffer;
-    else d_ptr.momentum_space_buffer = (__float2 *)d_ptr.position_space_buffer;
+    if constexpr(std::is_same< decltype(d_ptr.momentum_space), __half2>::value )
+    {
+      d_ptr.momentum_space = (__half2 *)d_ptr.position_space;
+      d_ptr.position_space_buffer = &d_ptr.position_space[output_memory_allocated];
+      d_ptr.momentum_space_buffer = (__half2 *)d_ptr.position_space_buffer;
+    }
+    else
+    {
+      d_ptr.momentum_space = (float2 *)d_ptr.position_space;
+      d_ptr.position_space_buffer = &d_ptr.position_space[output_memory_allocated];
+      d_ptr.momentum_space_buffer = (float2 *)d_ptr.position_space_buffer;
+    }
+
+
  
 		is_in_memory_device_pointer = true;
 	}
@@ -214,7 +226,7 @@ void FourierTransformer::CopyHostToDevice()
 }
 
 template <class ComputeType, class InputType, class OutputType>
-void FourierTransformer::CopyDeviceToHost( bool free_gpu_memory, bool unpin_host_memory)
+void FourierTransformer<ComputeType, InputType, OutputType>::CopyDeviceToHost( bool free_gpu_memory, bool unpin_host_memory)
 {
  
 	MyFFTDebugAssertTrue(is_in_memory_device_pointer, "GPU memory not allocated");
@@ -238,7 +250,7 @@ void FourierTransformer::CopyDeviceToHost( bool free_gpu_memory, bool unpin_host
 }
 
 template <class ComputeType, class InputType, class OutputType>
-void FourierTransformer::CopyDeviceToHost(OutputType* output_pointer, bool free_gpu_memory, bool unpin_host_memory)
+void FourierTransformer<ComputeType, InputType, OutputType>::CopyDeviceToHost(OutputType* output_pointer, bool free_gpu_memory, bool unpin_host_memory)
 {
  
 	MyFFTDebugAssertTrue(is_in_memory_device_pointer, "GPU memory not allocated");
@@ -276,13 +288,13 @@ void FourierTransformer::CopyDeviceToHost(OutputType* output_pointer, bool free_
 }
 
 // template <class ComputeType, class InputType, class OutputType> 
-// void FourierTransformer::CopyDeviceToDevice(CopyInputType* input_pointer, CopyOutputType* output_pointer)
+// void FourierTransformer<ComputeType, InputType, OutputType>::CopyDeviceToDevice(CopyInputType* input_pointer, CopyOutputType* output_pointer)
 // {
 
 // }
 
 template <class ComputeType, class InputType, class OutputType>
-void FourierTransformer::Deallocate()
+void FourierTransformer<ComputeType, InputType, OutputType>::Deallocate()
 {
 
 	if (is_in_memory_device_pointer) 
@@ -295,7 +307,7 @@ void FourierTransformer::Deallocate()
 }
 
 template <class ComputeType, class InputType, class OutputType>
-void FourierTransformer::UnPinHostMemory()
+void FourierTransformer<ComputeType, InputType, OutputType>::UnPinHostMemory()
 {
   if (is_host_memory_pinned)
 	{
@@ -307,7 +319,7 @@ void FourierTransformer::UnPinHostMemory()
 }
 
 template <class ComputeType, class InputType, class OutputType>
-void FourierTransformer::FwdFFT(bool swap_real_space_quadrants, bool transpose_output)
+void FourierTransformer<ComputeType, InputType, OutputType>::FwdFFT(bool swap_real_space_quadrants, bool transpose_output)
 {
   CheckDimensions();
 
@@ -350,7 +362,7 @@ void FourierTransformer::FwdFFT(bool swap_real_space_quadrants, bool transpose_o
 }
 
 template <class ComputeType, class InputType, class OutputType>
-void FourierTransformer::InvFFT(bool transpose_output)
+void FourierTransformer<ComputeType, InputType, OutputType>::InvFFT(bool transpose_output)
 {
   CheckDimensions();
 
@@ -393,7 +405,7 @@ void FourierTransformer::InvFFT(bool transpose_output)
 }
 
 template <class ComputeType, class InputType, class OutputType>
-void FourierTransformer::CrossCorrelate(float2* image_to_search, bool swap_real_space_quadrants)
+void FourierTransformer<ComputeType, InputType, OutputType>::CrossCorrelate(float2* image_to_search, bool swap_real_space_quadrants)
 {
   CheckDimensions();
   // Checks on input ft type
@@ -437,7 +449,7 @@ void FourierTransformer::CrossCorrelate(float2* image_to_search, bool swap_real_
 }
 
 template <class ComputeType, class InputType, class OutputType>
-void FourierTransformer::CrossCorrelate(__half2* image_to_search, bool swap_real_space_quadrants)
+void FourierTransformer<ComputeType, InputType, OutputType>::CrossCorrelate(__half2* image_to_search, bool swap_real_space_quadrants)
 {
   CheckDimensions();
   // Checks on input ft type
@@ -482,9 +494,9 @@ void FourierTransformer::CrossCorrelate(__half2* image_to_search, bool swap_real
 ////////////////////////////////////////////////////
 /// END PUBLIC METHODS
 ////////////////////////////////////////////////////
-
+template <class ComputeType, class InputType, class OutputType>
 template<class FFT> 
-void FourierTransformer::FFT_R2C_decomposed_t(bool transpose_output)
+void FourierTransformer<ComputeType, InputType, OutputType>::FFT_R2C_decomposed_t(bool transpose_output)
 {
 
   // Note unlike block transforms, we get the transform size here, it must be before LaunchParams. TODO add logical checks
@@ -526,7 +538,8 @@ void FourierTransformer::FFT_R2C_decomposed_t(bool transpose_output)
   is_in_buffer_memory = true;
 }
 
-void FourierTransformer::FFT_R2C_decomposed(bool transpose_output)
+template <class ComputeType, class InputType, class OutputType>
+void FourierTransformer<ComputeType, InputType, OutputType>::FFT_R2C_decomposed(bool transpose_output)
 {
 
   int device, arch;
@@ -596,9 +609,9 @@ void thread_fft_kernel_R2C_decomposed_transposed(const ScalarType*  __restrict__
  
 } // end of block_fft_kernel_R2C_transposed
 
-
+template <class ComputeType, class InputType, class OutputType>
 template<class FFT>
-void FourierTransformer::FFT_R2C_t(bool transpose_output)
+void FourierTransformer<ComputeType, InputType, OutputType>::FFT_R2C_t(bool transpose_output)
 {
 
   LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_transposed);
@@ -621,8 +634,8 @@ void FourierTransformer::FFT_R2C_t(bool transpose_output)
 
   is_in_buffer_memory = true;
 }
-
-void FourierTransformer::FFT_R2C(bool transpose_output)
+template <class ComputeType, class InputType, class OutputType>
+void FourierTransformer<ComputeType, InputType, OutputType>::FFT_R2C(bool transpose_output)
 {
 
   MyFFTRunTimeAssertTrue(transpose_output, "In FFT_R2C, non-transposed output is not yet supported.");
@@ -753,8 +766,9 @@ void block_fft_kernel_R2C(const ScalarType* __restrict__ input_values, ComplexTy
  
 } // end of block_fft_kernel_R2C
 
+template <class ComputeType, class InputType, class OutputType>
 template<class FFT>
-void FourierTransformer::FFT_R2C_WithPadding_t(bool transpose_output)
+void FourierTransformer<ComputeType, InputType, OutputType>::FFT_R2C_WithPadding_t(bool transpose_output)
 {
 
   LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_transposed);
@@ -774,7 +788,8 @@ void FourierTransformer::FFT_R2C_WithPadding_t(bool transpose_output)
   is_in_buffer_memory = true;
 }
 
-void FourierTransformer::FFT_R2C_WithPadding(bool transpose_output)
+template <class ComputeType, class InputType, class OutputType>
+void FourierTransformer<ComputeType, InputType, OutputType>::FFT_R2C_WithPadding(bool transpose_output)
 {
 
   MyFFTRunTimeAssertTrue(transpose_output, "FFT_R2C_WithPadding: transpose_output must be true");
@@ -946,8 +961,9 @@ void block_fft_kernel_R2C_WithPadding(const ScalarType* __restrict__  input_valu
 
 } // end of block_fft_kernel_R2C_WithPadding
 
+template <class ComputeType, class InputType, class OutputType>
 template<class FFT, class invFFT> 
-void FourierTransformer::FFT_C2C_WithPadding_ConjMul_C2C_t(float2* image_to_search, bool swap_real_space_quadrants)
+void FourierTransformer<ComputeType, InputType, OutputType>::FFT_C2C_WithPadding_ConjMul_C2C_t(float2* image_to_search, bool swap_real_space_quadrants)
 {
   
   LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, xcorr_transposed);
@@ -985,7 +1001,8 @@ void FourierTransformer::FFT_C2C_WithPadding_ConjMul_C2C_t(float2* image_to_sear
 
 }
 
-void FourierTransformer::FFT_C2C_WithPadding_ConjMul_C2C(float2* image_to_search, bool swap_real_space_quadrants)
+template <class ComputeType, class InputType, class OutputType>
+void FourierTransformer<ComputeType, InputType, OutputType>::FFT_C2C_WithPadding_ConjMul_C2C(float2* image_to_search, bool swap_real_space_quadrants)
 {
 
 	// This is the first set of 1d ffts when the input data are real valued, accessing the strided dimension. Since we need the full length, it will actually run a C2C xform
@@ -1174,8 +1191,9 @@ void block_fft_kernel_C2C_WithPadding_ConjMul_C2C_SwapRealSpaceQuadrants(const C
 
 } // 
 
+template <class ComputeType, class InputType, class OutputType>
 template <class FFT>
-void FourierTransformer::FFT_C2C_WithPadding_t(bool swap_real_space_quadrants)
+void FourierTransformer<ComputeType, InputType, OutputType>::FFT_C2C_WithPadding_t(bool swap_real_space_quadrants)
 {
 
   LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_padded);
@@ -1212,7 +1230,9 @@ void FourierTransformer::FFT_C2C_WithPadding_t(bool swap_real_space_quadrants)
 
 
 }
-void FourierTransformer::FFT_C2C_WithPadding(bool swap_real_space_quadrants)
+
+template <class ComputeType, class InputType, class OutputType>
+void FourierTransformer<ComputeType, InputType, OutputType>::FFT_C2C_WithPadding(bool swap_real_space_quadrants)
 {
 
 	// This is the first set of 1d ffts when the input data are real valued, accessing the strided dimension. Since we need the full length, it will actually run a C2C xform
@@ -1454,8 +1474,9 @@ void block_fft_kernel_C2C_WithPadding_SwapRealSpaceQuadrants(const ComplexType* 
 
 } // end of block_fft_kernel_C2C_WithPadding_SwapRealSpaceQuadrants
 
+template <class ComputeType, class InputType, class OutputType>
 template<class FFT_nodir>
-void FourierTransformer::FFT_C2C_t( bool do_forward_transform )
+void FourierTransformer<ComputeType, InputType, OutputType>::FFT_C2C_t( bool do_forward_transform )
 {
   LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c, do_forward_transform);
 
@@ -1494,7 +1515,8 @@ void FourierTransformer::FFT_C2C_t( bool do_forward_transform )
 
 }
 
-void FourierTransformer::FFT_C2C( bool do_forward_transform )
+template <class ComputeType, class InputType, class OutputType>
+void FourierTransformer<ComputeType, InputType, OutputType>::FFT_C2C( bool do_forward_transform )
 {
 
   int device, arch;
@@ -1623,8 +1645,9 @@ void block_fft_kernel_C2C(const ComplexType*  __restrict__  input_values, Comple
 
 } // end of block_fft_kernel_C2C
 
+template <class ComputeType, class InputType, class OutputType>
 template<class FFT_nodir>
-void FourierTransformer::FFT_C2C_decomposed_t( bool do_forward_transform )
+void FourierTransformer<ComputeType, InputType, OutputType>::FFT_C2C_decomposed_t( bool do_forward_transform )
 {
 
   // Note unlike block transforms, we get the transform size here, it must be before LaunchParams. TODO add logical checks
@@ -1667,7 +1690,8 @@ void FourierTransformer::FFT_C2C_decomposed_t( bool do_forward_transform )
 
 }
 
-void FourierTransformer::FFT_C2C_decomposed( bool do_forward_transform )
+template <class ComputeType, class InputType, class OutputType>
+void FourierTransformer<ComputeType, InputType, OutputType>::FFT_C2C_decomposed( bool do_forward_transform )
 {
 
   int device, arch;
@@ -1708,8 +1732,9 @@ void thread_fft_kernel_C2C_decomposed(const ComplexType* __restrict__  input_val
 
 }
 
+template <class ComputeType, class InputType, class OutputType>
 template <class FFT>
-void FourierTransformer::FFT_C2R_Transposed_t()
+void FourierTransformer<ComputeType, InputType, OutputType>::FFT_C2R_Transposed_t()
 {
   LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2r_transposed);
 
@@ -1739,7 +1764,8 @@ void FourierTransformer::FFT_C2R_Transposed_t()
 
 }
 
-void FourierTransformer::FFT_C2R_Transposed()
+template <class ComputeType, class InputType, class OutputType>
+void FourierTransformer<ComputeType, InputType, OutputType>::FFT_C2R_Transposed()
 {
 
 
@@ -1865,9 +1891,9 @@ void block_fft_kernel_C2R_Transposed(const ComplexType* __restrict__  input_valu
 
 } // end of block_fft_kernel_C2R_Transposed
 
-
+template <class ComputeType, class InputType, class OutputType>
 template <class FFT>
-void FourierTransformer::FFT_C2R_decomposed_t(bool transpose_output)
+void FourierTransformer<ComputeType, InputType, OutputType>::FFT_C2R_decomposed_t(bool transpose_output)
 {
 
   GetTransformSize_thread(dims_out.x, size_of<FFT>::value);
@@ -1915,7 +1941,8 @@ void FourierTransformer::FFT_C2R_decomposed_t(bool transpose_output)
 
 }
 
-void FourierTransformer::FFT_C2R_decomposed(bool transpose_output)
+template <class ComputeType, class InputType, class OutputType>
+void FourierTransformer<ComputeType, InputType, OutputType>::FFT_C2R_decomposed(bool transpose_output)
 {
   int device, arch;
   GetCudaDeviceArch( device, arch );
@@ -1983,8 +2010,8 @@ void thread_fft_kernel_C2R_decomposed_transposed(const ComplexType*  __restrict_
 }
 
 
-
-void FourierTransformer::ClipIntoTopLeft()
+template <class ComputeType, class InputType, class OutputType>
+void FourierTransformer<ComputeType, InputType, OutputType>::ClipIntoTopLeft()
 {
   // TODO add some checks and logic.
 
@@ -2022,8 +2049,8 @@ __global__ void clip_into_top_left_kernel(InputType*  input_values, OutputType* 
   }
 } // end of clip_into_top_left_kernel
 
-
-void FourierTransformer::ClipIntoReal(int wanted_coordinate_of_box_center_x, int wanted_coordinate_of_box_center_y, int wanted_coordinate_of_box_center_z)
+template <class ComputeType, class InputType, class OutputType>
+void FourierTransformer<ComputeType, InputType, OutputType>::ClipIntoReal(int wanted_coordinate_of_box_center_x, int wanted_coordinate_of_box_center_y, int wanted_coordinate_of_box_center_z)
 {
   // TODO add some checks and logic.
 

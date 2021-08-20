@@ -25,7 +25,7 @@ void const_image_test(short4 input_size, short4 output_size)
 
   // We just make one instance of the FourierTransformer class, with calc type float.
   // For the time being input and output are also float. TODO calc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
-  FastFFT::FourierTransformer FT(FastFFT::FourierTransformer::DataType::fp32);
+  FastFFT::FourierTransformer<float, float, float> FT;
   
   
   // Determine how much memory we need, working with FFTW/CUDA style in place transform padding.
@@ -51,8 +51,8 @@ void const_image_test(short4 input_size, short4 output_size)
 
     
   // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
-  FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
-  FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
+  FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+  FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
   
   // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
   // ensures faster transfer. If false, it will be pinned for you.
@@ -122,7 +122,7 @@ void unit_impulse_test(short4 input_size, short4 output_size)
 
   // We just make one instance of the FourierTransformer class, with calc type float.
   // For the time being input and output are also float. TODO calc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
-  FastFFT::FourierTransformer FT(FastFFT::FourierTransformer::DataType::fp32);
+  FastFFT::FourierTransformer<float, float, float> FT;
   
   
   // Determine how much memory we need, working with FFTW/CUDA style in place transform padding.
@@ -144,8 +144,8 @@ void unit_impulse_test(short4 input_size, short4 output_size)
   
 
   // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
-  FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
-  FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
+  FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+  FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
   
   // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
   // ensures faster transfer. If false, it will be pinned for you.
@@ -270,10 +270,10 @@ void compare_libraries(short4 input_size, short4 output_size)
 
    // We just make one instance of the FourierTransformer class, with calc type float.
   // For the time being input and output are also float. TODO calc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
-  FastFFT::FourierTransformer FT(FastFFT::FourierTransformer::DataType::fp32);
+  FastFFT::FourierTransformer<float, float, float> FT;
     // Create an instance to copy memory also for the cufft tests.
-  FastFFT::FourierTransformer cuFFT(FastFFT::FourierTransformer::DataType::fp32);
-  FastFFT::FourierTransformer targetFT(FastFFT::FourierTransformer::DataType::fp32);
+  FastFFT::FourierTransformer<float, float, float> cuFFT;
+  FastFFT::FourierTransformer<float, float, float> targetFT;
 
 
   FT_input.real_memory_allocated = FT.ReturnPaddedMemorySize(input_size);
@@ -299,13 +299,13 @@ void compare_libraries(short4 input_size, short4 output_size)
 
 
   // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
-  FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
-  FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
-  cuFFT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
-  cuFFT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
+  FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+  FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+  cuFFT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+  cuFFT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
   
-  targetFT.SetInputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, false,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
-  targetFT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
+  targetFT.SetInputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+  targetFT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
 
   // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
   // ensures faster transfer. If false, it will be pinned for you.
@@ -382,7 +382,7 @@ void compare_libraries(short4 input_size, short4 output_size)
   //////////////////////////////////////////
   //////////////////////////////////////////
   // Warm up and check for accuracy
-  FT.CrossCorrelate(targetFT.device_pointer_fp32_complex, false);
+  FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
   FT.CopyDeviceToHost(FT_output.real_values,false, false);
 
   address = 0;
@@ -437,7 +437,7 @@ void compare_libraries(short4 input_size, short4 output_size)
   {
     // FT.FwdFFT();
     // FT.InvFFT();
-    FT.CrossCorrelate(targetFT.device_pointer_fp32_complex, false);
+    FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
   }
   cuFFT_output.record_stop();
   cuFFT_output.synchronize();
@@ -448,7 +448,7 @@ void compare_libraries(short4 input_size, short4 output_size)
   {
     precheck
     cufftReal* overlap_pointer;
-    overlap_pointer = cuFFT.device_pointer_fp32;
+    overlap_pointer = cuFFT.d_ptr.position_space;
     cuFFT_output.SetClipIntoCallback(overlap_pointer, cuFFT_input.size.x, cuFFT_input.size.y, cuFFT_input.size.w*2);
     postcheck
   }
@@ -457,7 +457,7 @@ void compare_libraries(short4 input_size, short4 output_size)
   {
     precheck
     // FIXME scaling factor
-    cuFFT_output.SetComplexConjMultiplyAndLoadCallBack( (cufftComplex *) targetFT.device_pointer_fp32_complex, 1.0f);
+    cuFFT_output.SetComplexConjMultiplyAndLoadCallBack( (cufftComplex *) targetFT.d_ptr.momentum_space_buffer, 1.0f);
     postcheck
   }
 
@@ -471,10 +471,10 @@ void compare_libraries(short4 input_size, short4 output_size)
   cuFFT.CopyDeviceToHost(cuFFT_output.real_values,false, false);
   // cuFFT.ClipIntoReal(input_size.x/2, input_size.y/2, input_size.z/2);
   precheck
-  cudaErr(cufftExecR2C(cuFFT_output.cuda_plan_forward, (cufftReal*)cuFFT.device_pointer_fp32, (cufftComplex*)cuFFT.device_pointer_fp32_complex));
+  cudaErr(cufftExecR2C(cuFFT_output.cuda_plan_forward, (cufftReal*)cuFFT.d_ptr.position_space, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer));
   postcheck
   precheck
-  cudaErr(cufftExecC2R(cuFFT_output.cuda_plan_inverse, (cufftComplex*)cuFFT.device_pointer_fp32_complex, (cufftReal*)cuFFT.device_pointer_fp32));
+  cudaErr(cufftExecC2R(cuFFT_output.cuda_plan_inverse, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer, (cufftReal*)cuFFT.d_ptr.position_space));
   postcheck  
   cuFFT.CopyDeviceToHost(cuFFT_output.real_values,false, false);
 
@@ -529,11 +529,11 @@ void compare_libraries(short4 input_size, short4 output_size)
     // cuFFT.ClipIntoReal(input_size.x/2, input_size.y/2, input_size.z/2);
 
     precheck
-    cudaErr(cufftExecR2C(cuFFT_output.cuda_plan_forward, (cufftReal*)cuFFT.device_pointer_fp32, (cufftComplex*)cuFFT.device_pointer_fp32_complex));
+    cudaErr(cufftExecR2C(cuFFT_output.cuda_plan_forward, (cufftReal*)cuFFT.d_ptr.position_space, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer));
     postcheck
 
     precheck
-    cudaErr(cufftExecC2R(cuFFT_output.cuda_plan_inverse, (cufftComplex*)cuFFT.device_pointer_fp32_complex, (cufftReal*)cuFFT.device_pointer_fp32));
+    cudaErr(cufftExecC2R(cuFFT_output.cuda_plan_inverse, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer, (cufftReal*)cuFFT.d_ptr.position_space));
     postcheck
   }
   cuFFT_output.record_stop();
@@ -561,10 +561,12 @@ void run_oned(std::vector<int> size)
 
     Image< float, float2 > FT_input(input_size);
     Image< float, float2 > FT_output(output_size);
+    Image< float2, float2 > FT_input_complex(input_size);
+    Image< float2, float2 > FT_output_complex(output_size);
 
     // We just make one instance of the FourierTransformer class, with calc type float.
     // For the time being input and output are also float. TODO calc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
-    FastFFT::FourierTransformer FT(FastFFT::FourierTransformer::DataType::fp32);
+    FastFFT::FourierTransformer<float, float, float> FT;
 
 
     FT_input.real_memory_allocated = FT.ReturnPaddedMemorySize(input_size);
@@ -576,8 +578,8 @@ void run_oned(std::vector<int> size)
     FT_output.Allocate(set_fftw_plan);
 
     // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
-    FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
-    FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true,FastFFT::FourierTransformer::DataType::fp32, FastFFT::FourierTransformer::OriginType::natural);
+    FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+    FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
 
 
     // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
