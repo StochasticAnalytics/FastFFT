@@ -207,7 +207,6 @@ private:
     LaunchParams L;
     switch (kernel_type)
     {
-      std::cerr << " Kernel type " << kernel_type << " not yet implemented" << std::endl;
       case r2c_decomposed: 
 
         L.threadsPerBlock = dim3(transform_divisor, 1, 1);
@@ -291,9 +290,8 @@ private:
         break;
 
       case c2r_decomposed:
-      std::cerr << "\nI'm in c2r_decomposed and my number of threads is\n " << transform_divisor << "\n" << std::endl;
         L.twiddle_in = 2*PIf/dims_out.x;
-        L.Q = transform_divisor; //  (dims_out / transform size)
+        L.Q = transform_divisor; //  (dims_in / transform size)
         L.threadsPerBlock = dim3(transform_divisor, 1, 1); 
         L.gridDims = dim3(1, dims_out.y, 1);
         L.mem_offsets.shared_input = 0;

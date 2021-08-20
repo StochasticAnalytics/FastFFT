@@ -1893,17 +1893,14 @@ void thread_fft_kernel_C2R_decomposed(const ComplexType*  __restrict__ input_val
 	// Memory used by FFT - for Thread() type, FFT::storage_size == FFT::elements_per_thread == size_of<FFT>::value
   complex_type thread_data[FFT::storage_size];
  
-  io_thread<FFT>::load_c2r(&input_values[blockIdx.y*mem_offsets.pixel_pitch_input], thread_data, shared_mem_C2R_decomposed, Q, mem_offsets.pixel_pitch_input);
-  // shared memory is zerod here, so we need to sync 
-  __syncthreads();
+
+  io_thread<FFT>::load_c2r(&input_values[blockIdx.y*mem_offsets.pixel_pitch_input], thread_data, Q, mem_offsets.pixel_pitch_input);
 
   // We then have Q FFTs of size size_of<FFT>::value (P in the paper)
 	FFT().execute(thread_data);
-  __syncthreads();
 
   // Now we need to aggregate each of the Q transforms into each output block of size P
-  io_thread<FFT>::remap_decomposed_segments_c2r(thread_data, shared_mem_C2R_decomposed, twiddle_in, (unsigned int)Q);
-  __syncthreads();
+  io_thread<FFT>::remap_decomposed_segments_c2r(thread_data, shared_mem_C2R_decomposed, twiddle_in, Q);
 
   io_thread<FFT>::store_c2r(shared_mem_C2R_decomposed, &output_values[blockIdx.y*mem_offsets.pixel_pitch_output],Q);
 }
