@@ -145,16 +145,18 @@ public:
 
   inline int ReturnPaddedMemorySize(short4 & wanted_dims)
   {
+    int wanted_memory = 0;
+
     if constexpr(std::is_same< InputType, __half2>::value || std::is_same< InputType,float2>::value)
     {
-      int wanted_memory = wanted_dims.x * wanted_dims.y * wanted_dims.z;
+      is_real_valued_input = false;
+      wanted_memory = wanted_dims.x * wanted_dims.y * wanted_dims.z;
       wanted_dims.w = wanted_dims.x; // pitch is constant
-      compute_memory_allocated = 4 * wanted_memory; // Because we don't save any memory real--->complex, we have to explicitly multiply by 2 to make room for the buffer memory.
-      return wanted_memory;
+      compute_memory_allocated = 4 * wanted_memory; // We allocate using sizeof(ComputeType) which is either __half or float, so we need an extra factor of 2
     }
     else
     {
-      int wanted_memory = 0;
+      is_real_valued_input = true;
       if (wanted_dims.x % 2 == 0) { padding_jump_val = 2; wanted_memory = wanted_dims.x / 2 + 1;}
       else { padding_jump_val = 1 ; wanted_memory = (wanted_dims.x - 1) / 2 + 1;}
     
@@ -162,22 +164,21 @@ public:
       wanted_memory *= 2; // room for complex
       wanted_dims.w = (wanted_dims.x + padding_jump_val) / 2; // number of complex elements in the X dimesnions after FFT.
       compute_memory_allocated = 2 * wanted_memory; // scaling by 2 making room for the buffer.
-      return wanted_memory;
     }
-
+    return wanted_memory;
   }
 
 
 
 
   template<typename T, bool is_on_host = true>
-  void SetToConstant(T* input_pointer, int N_values, const T wanted_value)
+  void SetToConstant(T* input_pointer, int N_values, const T& wanted_value)
   {
     if (is_on_host) 
     {
       for (int i = 0; i < N_values; i++)
       {
-        input_pointer[i] = (T)wanted_value;
+        input_pointer[i] = wanted_value;
       }
     }
     else
@@ -188,6 +189,7 @@ public:
 
   // Input is real or complex inferred from InputType
   DevicePointers<InputType*, ComputeType*> d_ptr;
+  bool is_in_buffer_memory;
 
 private:
 
@@ -198,13 +200,13 @@ private:
   // booleans to track state, could be bit fields but that seem opaque to me.
   bool is_in_memory_host_pointer;
   bool is_in_memory_device_pointer;
-  bool is_in_buffer_memory;
 
   bool is_host_memory_pinned;
 
   bool is_fftw_padded_input;
   bool is_fftw_padded_output;
   bool is_fftw_padded_buffer;
+  bool is_real_valued_input;
 
   bool is_size_validated;
   int  transform_dimension;
@@ -268,7 +270,7 @@ private:
     switch (kernel_type)
     {
       case r2c_decomposed: 
-
+        // This is also fine for a one dimensional transform
         L.threadsPerBlock = dim3(transform_divisor, 1, 1);
         L.gridDims = dim3(1, dims_in.y, 1); 
         L.mem_offsets.shared_input = 0;
@@ -328,13 +330,31 @@ private:
 
       case c2c_decomposed: 
         L.threadsPerBlock = dim3(transform_divisor, 1, 1);
-        L.gridDims = dim3(1, dims_out.w, 1); 
-        L.mem_offsets.shared_input = 0;
-        L.mem_offsets.shared_output = dims_out.y; 
-        L.mem_offsets.pixel_pitch_input = dims_out.y; // scalar type, natural 
-        L.mem_offsets.pixel_pitch_output = dims_out.y; // complex type
-        if ( do_forward_transform) L.twiddle_in = -2*PIf/dims_out.y ;
-        else L.twiddle_in = 2*PIf/dims_out.y;
+        switch (transform_dimension)
+        {
+          case 1: {
+            L.gridDims = dim3(1, 1, 1); 
+            L.mem_offsets.shared_input = 0;
+            L.mem_offsets.shared_output = dims_out.x; 
+            L.mem_offsets.pixel_pitch_input = dims_out.x; // scalar type, natural 
+            L.mem_offsets.pixel_pitch_output = dims_out.x; // complex type
+            L.twiddle_in = 2*PIf/dims_out.x;            
+            break;
+          }
+          case 2: {
+            L.gridDims = dim3(1, dims_out.w, 1); 
+            L.mem_offsets.shared_input = 0;
+            L.mem_offsets.shared_output = dims_out.y; 
+            L.mem_offsets.pixel_pitch_input = dims_out.y; // scalar type, natural 
+            L.mem_offsets.pixel_pitch_output = dims_out.y; // complex type
+            L.twiddle_in = 2*PIf/dims_out.y;
+            break;
+          }
+          default: {
+            std::cout << "Only 1 and 2d transforms have been implemented." << std::endl;
+          }
+        }
+        if ( ! do_forward_transform) L.twiddle_in = - L.twiddle_in ;
         L.Q =  transform_divisor; //  (dims_in / transform size)
       break;
       
@@ -390,7 +410,6 @@ private:
         exit(-1);
         
     }
-    std::cout << "Transform Divisor " << L.Q << " " << transform_divisor << std::endl;
     return L;
   }
 
