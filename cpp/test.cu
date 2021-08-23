@@ -567,10 +567,14 @@ void run_oned(std::vector<int> size)
     // We just make one instance of the FourierTransformer class, with calc type float.
     // For the time being input and output are also float. TODO calc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
     FastFFT::FourierTransformer<float, float, float> FT;
+    FastFFT::FourierTransformer<float, float2, float2> FT_complex;
 
 
     FT_input.real_memory_allocated = FT.ReturnPaddedMemorySize(input_size);
     FT_output.real_memory_allocated = FT.ReturnPaddedMemorySize(output_size);
+
+    FT_input_complex.real_memory_allocated = FT_complex.ReturnPaddedMemorySize(input_size);
+    FT_output_complex.real_memory_allocated = FT_complex.ReturnPaddedMemorySize(output_size);
     
 
     bool set_fftw_plan = true;
@@ -581,15 +585,21 @@ void run_oned(std::vector<int> size)
     FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
     FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
 
+    FT_complex.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float2 ,float2>::OriginType::natural);
+    FT_complex.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float2 ,float2>::OriginType::natural);
 
     // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
     // ensures faster transfer. If false, it will be pinned for you.
     FT.SetInputPointer(FT_input.real_values, false);
+    FT_complex.SetInputPointer(FT_input.complex_values, false);
+
+
+    FT.SetToConstant<float>(FT_input.complex_values, FT_input.real_memory_allocated/2, 1.f);
 
     // Set a unit impulse at the center of the input array.
     // FT.SetToConstant<float>(FT_input.real_values, FT_input.real_memory_allocated, 1.0f);
     float2 const_val = make_float2(1.0f,0.0f);
-    FT.SetToConstant<float2>(FT_input.complex_values, FT_input.real_memory_allocated/2, const_val);
+    FT_input_complex.SetToConstant<float2>(FT_input.complex_values, FT_input.real_memory_allocated/2, const_val);
     for (int i=0; i<10; i++)
     {
       std::cout << FT_input.complex_values[i].x << ", " << FT_input.complex_values[i].y << std::endl;
@@ -598,11 +608,13 @@ exit(0);
     FT.SetToConstant<float>(FT_output.real_values, FT_input.real_memory_allocated, 0.0f);
 
     FT.CopyHostToDevice();
+    FT_input_complex.CopyHostToDevice();
     cudaErr(cudaStreamSynchronize(cudaStreamPerThread));  
 
     FT_input.FwdFFT();
     for (int i = 0; i < 5; ++i) std::cout << "FFTW fwd " << FT_input.real_values[i] << std::endl;
     std::cout << std::endl;
+
 
     bool transpose_output = false;
     bool swap_real_space_quadrants = false;

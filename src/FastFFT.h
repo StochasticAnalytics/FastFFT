@@ -145,7 +145,7 @@ public:
 
   inline int ReturnPaddedMemorySize(short4 & wanted_dims)
   {
-    if (std::is_same< InputType, __half2>::value || std::is_same< InputType,float2>::value)
+    if constexpr(std::is_same< InputType, __half2>::value || std::is_same< InputType,float2>::value)
     {
       int wanted_memory = wanted_dims.x * wanted_dims.y * wanted_dims.z;
       wanted_dims.w = wanted_dims.x; // pitch is constant
