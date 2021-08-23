@@ -161,7 +161,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetInputPointer(Inp
   if ( ! is_host_memory_pinned)
   {
     precheck
-    cudaErr(cudaHostRegister(host_pointer, sizeof(InputType)*input_memory_allocated, cudaHostRegisterDefault));
+    cudaErr(cudaHostRegister((void *)host_pointer, sizeof(InputType)*input_memory_allocated, cudaHostRegisterDefault));
     postcheck
 
     precheck
@@ -188,23 +188,27 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CopyHostToDevice()
 	if ( ! is_in_memory_device_pointer )
 	{
 
-    using this_type = decltype(d_ptr.momentum_space);
     // Allocate enough for the out of place buffer as well.
     // MyFFTPrintWithDetails("Allocating device memory for input pointer");
+    std::cout << "Compute mem allocated , size of " << compute_memory_allocated << " " << sizeof(ComputeType) << std::endl;
     precheck
 		cudaErr(cudaMalloc(&d_ptr.position_space, compute_memory_allocated * sizeof(ComputeType)));
     postcheck
 
+    size_t buffer_address;
+    if (is_real_valued_input) buffer_address = compute_memory_allocated/2 ;
+    else buffer_address = compute_memory_allocated/4; // FIXME i don't like this.
+
     if constexpr(std::is_same< decltype(d_ptr.momentum_space), __half2>::value )
     {
       d_ptr.momentum_space = (__half2 *)d_ptr.position_space;
-      d_ptr.position_space_buffer = &d_ptr.position_space[output_memory_allocated];
+      d_ptr.position_space_buffer = &d_ptr.position_space[buffer_address];
       d_ptr.momentum_space_buffer = (__half2 *)d_ptr.position_space_buffer;
     }
     else
     {
       d_ptr.momentum_space = (float2 *)d_ptr.position_space;
-      d_ptr.position_space_buffer = &d_ptr.position_space[output_memory_allocated];
+      d_ptr.position_space_buffer = &d_ptr.position_space[buffer_address]; // compute 
       d_ptr.momentum_space_buffer = (float2 *)d_ptr.position_space_buffer;
     }
 
@@ -254,11 +258,6 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CopyDeviceToHost(Ou
 {
  
 	MyFFTDebugAssertTrue(is_in_memory_device_pointer, "GPU memory not allocated");
-
-  ComputeType* copy_pointer;
-  if (is_in_buffer_memory) copy_pointer = d_ptr.position_space_buffer;
-  else copy_pointer = d_ptr.position_space;
-
   // Assuming the output is not pinned, TODO change to optionally maintain as host_input as well.
   OutputType* tmpPinnedPtr;
   precheck
@@ -269,10 +268,19 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CopyDeviceToHost(Ou
   precheck
   cudaErr(cudaHostGetDevicePointer( &tmpPinnedPtr, output_pointer, 0));
   postcheck
-  
-  precheck
-	cudaErr(cudaMemcpyAsync(tmpPinnedPtr, copy_pointer, output_memory_allocated*sizeof(OutputType),cudaMemcpyDeviceToHost,cudaStreamPerThread));
-  postcheck
+  if (is_in_buffer_memory)
+  {
+    precheck
+    cudaErr(cudaMemcpyAsync(tmpPinnedPtr, d_ptr.position_space_buffer, output_memory_allocated*sizeof(OutputType),cudaMemcpyDeviceToHost,cudaStreamPerThread));
+    postcheck
+  }
+  else
+  {
+    precheck
+    cudaErr(cudaMemcpyAsync(tmpPinnedPtr, d_ptr.position_space, output_memory_allocated*sizeof(OutputType),cudaMemcpyDeviceToHost,cudaStreamPerThread));
+    postcheck
+  }
+
 
   // Just set true her for now
   bool should_block_until_complete = true;
@@ -326,7 +334,9 @@ void FourierTransformer<ComputeType, InputType, OutputType>::FwdFFT(bool swap_re
   switch (transform_dimension)
   {
     case 1: {
-      FFT_R2C_decomposed(transpose_output);
+      if (is_real_valued_input) FFT_R2C_decomposed(transpose_output);
+      else FFT_C2C_decomposed(true);
+      
       break;
     }
     case 2: {
@@ -369,7 +379,8 @@ void FourierTransformer<ComputeType, InputType, OutputType>::InvFFT(bool transpo
   switch (transform_dimension)
   {
     case 1: {
-      FFT_C2R_decomposed(transpose_output);
+      if (is_real_valued_input) FFT_C2R_decomposed(transpose_output);
+      else FFT_C2C_decomposed(false);
       break;
     }
     case 2: {
@@ -1651,39 +1662,50 @@ void FourierTransformer<ComputeType, InputType, OutputType>::FFT_C2C_decomposed_
 {
 
   // Note unlike block transforms, we get the transform size here, it must be before LaunchParams. TODO add logical checks
-  GetTransformSize_thread(dims_in.y, size_of<FFT_nodir>::value);
+  // Temporary fix to check for 1d, this is not to be sustained. FIXME
+  if (dims_in.y == 1) GetTransformSize_thread(dims_in.x, size_of<FFT_nodir>::value);
+  else GetTransformSize_thread(dims_in.y, size_of<FFT_nodir>::value);
+  
 
   LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_decomposed, do_forward_transform);
 
+  using complex_type = typename FFT_nodir::value_type;
+  using scalar_type  = typename complex_type::value_type;
 
-
+  complex_type* input_pointer;
+  complex_type* output_pointer;
+  if (is_in_buffer_memory)
+  {
+    input_pointer  = (complex_type*)d_ptr.momentum_space_buffer;
+    output_pointer = (complex_type*)d_ptr.momentum_space;
+    is_in_buffer_memory = false;
+  }
+  else
+  {
+    input_pointer  = (complex_type*)d_ptr.momentum_space;
+    output_pointer = (complex_type*)d_ptr.momentum_space_buffer;
+    is_in_buffer_memory = true;
+  }
   if (do_forward_transform)
   {
     using FFT = decltype( FFT_nodir() + Direction<fft_direction::forward>() );
-    using complex_type = typename FFT::value_type;
-    using scalar_type    = typename complex_type::value_type;
     int shared_mem = LP.mem_offsets.shared_output * sizeof(complex_type);
 
     precheck
     thread_fft_kernel_C2C_decomposed<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
-    ((complex_type*) d_ptr.momentum_space_buffer, (complex_type*) d_ptr.position_space, LP.mem_offsets, LP.twiddle_in, LP.Q);
+    (input_pointer, output_pointer, LP.mem_offsets, LP.twiddle_in, LP.Q);
     postcheck
-    is_in_buffer_memory = false;
-
   }
   else
   {
 
     using FFT = decltype( FFT_nodir() + Direction<fft_direction::inverse>() );
-    using complex_type = typename FFT::value_type;
     int shared_mem = LP.mem_offsets.shared_output * sizeof(complex_type);
 
     precheck
     thread_fft_kernel_C2C_decomposed<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
-    ((complex_type*) d_ptr.position_space,  (complex_type*) d_ptr.momentum_space_buffer, LP.mem_offsets, LP.twiddle_in, LP.Q);
+    (input_pointer, output_pointer, LP.mem_offsets, LP.twiddle_in, LP.Q);
     postcheck
-    is_in_buffer_memory = true;
-
   }
 
 

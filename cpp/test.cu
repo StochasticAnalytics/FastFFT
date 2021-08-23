@@ -13,7 +13,7 @@ void const_image_test(short4 input_size, short4 output_size)
   bool test_passed = true;
   long address = 0;
   float sum;
-  const float acceptable_error = 1e-4;
+  const float acceptable_epsilon = 1e-4;
   float2 sum_complex;
 
   Image< float, float2 > host_input(input_size);
@@ -575,11 +575,15 @@ void run_oned(std::vector<int> size)
 
     FT_input_complex.real_memory_allocated = FT_complex.ReturnPaddedMemorySize(input_size);
     FT_output_complex.real_memory_allocated = FT_complex.ReturnPaddedMemorySize(output_size);
-    
+    std::cout << "Allocated " << FT_input_complex.real_memory_allocated << " bytes for input.\n";
+    std::cout << "Allocated complex " << FT_output_complex.real_memory_allocated << " bytes for input.\n";
 
     bool set_fftw_plan = true;
     FT_input.Allocate(set_fftw_plan);
     FT_output.Allocate(set_fftw_plan);
+
+    FT_input_complex.Allocate();
+    FT_output_complex.Allocate();
 
     // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
     FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
@@ -591,27 +595,32 @@ void run_oned(std::vector<int> size)
     // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
     // ensures faster transfer. If false, it will be pinned for you.
     FT.SetInputPointer(FT_input.real_values, false);
-    FT_complex.SetInputPointer(FT_input.complex_values, false);
+    FT_complex.SetInputPointer(FT_input_complex.complex_values, false);
 
 
-    FT.SetToConstant<float>(FT_input.complex_values, FT_input.real_memory_allocated/2, 1.f);
+    FT.SetToConstant<float>(FT_input.real_values, FT_input.real_memory_allocated, 1.f);
 
     // Set a unit impulse at the center of the input array.
     // FT.SetToConstant<float>(FT_input.real_values, FT_input.real_memory_allocated, 1.0f);
     float2 const_val = make_float2(1.0f,0.0f);
-    FT_input_complex.SetToConstant<float2>(FT_input.complex_values, FT_input.real_memory_allocated/2, const_val);
+    FT_complex.SetToConstant<float2>(FT_input_complex.complex_values, FT_input.real_memory_allocated, const_val);
     for (int i=0; i<10; i++)
     {
-      std::cout << FT_input.complex_values[i].x << ", " << FT_input.complex_values[i].y << std::endl;
+      std::cout << FT_input_complex.complex_values[i].x << "," << FT_input_complex.complex_values[i].y << std::endl;
     }
-exit(0);
-    FT.SetToConstant<float>(FT_output.real_values, FT_input.real_memory_allocated, 0.0f);
+
 
     FT.CopyHostToDevice();
-    FT_input_complex.CopyHostToDevice();
+    FT_complex.CopyHostToDevice();
     cudaErr(cudaStreamSynchronize(cudaStreamPerThread));  
 
+        // Set the outputs to a clearly wrong answer.
+        FT.SetToConstant<float>(FT_output.real_values, FT_input.real_memory_allocated, 2.0f);
+        const_val = make_float2(2.0f,2.0f);
+        FT_complex.SetToConstant<float2>(FT_output_complex.complex_values, FT_output.real_memory_allocated, const_val);
+
     FT_input.FwdFFT();
+
     for (int i = 0; i < 5; ++i) std::cout << "FFTW fwd " << FT_input.real_values[i] << std::endl;
     std::cout << std::endl;
 
@@ -619,20 +628,29 @@ exit(0);
     bool transpose_output = false;
     bool swap_real_space_quadrants = false;
     FT.FwdFFT(swap_real_space_quadrants, transpose_output);
-    FT.CopyDeviceToHost(FT_output.real_values, false, false);
+    FT_complex.FwdFFT(swap_real_space_quadrants, transpose_output);
 
-    for (int i = 0; i < 10; ++i) std::cout << "FT fwd " << FT_output.real_values[i] << std::endl;
+    FT.CopyDeviceToHost(FT_output.real_values, false, false);
+    FT_complex.CopyDeviceToHost(FT_output_complex.real_values, false, false);
+
+    for (int i = 0; i < 10; ++i) {std::cout << "FT fwd " << FT_output.real_values[i] << std::endl;}
+    for (int i = 0; i < 10; ++i) {std::cout << "FT complex fwd "<< FT_output_complex.real_values[i].x << "," << FT_output_complex.real_values[i].y << std::endl;}
+  
 
     FT_input.InvFFT();
+
     for (int i = 0; i < 5; ++i) {std::cout << "FFTW inv " << FT_input.real_values[i] << std::endl;}
     std::cout << std::endl;
 
 
 
     FT.InvFFT(transpose_output);
-    FT.CopyDeviceToHost(FT_output.real_values, false, false);
+    FT_complex.InvFFT(transpose_output);
+    FT.CopyDeviceToHost(FT_output.real_values, true, true);
+    FT_complex.CopyDeviceToHost(FT_output_complex.real_values, true, true);
 
     for (int i = 0; i < 10; i++) {std::cout << "Ft inv " << FT_output.real_values[i] << std::endl;}
+    for (int i = 0; i < 10; i++) {std::cout << "Ft complex inv " << FT_output_complex.real_values[i].x << "," << FT_output_complex.real_values[i].y << std::endl;}
 
 
   }
@@ -654,13 +672,13 @@ int main(int argc, char** argv) {
   constexpr const int n_tests = 6;
   const int test_size[n_tests] = {384, 1536, 4480, 512, 1024, 4096};
 
-  std::vector<int> test_sizes =  {32,64,128,256,320,480,512,544,608,768,1024,1056,1536,2048,2560,3072,3584,4096,5120,6144};
+  std::vector<int> test_sizes =  {32};//,64,128,256,320,480,512,544,608,768,1024,1056,1536,2048,2560,3072,3584,4096,5120,6144};
 
   if (run_validation_tests)  {
 
     // change onde these to just report the pass/fail.
     run_oned(test_sizes);
-
+    exit(0);
 
     for (int iSize = 0; iSize < n_tests; iSize++) {
 
@@ -672,7 +690,7 @@ int main(int argc, char** argv) {
 
     }
 
-    exit(0);
+   
     for (int iSize = 0; iSize < n_tests - 1; iSize++) {
       int oSize = iSize + 1;
       while (oSize < n_tests)

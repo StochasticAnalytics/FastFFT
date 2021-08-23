@@ -44,7 +44,8 @@ class Image {
     bool is_cufft_planned;
 
 
-    void Allocate(bool is_fftw_planned = false);
+    void Allocate( );
+    void Allocate(bool plan_fftw);
     void FwdFFT();
     void InvFFT();
 

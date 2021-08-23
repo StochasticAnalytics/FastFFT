@@ -24,29 +24,40 @@ Image<wanted_real_type, wanted_complex_type>::Image(short4 wanted_size)
 template < class wanted_real_type, class wanted_complex_type >
 Image<wanted_real_type, wanted_complex_type>::~Image()
 {
+
+  
   if (is_in_memory) 
   {
-    fftwf_free(real_values);
+    delete [] real_values;
+    // fftw_free((wanted_real_type *)real_values);
      is_in_memory = false;
   } 
+  
+
   if (is_fftw_planned)
   {
     fftwf_destroy_plan(plan_fwd);
     fftwf_destroy_plan(plan_bwd);
     is_fftw_planned = false;
   }
+  
+
   if (is_cufft_planned)
   {
     cudaErr(cufftDestroy(cuda_plan_inverse));
     cudaErr(cufftDestroy(cuda_plan_forward));
     is_cufft_planned = false;
   }
+  
+
 
   if (is_set_clip_into_mask)
   {
     cudaErr(cudaFree(clipIntoMask));
     is_set_clip_into_mask = false;
   }
+  
+
 }
 
 template < class wanted_real_type, class wanted_complex_type >
@@ -95,9 +106,23 @@ void Image<wanted_real_type, wanted_complex_type>::SetClipIntoMask(short4 input_
 // }
 
 template < class wanted_real_type, class wanted_complex_type >
+void Image<wanted_real_type, wanted_complex_type>::Allocate()
+{
+  // This overload for complex inputs is probably a bad idea. Either figure out the FFTW for complex (should be easy) or a static check on bool set plan.
+  // FIXME. Also not sure why I neet to pad the array by 2, I'm assuming it is some alignment issue?
+  real_values = new wanted_real_type[real_memory_allocated+2];
+
+  // real_values = (wanted_real_type *) fftw_malloc(sizeof(wanted_real_type) * real_memory_allocated);
+  complex_values = (wanted_complex_type*) real_values;  // Set the complex_values to point at the newly allocated real values;
+  is_fftw_planned = false;
+  is_in_memory = true;
+}
+
+template < class wanted_real_type, class wanted_complex_type >
 void Image<wanted_real_type, wanted_complex_type>::Allocate(bool set_fftw_plan)
 {
-  real_values = (wanted_real_type *) fftwf_malloc(sizeof(wanted_real_type) * real_memory_allocated);
+  real_values = new wanted_real_type[real_memory_allocated];
+  // real_values = (wanted_real_type *) fftw_malloc(sizeof(wanted_real_type) * real_memory_allocated);
   complex_values = (wanted_complex_type*) real_values;  // Set the complex_values to point at the newly allocated real values;
 
   // This will only work for single precision, should probably add a check on this, but for now rely on the user to make sure they are using single precision.
