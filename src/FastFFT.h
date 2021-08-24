@@ -97,8 +97,13 @@ public:
   int input_memory_allocated;
   int output_memory_allocated;
   int compute_memory_allocated;
-  int input_number_of_real_values;
-  int output_number_of_real_values;
+  int input_number_non_padding_values; // not used, but set in constructor
+  int output_number_non_padding_values;// not used, but set in constructor
+
+
+  ///////////////////////////////////////////////
+  // Initialization functions
+  ///////////////////////////////////////////////
 
   FourierTransformer();
   // FourierTransformer(const FourierTransformer &); // Copy constructor
@@ -121,17 +126,19 @@ public:
   // For the time being, the caller is responsible for having the memory allocated for any of these input/output pointers.
   void SetInputPointer(InputType* input_pointer, bool is_input_on_device);
 
+
+  ///////////////////////////////////////////////
+  // Public actions:
+  // ALL public actions should call ::CheckDimensions() to ensure the meta data are properly intialized.
+  // this ensures the prior three methods have been called and are valid.
+  ///////////////////////////////////////////////
+
   void CopyHostToDevice();
   // By default we are blocking with a stream sync until complete for simplicity. This is overkill and should FIXME.
   void CopyDeviceToHost(bool free_gpu_memory, bool unpin_host_memory);
   // When the size changes, we need a new host pointer
   void CopyDeviceToHost(OutputType* output_pointer, bool free_gpu_memory = true, bool unpin_host_memory = true);
-
-
   // FFT calls
-
-  // 1:1 no resizing or anything fancy.
-
 
   void FwdFFT(bool swap_real_space_quadrants = false, bool transpose_output = true);
   void InvFFT(bool transpose_output = true);
@@ -143,33 +150,8 @@ public:
 
   // For all real valued inputs, assumed for any InputType that is not float2 or __half2
 
-  inline int ReturnPaddedMemorySize(short4 & wanted_dims)
-  {
-    int wanted_memory = 0;
-
-    if constexpr(std::is_same< InputType, __half2>::value || std::is_same< InputType,float2>::value)
-    {
-      is_real_valued_input = false;
-      wanted_memory = wanted_dims.x * wanted_dims.y * wanted_dims.z;
-      wanted_dims.w = wanted_dims.x; // pitch is constant
-      compute_memory_allocated = 4 * wanted_memory; // We allocate using sizeof(ComputeType) which is either __half or float, so we need an extra factor of 2
-    }
-    else
-    {
-      is_real_valued_input = true;
-      if (wanted_dims.x % 2 == 0) { padding_jump_val = 2; wanted_memory = wanted_dims.x / 2 + 1;}
-      else { padding_jump_val = 1 ; wanted_memory = (wanted_dims.x - 1) / 2 + 1;}
-    
-      wanted_memory *= wanted_dims.y * wanted_dims.z; // other dimensions
-      wanted_memory *= 2; // room for complex
-      wanted_dims.w = (wanted_dims.x + padding_jump_val) / 2; // number of complex elements in the X dimesnions after FFT.
-      compute_memory_allocated = 2 * wanted_memory; // scaling by 2 making room for the buffer.
-    }
-    return wanted_memory;
-  }
-
-
-
+  int inline ReturnInputMemorySize() { return input_memory_allocated; }
+  int inline ReturnOutputMemorySize() { return output_memory_allocated; }
 
   template<typename T, bool is_on_host = true>
   void SetToConstant(T* input_pointer, int N_values, const T& wanted_value)
@@ -189,7 +171,6 @@ public:
 
   // Input is real or complex inferred from InputType
   DevicePointers<InputType*, ComputeType*> d_ptr;
-  bool is_in_buffer_memory;
 
 private:
 
@@ -198,25 +179,28 @@ private:
   OriginType output_origin_type;
 
   // booleans to track state, could be bit fields but that seem opaque to me.
-  bool is_in_memory_host_pointer;
-  bool is_in_memory_device_pointer;
+  bool is_in_memory_host_pointer; // To track allocation of host side memory
+  bool is_in_memory_device_pointer; // To track allocation of device side memory.
+  bool is_in_buffer_memory; // To track whether the current result is in dev_ptr.position_space or dev_ptr.position_space_buffer (momemtum space/ momentum space buffer respectively.)
 
-  bool is_host_memory_pinned;
 
-  bool is_fftw_padded_input;
-  bool is_fftw_padded_output;
-  bool is_fftw_padded_buffer;
-  bool is_real_valued_input;
+  bool is_host_memory_pinned; // Specified in the constructor. Assuming host memory won't be pinned for many applications.
 
-  bool is_size_validated;
-  int  transform_dimension;
-  int  transform_size;
-  int  transform_divisor;
-  enum SizeChangeType { increase, decrease, none };
-  SizeChangeType size_change_type;
+  bool is_fftw_padded_input; // Padding for in place r2c transforms
+  bool is_fftw_padded_output; // Currently the output state will match the input state, otherwise it is an error.
 
-  bool is_set_input_params;
+  bool is_real_valued_input; // This is determined by the input type. If it is a float2 or __half2, then it is assumed to be a complex valued input function.
+
+  bool is_set_input_params; // Yes, yes, "are" set.
   bool is_set_output_params;
+  bool is_size_validated; // Defaults to false, set after both input/output dimensions are set and checked.
+  bool is_set_input_pointer; // May be on the host of the device.
+
+  int  transform_dimension; // 1,2,3d.
+  int  transform_size; // Size of the 1d (sub) FFT which is <= the size of the full transform determined by the larger of the input/output dimensions. 
+  int  transform_divisor; // full size/ transform size = Q the number of sub-transforms.
+  enum SizeChangeType { increase, decrease, none }; // Assumed to be the same for all dimesnions. This may be relaxed later.
+  SizeChangeType size_change_type;
 
   short4 dims_in;
   short4 dims_out;
@@ -230,21 +214,22 @@ private:
   void SetDefaults();
   void CheckDimensions();
 
-  inline void GetTransformSize(int input_dimension)
+  inline void GetTransformSize(int input_size)
   {
-    if ( abs(fmod(log2(float(input_dimension)), 1)) < 1e-6 ) 
+    if ( abs(fmod(log2(float(input_size)), 1)) < 1e-6 ) 
     {
+      // For the time being, this also implies a block transform rather than a thread transform.
       transform_divisor = 1;
-      transform_size = input_dimension;
+      transform_size = input_size;
       // TODO for larger sizes, below
-      // transform_size = input_dimension / transform_divisor;
+      // transform_size = input_size / transform_divisor;
     }
     else 
     {
-      if ( abs(fmod(log2(float(input_dimension)/3), 1)) < 1e-6) 
+      if ( abs(fmod(log2(float(input_size)/3), 1)) < 1e-6) 
       {
         transform_divisor = 3;
-        transform_size = input_dimension / transform_divisor;
+        transform_size = input_size / transform_divisor;
       }
       else
       {
@@ -254,23 +239,40 @@ private:
     }
   };
 
-  inline void GetTransformSize_thread(int input_dimension, int thread_fft_size)
+  inline void GetTransformSize_thread(int input_size, int thread_fft_size)
   {
-    if (input_dimension % thread_fft_size != 0) { std::cerr << "Thread based decompositions must factor by thread_fft_size (" << thread_fft_size << ") in the current implmentations." << std::endl; exit(-1); }
-    transform_divisor = input_dimension / thread_fft_size;
+    if (input_size % thread_fft_size != 0) { std::cerr << "Thread based decompositions must factor by thread_fft_size (" << thread_fft_size << ") in the current implmentations." << std::endl; exit(-1); }
+    transform_divisor = input_size / thread_fft_size;
     transform_size = thread_fft_size;
   };
 
 
   enum KernelType { r2c_decomposed, r2c_decomposed_transposed, r2c_transposed, c2c_padded, c2c, c2c_decomposed, c2r_transposed,
                     c2r_decomposed, c2r_decomposed_transposed,  xcorr_transposed}; // Used to specify the origin of the data
+
+  // TODO: not sure this should be inlined. (Probably ignored by the compiler anyway.)
   inline LaunchParams SetLaunchParameters(const int& ept, KernelType kernel_type, bool do_forward_transform = true)
   {
+    /*
+      Assuming:
+      1) r2c/c2r imply forward/inverse transform. 
+         c2c_padded implies forward transform.
+      2) for 2d or 3d transforms the x/y dimensions are transposed in momentum space during store on the 1st set of 1ds transforms.
+      3) if 1d then z = y = 1.
+
+      threadsPerBlock = size/threads_per_fft (for thread based transforms)
+                      = size of fft ( for block based transforms ) NOTE: Something in cufftdx seems to be very picky about this. Launching > threads seem to cause problems.
+      gridDims = number of 1d FFTs, placed on blockDim perpendicular
+      shared_input/output = number of elements reserved in dynamic shared memory. TODO add a check on minimal (48k) and whether this should be increased (depends on Arch)
+      pixel_pitch_input/output = number of elements along the fast (x) dimension, depends on fftw padding && whether the memory is currently transposed in x/y
+      twiddle_in = +/- 2*PI/Largest dimension : + for the inverse transform
+      Q = number of sub-transforms
+    */
     LaunchParams L;
     switch (kernel_type)
     {
       case r2c_decomposed: 
-        // This is also fine for a one dimensional transform
+        // This is also fine for a 1d transform
         L.threadsPerBlock = dim3(transform_divisor, 1, 1);
         L.gridDims = dim3(1, dims_in.y, 1); 
         L.mem_offsets.shared_input = 0;
@@ -281,8 +283,10 @@ private:
         L.Q =  transform_divisor; //  (dims_in / transform size)
         break;
 
-        case r2c_decomposed_transposed: 
-
+      case r2c_decomposed_transposed: 
+        // The logic in this kernel would cause a segfault if the output is transposed in 1d
+        if (transform_dimension == 1) { std::cerr << "r2c_decomposed_transposed is not supported for 1d transforms." << std::endl; exit(-1); }
+      
         L.threadsPerBlock = dim3(transform_divisor, 1, 1);
         L.gridDims = dim3(1, dims_in.y, 1); 
         L.mem_offsets.shared_input = 0;  
@@ -294,7 +298,9 @@ private:
         break;        
 
       case r2c_transposed:
-        // The only read from the input array is in this blcok
+        // The logic in this kernel would cause a segfault if the output is transposed in 1d
+        if (transform_dimension == 1) { std::cerr << "r2c_decomposed_transposed is not supported for 1d transforms." << std::endl; exit(-1); }
+
         L.threadsPerBlock = dim3(transform_size/ept, 1, 1);
         L.gridDims = dim3(transform_divisor, dims_in.y, 1); 
         L.mem_offsets.shared_input = dims_in.x;
@@ -304,32 +310,84 @@ private:
         L.twiddle_in = -2*PIf/dims_out.x;
         L.Q = dims_out.x / dims_in.x; 
         break;
-      case c2c_padded:
-        L.threadsPerBlock = dim3(transform_size/ept, 1, 1); 
-        L.gridDims = dim3(transform_divisor, dims_out.w, 1);
-        L.mem_offsets.shared_input = dims_in.y;
-        L.mem_offsets.shared_output = dims_out.y;
-        L.mem_offsets.pixel_pitch_input = dims_out.y;
-        L.mem_offsets.pixel_pitch_output = dims_out.y;
-        if ( do_forward_transform) L.twiddle_in = -2*PIf/dims_in.y;
-        else L.twiddle_in = 2*PIf/dims_out.y;  
-        L.Q = dims_out.y / dims_in.y; // FIXME assuming for now this is already divisible
 
-        break;
+      case c2c_padded:
+        // This is implicitly a forward transform
+        switch (transform_dimension)
+        {
+          case 1: {         
+            // If 1d, this is implicitly a complex valued input, s.t. dims_in.x = dims_in.w.) But if fftw_padding is allowed false this may not be true.
+            L.threadsPerBlock = dim3(transform_size/ept, 1, 1);
+            L.gridDims = dim3(transform_divisor, 1, 1);
+            L.mem_offsets.shared_input = dims_in.x;
+            L.mem_offsets.shared_output = dims_out.w;
+            L.mem_offsets.pixel_pitch_input = dims_in.w; // complex ype, natural
+            L.mem_offsets.pixel_pitch_output = dims_out.w; // complex type, natural
+            L.twiddle_in = -2*PIf/dims_out.x;
+            L.Q = dims_out.x / dims_in.x;
+            break;
+          }
+          case 2: {
+            L.threadsPerBlock = dim3(transform_size/ept, 1, 1); 
+            L.gridDims = dim3(transform_divisor, dims_out.w, 1);
+            L.mem_offsets.shared_input = dims_in.y;
+            L.mem_offsets.shared_output = dims_out.y;
+            L.mem_offsets.pixel_pitch_input = dims_out.y;
+            L.mem_offsets.pixel_pitch_output = dims_out.y;
+            L.twiddle_in = -2*PIf/dims_in.y;
+            L.Q = dims_out.y / dims_in.y; // FIXME assuming for now this is already divisible
+            break;
+          }
+          case 3: {
+            // Not implemented
+            std::cerr << "3d c2c_padded not implemented" << std::endl;
+            exit(-1);
+            break;
+          }
+        } // end switch on transform dimension
+        // If inverse we need to negate the twidddle factor.
+        if ( ! do_forward_transform)  L.twiddle_in  = -L.twiddle_in ;
+        break; // case c2c_padded
+
       case c2c:
-        L.threadsPerBlock = dim3(transform_size/ept, 1, 1); 
-        L.gridDims = dim3(transform_divisor, dims_out.w, 1);
+        switch (transform_dimension)
+        {
+          case 1: {  
+            // If 1d, this is implicitly a complex valued input, s.t. dims_in.x = dims_in.w.) But if fftw_padding is allowed false this may not be true.
+            L.threadsPerBlock = dim3(transform_size/ept, 1, 1);
+            L.gridDims = dim3(transform_divisor, 1, 1);
+            L.mem_offsets.pixel_pitch_input = dims_in.w;
+            L.mem_offsets.pixel_pitch_output = dims_out.w;
+            L.twiddle_in = -2*PIf/dims_out.x;
+            L.Q = dims_out.x / dims_in.x; // should be 1
+            break;
+          }
+          case 2: {             
+            L.threadsPerBlock = dim3(transform_size/ept, 1, 1); 
+            L.gridDims = dim3(transform_divisor, dims_out.w, 1);
+            L.mem_offsets.pixel_pitch_input = dims_out.y;
+            L.mem_offsets.pixel_pitch_output = dims_out.y;
+            L.twiddle_in = -2*PIf/dims_out.y;
+            L.Q = dims_out.y / dims_in.y; // should be 1
+            break;
+          }
+          case 3: {
+            // Not implemented
+            std::cerr << "3d c2c not implemented" << std::endl;
+            exit(-1);
+            break;
+          }
+        } // end switch on transform dimension
         L.mem_offsets.shared_input = 0;
-        L.mem_offsets.shared_output = 0;
-        L.mem_offsets.pixel_pitch_input = dims_out.y;
-        L.mem_offsets.pixel_pitch_output = dims_out.y;
-        if ( do_forward_transform) L.twiddle_in = -2*PIf/dims_out.y;
-        else L.twiddle_in = 2*PIf/dims_out.y;
-        L.Q = 1; // Already full size - FIXME when working out limited number of output pixels       
-        break;
+        L.mem_offsets.shared_output = 0;  
+        // If inverse we need to negate the twidddle factor.
+        if ( ! do_forward_transform)  L.twiddle_in  = -L.twiddle_in ; 
+        break; // case c2c
 
       case c2c_decomposed: 
         L.threadsPerBlock = dim3(transform_divisor, 1, 1);
+        L.Q =  transform_divisor; //  (dims_in / transform size)
+
         switch (transform_dimension)
         {
           case 1: {
@@ -350,15 +408,20 @@ private:
             L.twiddle_in = 2*PIf/dims_out.y;
             break;
           }
-          default: {
-            std::cout << "Only 1 and 2d transforms have been implemented." << std::endl;
+          case 3: {
+            // Not implemented
+            std::cerr << "3d c2c_decomposed not implemented" << std::endl;
+            exit(-1);
+            break;
           }
-        }
+
+        } // end switch on transform dimension
         if ( ! do_forward_transform) L.twiddle_in = - L.twiddle_in ;
-        L.Q =  transform_divisor; //  (dims_in / transform size)
       break;
       
       case c2r_transposed:
+        if (transform_dimension == 1) { std::cerr << "c2r_transposed is not supported for 1d transforms." << std::endl; exit(-1); }
+
         L.twiddle_in = 2*PIf/dims_out.y;
         L.Q = 1; // Already full size - FIXME when working out limited number of output pixels  
         L.threadsPerBlock = dim3(transform_size/ept, 1, 1); 
@@ -370,6 +433,8 @@ private:
         break;
 
       case c2r_decomposed:
+        if (transform_dimension == 2 || transform_dimension == 3) { std::cerr << "c2r_decomposed is not supported for transposed xforms, implied by 2d/3d." << std::endl; exit(-1); }
+
         L.twiddle_in = 2*PIf/dims_out.x;
         L.Q = transform_divisor; //  (dims_in / transform size)
         L.threadsPerBlock = dim3(transform_divisor, 1, 1); 
@@ -381,6 +446,7 @@ private:
       break; 
       
       case c2r_decomposed_transposed:
+        if (transform_dimension == 1) { std::cerr << "c2r_decomposed_transposed is not supported for 1d transforms." << std::endl; exit(-1); }
         L.twiddle_in = 2*PIf/dims_out.x;
         L.Q = 1; // Already full size - FIXME when working out limited number of output pixels  
         L.threadsPerBlock = dim3(transform_divisor, 1, 1); 
@@ -392,6 +458,8 @@ private:
       break; 
 
       case xcorr_transposed:
+        if (transform_dimension == 1 || transform_dimension == 3) { std::cerr << "xcorr_transposed is not supported for 1d/3d yet." << std::endl; exit(-1); } // FIXME
+
       // Cross correlation case
       // The added complexity, in instructions and shared memory usage outweigh the cost of just running the full length C2C on the forward.
         L.threadsPerBlock = dim3(transform_size/ept, 1, 1); 
@@ -413,6 +481,31 @@ private:
     return L;
   }
 
+  inline int ReturnPaddedMemorySize(short4 & wanted_dims)
+  {
+    // Assumes a) SetInputDimensionsAndType has been called and is_fftw_padded is set before this call. (Currently RuntimeAssert to die if false) FIXME
+    int wanted_memory = 0;
+
+    if (is_real_valued_input)
+    {
+      if (wanted_dims.x % 2 == 0) { padding_jump_val = 2; wanted_memory = wanted_dims.x / 2 + 1;}
+      else { padding_jump_val = 1 ; wanted_memory = (wanted_dims.x - 1) / 2 + 1;}
+    
+      wanted_memory *= wanted_dims.y * wanted_dims.z; // other dimensions
+      wanted_memory *= 2; // room for complex
+      wanted_dims.w = (wanted_dims.x + padding_jump_val) / 2; // number of complex elements in the X dimesnions after FFT.
+      compute_memory_allocated = 2 * wanted_memory; // scaling by 2 making room for the buffer.
+    }
+    else
+    {    
+      wanted_memory = wanted_dims.x * wanted_dims.y * wanted_dims.z;
+      wanted_dims.w = wanted_dims.x; // pitch is constant
+      // We allocate using sizeof(ComputeType) which is either __half or float, so we need an extra factor of 2
+      // Note: this must be considered when setting the address of the buffer memory based on the address of the regular memory.
+      compute_memory_allocated = 4 * wanted_memory; 
+    }
+    return wanted_memory;
+  }
 
   void FFT_R2C_decomposed(bool transpose_output = true);
   void FFT_R2C(bool transpose_output = true); // non-transposed is not implemented and will fail at runtime.
