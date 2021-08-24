@@ -370,7 +370,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::FwdFFT(bool swap_re
         case none: {
           // FFT_R2C(transpose_output);
           // FFT_C2C(true);
-          FFT_R2C_decomposed(transpose_output);
+          FFT_R2C_decomposed(true);
           FFT_C2C_decomposed(true);
           break;
         }
@@ -415,7 +415,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::InvFFT(bool transpo
           // FFT_C2C(false);
           // FFT_C2R_Transposed();
           FFT_C2C_decomposed(false);
-          FFT_C2R_decomposed(false);
+          FFT_C2R_decomposed(true);
           break;
         }
         case increase: {
@@ -1689,7 +1689,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::FFT_C2C_decomposed_
   // Note unlike block transforms, we get the transform size here, it must be before LaunchParams. TODO add logical checks
   // Temporary fix to check for 1d, this is not to be sustained. FIXME
   if (dims_in.y == 1) GetTransformSize_thread(dims_in.x, size_of<FFT_nodir>::value);
-  else GetTransformSize_thread(dims_in.y, size_of<FFT_nodir>::value);
+  else GetTransformSize_thread(dims_in.y, size_of<FFT_nodir>::value); // does dims_in make sense?
   
 
   LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_decomposed, do_forward_transform);
@@ -1967,6 +1967,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::FFT_C2R_decomposed_
 
   if (transpose_output)
   {
+    std::cout << " CONFIRM TRANSOPOSE OUTPUT C2R " << std::endl;
     LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2r_decomposed_transposed);
     int shared_memory = LP.mem_offsets.shared_output * sizeof(scalar_type);
 
@@ -2047,7 +2048,7 @@ void thread_fft_kernel_C2R_decomposed_transposed(const ComplexType*  __restrict_
   io_thread<FFT>::load_c2r_transposed(&input_values[blockIdx.y], thread_data, Q, mem_offsets.pixel_pitch_input, mem_offsets.pixel_pitch_output/2);
 
   // We then have Q FFTs of size size_of<FFT>::value (P in the paper)
-	FFT().execute(thread_data);
+	// FFT().execute(thread_data);
 
   // Now we need to aggregate each of the Q transforms into each output block of size P
   io_thread<FFT>::remap_decomposed_segments_c2r(thread_data, shared_mem_transposed, twiddle_in, Q);

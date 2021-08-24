@@ -646,12 +646,12 @@ struct io_thread
     unsigned int index  = threadIdx.x;
     for (unsigned int i = 0; i < size_of<FFT>::value/2; i++) 
     {
-      output[index*pixel_pitch + blockIdx.y] = shared_output[index];
+      output[index*pixel_pitch] = shared_output[index];
       index += stride;
     }
     if (index < memory_limit)
     {
-      output[index*pixel_pitch + blockIdx.y] = shared_output[index];
+      output[index*pixel_pitch] = shared_output[index];
     }
   } // store_r2c_transposed
 
@@ -793,14 +793,14 @@ struct io_thread
 
     if (index <  memory_limit)
     {
-      thread_data[i] = input[index*pixel_pitch + blockIdx.y];
+      thread_data[i] = input[index*pixel_pitch];
     }
     else
     {
-      input[2*memory_limit - index - 2];
+      // input[2*memory_limit - index - 2];
       // assuming even dimension
       // FIXME shouldn't need to read in from global for an even stride
-      thread_data[i] = input[(offset - index)*pixel_pitch + blockIdx.y];
+      thread_data[i] = input[(offset - index)*pixel_pitch];
       thread_data[i].y = -thread_data[i].y; // conjugate
     }
     index += stride;
@@ -820,7 +820,7 @@ struct io_thread
     {
       // printf("remap tid, index + i %i %i\n", threadIdx.x, index+i);
       SINCOS( twiddle_in * (index + i) ,&twiddle.y,&twiddle.x);
-      shared_output[index +  i] = (twiddle.x*thread_data[i].x - twiddle.y*thread_data[i].y); // assuming the output is real, only the real parts add, so don't bother with the complex
+      shared_output[index +  i] = thread_data[i].y;//(twiddle.x*thread_data[i].x - twiddle.y*thread_data[i].y); // assuming the output is real, only the real parts add, so don't bother with the complex
     }  
     __syncthreads(); // make sure all the shared mem is initialized to the starting value. There should be no contention as every thread is working on its own block of memory. 
 
@@ -834,7 +834,7 @@ struct io_thread
         // if (threadIdx.x == 32) printf("remap tid, subfft, q, index + i %i %i %i %i\n", threadIdx.x,sub_fft, Q, index+i);
 
       SINCOS( twiddle_in * (index + i) ,&twiddle.y,&twiddle.x);
-      atomicAdd_block(&shared_output[index +  i], twiddle.x*thread_data[i].x - twiddle.y*thread_data[i].y);
+      atomicAdd_block(&shared_output[index +  i], thread_data[i].y);//twiddle.x*thread_data[i].x - twiddle.y*thread_data[i].y);
       }
     }
     __syncthreads();

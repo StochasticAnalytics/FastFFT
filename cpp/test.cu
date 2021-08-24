@@ -72,7 +72,10 @@ void const_image_test(short4 input_size, short4 output_size)
     if (host_output.complex_values[index].x != 0.0f && host_output.complex_values[index].y != 0.0f) { std::cout << host_output.complex_values[index].x  << " " << host_output.complex_values[index].y << " " << std::endl; test_passed = false;}
   }
   if (host_output.complex_values[0].x != (float)output_size.x * (float)output_size.y * (float)output_size.z) test_passed = false;
-  std::cout << "FFTW unit " << host_output.complex_values[0].x << " " << host_output.complex_values[0].y << std::endl;
+  for (int i = 0; i < 10; i++)
+  {
+    std::cout << "FFTW unit " << host_output.complex_values[i].x << " " << host_output.complex_values[i].y << std::endl;
+  }
 
   MyFFTDebugAssertTestTrue( test_passed, "FFTW unit impulse forward FFT");
   
@@ -91,7 +94,22 @@ void const_image_test(short4 input_size, short4 output_size)
     if (host_output.complex_values[index].x != 0.0f && host_output.complex_values[index].y != 0.0f) {test_passed = false;} // std::cout << host_output.complex_values[index].x  << " " << host_output.complex_values[index].y << " " << std::endl;}
   }
   if (host_output.complex_values[0].x != (float)output_size.x * (float)output_size.y * (float)output_size.z) test_passed = false;
-  std::cout << "fastFFT unit " << host_output.complex_values[0].x << " " << host_output.complex_values[0].y << std::endl;
+  // int n=0;
+  // for (int x = 0; x <  host_output.size.y ; x++)
+  // {
+    
+  //   std::cout << x << "[ ";
+  //   for (int y = 0; y < host_output.size.w; y++)
+  //   {  
+  //     std::cout << host_output.complex_values[x + y*host_output.size.y].x << "," << host_output.complex_values[x + y*host_output.size.y].y << " ";
+  //     n++;
+  //     if (n == 34) {n = 0; std::cout << std::endl ;} // line wrapping
+  //   }
+  //   std::cout << "] " << std::endl;
+  //   n = 0;
+  // }
+
+
   MyFFTDebugAssertTestTrue( test_passed, "FastFFT unit impulse forward FFT");
   FT.SetToConstant<float>(host_input.real_values, host_input.real_memory_allocated, 2.0f);
   
@@ -101,6 +119,21 @@ void const_image_test(short4 input_size, short4 output_size)
   
   // Assuming the outputs are always even dimensions, padding_jump_val is always 2.
   sum = ReturnSumOfReal(host_output.real_values, output_size);
+  
+   int n=0;
+  for (int x = 0; x <  host_output.size.x ; x++)
+  {
+    
+    std::cout << x << "[ ";
+    for (int y = 0; y < host_output.size.y; y++)
+    {  
+      std::cout << host_output.real_values[x + y*host_output.size.w*2] <<  " ";
+      n++;
+      if (n == 32) {n = 0; std::cout << std::endl ;} // line wrapping
+    }
+    std::cout << "] " << std::endl;
+    n = 0;
+  } 
   
   MyFFTDebugAssertTestTrue( sum == powf(input_size.x*input_size.y*input_size.z,2),"FastFFT unit impulse round trip FFT");
   
@@ -667,15 +700,15 @@ int main(int argc, char** argv) {
   short4 output_size;
 
   constexpr const int n_tests = 6;
-  const int test_size[n_tests] = {384, 1536, 4480, 512, 1024, 4096};
+  const int test_size[n_tests] = {64, 1536, 4480, 512, 1024, 4096};
 
   std::vector<int> test_sizes =  {32};//,64,128,256,320,480,512,544,608,768,1024,1056,1536,2048,2560,3072,3584,4096,5120,6144};
 
   if (run_validation_tests)  {
 
     // change onde these to just report the pass/fail.
-    run_oned(test_sizes);
-    exit(0);
+    // run_oned(test_sizes);
+    // exit(0);
 
     for (int iSize = 0; iSize < n_tests; iSize++) {
 
@@ -684,6 +717,7 @@ int main(int argc, char** argv) {
       output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
 
       const_image_test(input_size, output_size);
+      exit(0);
 
     }
 

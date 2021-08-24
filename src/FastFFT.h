@@ -387,7 +387,6 @@ private:
       case c2c_decomposed: 
         L.threadsPerBlock = dim3(transform_divisor, 1, 1);
         L.Q =  transform_divisor; //  (dims_in / transform size)
-
         switch (transform_dimension)
         {
           case 1: {
@@ -448,7 +447,7 @@ private:
       case c2r_decomposed_transposed:
         if (transform_dimension == 1) { std::cerr << "c2r_decomposed_transposed is not supported for 1d transforms." << std::endl; exit(-1); }
         L.twiddle_in = 2*PIf/dims_out.x;
-        L.Q = 1; // Already full size - FIXME when working out limited number of output pixels  
+        L.Q = transform_divisor; //  (dims_in / transform size)
         L.threadsPerBlock = dim3(transform_divisor, 1, 1); 
         L.gridDims = dim3(1, dims_out.y, 1);
         L.mem_offsets.shared_input = 0;
