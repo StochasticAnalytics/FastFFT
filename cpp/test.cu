@@ -27,12 +27,15 @@ void const_image_test(short4 input_size, short4 output_size)
   // For the time being input and output are also float. TODO calc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
   FastFFT::FourierTransformer<float, float, float> FT;
   
-  
+  // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
+  FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+  FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+
   // Determine how much memory we need, working with FFTW/CUDA style in place transform padding.
   // Note: there is no reason we really need this, because the xforms will always be out of place. 
   //       For now, this is just in place because all memory in cisTEM is allocated accordingly.
-  host_input.real_memory_allocated = FT.ReturnPaddedMemorySize(input_size);
-  host_output.real_memory_allocated = FT.ReturnPaddedMemorySize(output_size);
+  host_input.real_memory_allocated = FT.ReturnInputMemorySize();
+  host_output.real_memory_allocated = FT.ReturnOutputMemorySize();
   
   // On the device, we will always allocate enough memory for the larger of input/output including the buffer array.
   // Minmize the number of calls to malloc which are slow and can lead to fragmentation.
@@ -50,9 +53,7 @@ void const_image_test(short4 input_size, short4 output_size)
   FT.SetToConstant<float>(host_output.real_values, host_output.real_memory_allocated, 1.0f);
 
     
-  // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
-  FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-  FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+
   
   // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
   // ensures faster transfer. If false, it will be pinned for you.
@@ -123,29 +124,25 @@ void unit_impulse_test(short4 input_size, short4 output_size)
   // We just make one instance of the FourierTransformer class, with calc type float.
   // For the time being input and output are also float. TODO calc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
   FastFFT::FourierTransformer<float, float, float> FT;
-  
+  // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
+  FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+  FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural); 
   
   // Determine how much memory we need, working with FFTW/CUDA style in place transform padding.
   // Note: there is no reason we really need this, because the xforms will always be out of place. 
   //       For now, this is just in place because all memory in cisTEM is allocated accordingly.
-  host_input.real_memory_allocated = FT.ReturnPaddedMemorySize(input_size);
-  host_output.real_memory_allocated = FT.ReturnPaddedMemorySize(output_size);
+  host_input.real_memory_allocated = FT.ReturnInputMemorySize();
+  host_output.real_memory_allocated = FT.ReturnOutputMemorySize();
   
   // On the device, we will always allocate enough memory for the larger of input/output including the buffer array.
   // Minmize the number of calls to malloc which are slow and can lead to fragmentation.
   device_output.real_memory_allocated = std::max(host_input.real_memory_allocated, host_output.real_memory_allocated);
-  
   
   // In your own programs, you will be handling this memory allocation yourself. We'll just make something here.
   // I think fftwf_malloc may potentially create a different alignment than new/delete, but kinda doubt it. For cisTEM consistency...
   bool set_fftw_plan = true;
   host_input.Allocate(set_fftw_plan);
   host_output.Allocate(set_fftw_plan);
-  
-
-  // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
-  FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-  FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
   
   // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
   // ensures faster transfer. If false, it will be pinned for you.
@@ -275,15 +272,24 @@ void compare_libraries(short4 input_size, short4 output_size)
   FastFFT::FourierTransformer<float, float, float> cuFFT;
   FastFFT::FourierTransformer<float, float, float> targetFT;
 
-
-  FT_input.real_memory_allocated = FT.ReturnPaddedMemorySize(input_size);
-  FT_output.real_memory_allocated = FT.ReturnPaddedMemorySize(output_size);
+  // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
+  FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+  FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+  cuFFT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+  cuFFT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
   
-  cuFFT_input.real_memory_allocated = cuFFT.ReturnPaddedMemorySize(input_size);
-  cuFFT_output.real_memory_allocated = cuFFT.ReturnPaddedMemorySize(output_size);
+  targetFT.SetInputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+  targetFT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
 
-  target_search_image.real_memory_allocated = targetFT.ReturnPaddedMemorySize(output_size);
-  positive_control.real_memory_allocated = targetFT.ReturnPaddedMemorySize(output_size);
+
+  FT_input.real_memory_allocated = FT.ReturnInputMemorySize();
+  FT_output.real_memory_allocated = FT.ReturnOutputMemorySize();
+  
+  cuFFT_input.real_memory_allocated = cuFFT.ReturnInputMemorySize();
+  cuFFT_output.real_memory_allocated = cuFFT.ReturnOutputMemorySize();
+
+  target_search_image.real_memory_allocated = targetFT.ReturnInputMemorySize();
+  positive_control.real_memory_allocated = targetFT.ReturnOutputMemorySize();
 
 
   bool set_fftw_plan = false;
@@ -296,16 +302,6 @@ void compare_libraries(short4 input_size, short4 output_size)
   target_search_image.Allocate(true);
   positive_control.Allocate(true);
 
-
-
-  // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
-  FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-  FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-  cuFFT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-  cuFFT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-  
-  targetFT.SetInputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-  targetFT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
 
   // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
   // ensures faster transfer. If false, it will be pinned for you.
@@ -569,12 +565,18 @@ void run_oned(std::vector<int> size)
     FastFFT::FourierTransformer<float, float, float> FT;
     FastFFT::FourierTransformer<float, float2, float2> FT_complex;
 
+    // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
+    FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+    FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
 
-    FT_input.real_memory_allocated = FT.ReturnPaddedMemorySize(input_size);
-    FT_output.real_memory_allocated = FT.ReturnPaddedMemorySize(output_size);
+    FT_complex.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float2 ,float2>::OriginType::natural);
+    FT_complex.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float2 ,float2>::OriginType::natural);
 
-    FT_input_complex.real_memory_allocated = FT_complex.ReturnPaddedMemorySize(input_size);
-    FT_output_complex.real_memory_allocated = FT_complex.ReturnPaddedMemorySize(output_size);
+    FT_input.real_memory_allocated = FT.ReturnInputMemorySize();
+    FT_output.real_memory_allocated = FT.ReturnOutputMemorySize();
+
+    FT_input_complex.real_memory_allocated = FT_complex.ReturnInputMemorySize();
+    FT_output_complex.real_memory_allocated = FT_complex.ReturnOutputMemorySize();
     std::cout << "Allocated " << FT_input_complex.real_memory_allocated << " bytes for input.\n";
     std::cout << "Allocated complex " << FT_output_complex.real_memory_allocated << " bytes for input.\n";
 
@@ -585,12 +587,7 @@ void run_oned(std::vector<int> size)
     FT_input_complex.Allocate();
     FT_output_complex.Allocate();
 
-    // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
-    FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-    FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
 
-    FT_complex.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float2 ,float2>::OriginType::natural);
-    FT_complex.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float2 ,float2>::OriginType::natural);
 
     // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
     // ensures faster transfer. If false, it will be pinned for you.

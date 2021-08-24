@@ -18,6 +18,18 @@ template <class ComputeType, class InputType, class OutputType>
 FourierTransformer<ComputeType, InputType, OutputType>::FourierTransformer() 
 {
   SetDefaults();
+
+  // This assumption precludes the use of a packed _half2 that is really RRII layout for two arrays of __half.
+  // TODO could is_real_valued_input be constexpr?
+  if constexpr(std::is_same< InputType, __half2>::value || std::is_same< InputType,float2>::value)
+  {
+    is_real_valued_input = false;
+  }
+  else
+  {
+    is_real_valued_input = true;
+  }
+  
 }
 
 template <class ComputeType, class InputType, class OutputType>
@@ -25,6 +37,7 @@ FourierTransformer<ComputeType, InputType, OutputType>::~FourierTransformer()
 {
   Deallocate();
   UnPinHostMemory();
+  SetDefaults();
 }
 
 template <class ComputeType, class InputType, class OutputType>
@@ -37,18 +50,40 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetDefaults()
 
   is_fftw_padded_input = false;
   is_fftw_padded_output = false;
-  is_fftw_padded_buffer = false;
 
   is_set_input_params = false;
   is_set_output_params = false;
+  is_size_validated = false;
+  is_set_input_pointer = false;
 
   is_host_memory_pinned = false;
 
-  is_size_validated = false;
 
 }
 
+template <class ComputeType, class InputType, class OutputType>
+void FourierTransformer<ComputeType, InputType, OutputType>::Deallocate()
+{
+	if (is_in_memory_device_pointer) 
+	{
+    precheck
+		cudaErr(cudaFree(d_ptr.position_space));
+    postcheck
+		is_in_memory_device_pointer = false;
+	}	
+}
 
+template <class ComputeType, class InputType, class OutputType>
+void FourierTransformer<ComputeType, InputType, OutputType>::UnPinHostMemory()
+{
+  if (is_host_memory_pinned)
+	{
+    precheck
+		cudaErr(cudaHostUnregister(host_pointer));
+    postcheck
+		is_host_memory_pinned = false;
+	} 
+}
 
 
 template <class ComputeType, class InputType, class OutputType>
@@ -63,11 +98,13 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetInputDimensionsA
   MyFFTDebugAssertTrue(input_logical_x_dimension > 0, "Input logical x dimension must be > 0");
   MyFFTDebugAssertTrue(input_logical_y_dimension > 0, "Input logical y dimension must be > 0");
   MyFFTDebugAssertTrue(input_logical_z_dimension > 0, "Input logical z dimension must be > 0");
-  MyFFTDebugAssertTrue(is_padded_input, "The input memory must be fftw padded");
 
   dims_in = make_short4(input_logical_x_dimension, input_logical_y_dimension, input_logical_z_dimension,0);
+  is_fftw_padded_input = is_padded_input; // Note: Must be set before ReturnPaddedMemorySize
+  MyFFTRunTimeAssertTrue(is_fftw_padded_input, "Support for input arrays that are not FFTW padded needs to be implemented."); // FIXME
+
   input_memory_allocated = ReturnPaddedMemorySize(dims_in);
-  input_number_of_real_values = dims_in.x*dims_in.y*dims_in.z;
+  input_number_non_padding_values = dims_in.x*dims_in.y*dims_in.z;
 
   this->input_origin_type = input_origin_type;
   is_set_input_params = true;
@@ -80,15 +117,16 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetOutputDimensions
                                                     bool is_padded_output, 
                                                     OriginType output_origin_type)
 {
+  MyFFTDebugAssertTrue(is_set_input_params, "Please set the input paramters first.")
   MyFFTDebugAssertTrue(output_logical_x_dimension > 0, "output logical x dimension must be > 0");
   MyFFTDebugAssertTrue(output_logical_y_dimension > 0, "output logical y dimension must be > 0");
   MyFFTDebugAssertTrue(output_logical_z_dimension > 0, "output logical z dimension must be > 0");
-  MyFFTDebugAssertTrue(is_padded_output, "The output memory must be fftw padded");
+  MyFFTDebugAssertTrue(is_fftw_padded_input == is_padded_output, "If the input data are FFTW padded, so must the output.");
 
   dims_out = make_short4(output_logical_x_dimension, output_logical_y_dimension, output_logical_z_dimension,0);
 
   output_memory_allocated = ReturnPaddedMemorySize(dims_out);
-  output_number_of_real_values = dims_out.x*dims_out.y*dims_out.z;
+  output_number_non_padding_values = dims_out.x*dims_out.y*dims_out.z;
 
   this->output_origin_type = output_origin_type;
   is_set_output_params = true;
@@ -98,29 +136,42 @@ template <class ComputeType, class InputType, class OutputType>
 void FourierTransformer<ComputeType, InputType, OutputType>::CheckDimensions()
 {
   // This should be run inside any public method call to ensure things ar properly setup.
+
+  // TODO - runtime asserts would be better as these are breaking errors that are under user control.
+  // check to see if there is any measurable penalty for this.
   if ( ! is_size_validated )
   {
     MyFFTDebugAssertTrue(is_set_input_params, "Input parameters not set");
     MyFFTDebugAssertTrue(is_set_output_params, "Output parameters not set");
+    MyFFTDebugAssertTrue(is_set_input_pointer, "The input data pointer is not set");
+
   
     if (dims_out.x > dims_in.x || dims_out.y > dims_in.y || dims_out.z > dims_in.z)
     {
       // For now we must pad in all dimensions, this is not needed and should be lifted. FIXME
-      MyFFTRunTimeAssertTrue(dims_out.x >= dims_in.x, "If padding, all dimensions must be >=, x out < x in");
-      MyFFTRunTimeAssertTrue(dims_out.y >= dims_in.y, "If padding, all dimensions must be >=, y out < y in");
-      MyFFTRunTimeAssertTrue(dims_out.z >= dims_in.z, "If padding, all dimensions must be >=, z out < z in");
+      MyFFTDebugAssertTrue(dims_out.x >= dims_in.x, "If padding, all dimensions must be >=, x out < x in");
+      MyFFTDebugAssertTrue(dims_out.y >= dims_in.y, "If padding, all dimensions must be >=, y out < y in");
+      MyFFTDebugAssertTrue(dims_out.z >= dims_in.z, "If padding, all dimensions must be >=, z out < z in");
   
       size_change_type = increase;
     }
-  
-    MyFFTRunTimeAssertFalse(dims_out.x < dims_in.x || dims_out.y < dims_in.y || dims_out.z < dims_in.z, "Trimming (subset of output points) is yet to be implemented.");
-  
-    if (dims_out.x == dims_in.x && dims_out.y == dims_in.y && dims_out.z == dims_in.z)
+    else if (dims_out.x < dims_in.x || dims_out.y < dims_in.y || dims_out.z < dims_in.z)
+    {
+      MyFFTRunTimeAssertTrue( false, "Trimming (subset of output points) is yet to be implemented.");
+      size_change_type = decrease;
+    }
+    else if (dims_out.x == dims_in.x && dims_out.y == dims_in.y && dims_out.z == dims_in.z)
     {
       size_change_type = none;
     }
+    else
+    {
+      // TODO: if this is relaxed, the dimensionality check below will be invalid.
+      MyFFTRunTimeAssertTrue( false, "Currently all dimensions must either increase, decrease or stay the same.");
+    }
 
     // check for dimensionality
+    // Note: this is predicated on the else clause ensuring all dimensions behave the same way w.r.t. size change.
     if (dims_in.z == 1 && dims_out.z == 1)
     {
       if (dims_in.y == 1 && dims_out.y == 1) 
@@ -172,6 +223,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetInputPointer(Inp
   }
   is_in_memory_host_pointer = true;
   
+  is_set_input_pointer = true;
 }
 
 
@@ -180,9 +232,9 @@ template <class ComputeType, class InputType, class OutputType>
 void FourierTransformer<ComputeType, InputType, OutputType>::CopyHostToDevice()
 {
  
+  CheckDimensions();
 	MyFFTDebugAssertTrue(is_in_memory_host_pointer, "Host memory not allocated");
-  MyFFTDebugAssertTrue(is_set_output_params, "Output parameters need to be set");
-  MyFFTDebugAssertTrue(is_set_input_params, "Input parameters need to be set");
+
   // MyFFTPrintWithDetails("Copying host to device");
   // MyFFTPrint(std::to_string(output_memory_allocated) + " bytes of host memory to device");
 	if ( ! is_in_memory_device_pointer )
@@ -197,7 +249,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CopyHostToDevice()
 
     size_t buffer_address;
     if (is_real_valued_input) buffer_address = compute_memory_allocated/2 ;
-    else buffer_address = compute_memory_allocated/4; // FIXME i don't like this.
+    else buffer_address = compute_memory_allocated/4; 
 
     if constexpr(std::is_same< decltype(d_ptr.momentum_space), __half2>::value )
     {
@@ -233,6 +285,7 @@ template <class ComputeType, class InputType, class OutputType>
 void FourierTransformer<ComputeType, InputType, OutputType>::CopyDeviceToHost( bool free_gpu_memory, bool unpin_host_memory)
 {
  
+  CheckDimensions();
 	MyFFTDebugAssertTrue(is_in_memory_device_pointer, "GPU memory not allocated");
 
   ComputeType* copy_pointer;
@@ -257,6 +310,7 @@ template <class ComputeType, class InputType, class OutputType>
 void FourierTransformer<ComputeType, InputType, OutputType>::CopyDeviceToHost(OutputType* output_pointer, bool free_gpu_memory, bool unpin_host_memory)
 {
  
+  CheckDimensions();
 	MyFFTDebugAssertTrue(is_in_memory_device_pointer, "GPU memory not allocated");
   // Assuming the output is not pinned, TODO change to optionally maintain as host_input as well.
   OutputType* tmpPinnedPtr;
@@ -295,36 +349,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CopyDeviceToHost(Ou
 
 }
 
-// template <class ComputeType, class InputType, class OutputType> 
-// void FourierTransformer<ComputeType, InputType, OutputType>::CopyDeviceToDevice(CopyInputType* input_pointer, CopyOutputType* output_pointer)
-// {
 
-// }
-
-template <class ComputeType, class InputType, class OutputType>
-void FourierTransformer<ComputeType, InputType, OutputType>::Deallocate()
-{
-
-	if (is_in_memory_device_pointer) 
-	{
-    precheck
-		cudaErr(cudaFree(d_ptr.position_space));
-    postcheck
-		is_in_memory_device_pointer = false;
-	}	
-}
-
-template <class ComputeType, class InputType, class OutputType>
-void FourierTransformer<ComputeType, InputType, OutputType>::UnPinHostMemory()
-{
-  if (is_host_memory_pinned)
-	{
-    precheck
-		cudaErr(cudaHostUnregister(host_pointer));
-    postcheck
-		is_host_memory_pinned = false;
-	} 
-}
 
 template <class ComputeType, class InputType, class OutputType>
 void FourierTransformer<ComputeType, InputType, OutputType>::FwdFFT(bool swap_real_space_quadrants, bool transpose_output)
