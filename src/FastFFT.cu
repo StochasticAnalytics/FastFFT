@@ -242,7 +242,6 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CopyHostToDevice()
 
     // Allocate enough for the out of place buffer as well.
     // MyFFTPrintWithDetails("Allocating device memory for input pointer");
-    std::cout << "Compute mem allocated , size of " << compute_memory_allocated << " " << sizeof(ComputeType) << std::endl;
     precheck
 		cudaErr(cudaMalloc(&d_ptr.position_space, compute_memory_allocated * sizeof(ComputeType)));
     postcheck
@@ -2048,7 +2047,7 @@ void thread_fft_kernel_C2R_decomposed_transposed(const ComplexType*  __restrict_
   io_thread<FFT>::load_c2r_transposed(&input_values[blockIdx.y], thread_data, Q, mem_offsets.pixel_pitch_input, mem_offsets.pixel_pitch_output/2);
 
   // We then have Q FFTs of size size_of<FFT>::value (P in the paper)
-	// FFT().execute(thread_data);
+	FFT().execute(thread_data);
 
   // Now we need to aggregate each of the Q transforms into each output block of size P
   io_thread<FFT>::remap_decomposed_segments_c2r(thread_data, shared_mem_transposed, twiddle_in, Q);

@@ -12,7 +12,7 @@
 // 1 - basic checks without blocking
 // 2 - full checks, including blocking
 
-#define HEAVYERRORCHECKING_FFT 
+// #define HEAVYERRORCHECKING_FFT 
 
 // #ifdef DEBUG
 #define MyFFTPrint(...)	{std::cerr << __VA_ARGS__  << std::endl;}
@@ -787,24 +787,22 @@ struct io_thread
                                                     int                 memory_limit)   
   {
     // Each thread reads in the input data at stride = mem_offsets.Q
-    unsigned int index  = threadIdx.x;
-    unsigned int offset = 2*memory_limit - 2;
+    unsigned int index  = threadIdx.x * size_of<FFT>::value;
+    // unsigned int offset = 2*memory_limit - 2;
     for (unsigned int i = 0; i < size_of<FFT>::value; i++) 
 
     if (index <  memory_limit)
     {
-      thread_data[i] = input[index*pixel_pitch];
+      thread_data[i] = input[(i+index)*pixel_pitch];
     }
     else
     {
       // input[2*memory_limit - index - 2];
       // assuming even dimension
       // FIXME shouldn't need to read in from global for an even stride
-      thread_data[i] = input[(offset - index)*pixel_pitch];
+      thread_data[i] = input[(2*memory_limit - (i+index))*pixel_pitch];
       thread_data[i].y = -thread_data[i].y; // conjugate
     }
-    index += stride;
-
   } // load c2r_transposed
 
   static inline __device__ void remap_decomposed_segments_c2r(const complex_type* thread_data,
@@ -820,7 +818,7 @@ struct io_thread
     {
       // printf("remap tid, index + i %i %i\n", threadIdx.x, index+i);
       SINCOS( twiddle_in * (index + i) ,&twiddle.y,&twiddle.x);
-      shared_output[index +  i] = thread_data[i].y;//(twiddle.x*thread_data[i].x - twiddle.y*thread_data[i].y); // assuming the output is real, only the real parts add, so don't bother with the complex
+      shared_output[index +  i] = (twiddle.x*thread_data[i].x - twiddle.y*thread_data[i].y); // assuming the output is real, only the real parts add, so don't bother with the complex
     }  
     __syncthreads(); // make sure all the shared mem is initialized to the starting value. There should be no contention as every thread is working on its own block of memory. 
 
@@ -834,7 +832,7 @@ struct io_thread
         // if (threadIdx.x == 32) printf("remap tid, subfft, q, index + i %i %i %i %i\n", threadIdx.x,sub_fft, Q, index+i);
 
       SINCOS( twiddle_in * (index + i) ,&twiddle.y,&twiddle.x);
-      atomicAdd_block(&shared_output[index +  i], thread_data[i].y);//twiddle.x*thread_data[i].x - twiddle.y*thread_data[i].y);
+      atomicAdd_block(&shared_output[index +  i], twiddle.x*thread_data[i].x - twiddle.y*thread_data[i].y);
       }
     }
     __syncthreads();
