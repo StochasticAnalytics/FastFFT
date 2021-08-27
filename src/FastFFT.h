@@ -248,7 +248,7 @@ private:
 
 
   enum KernelType { r2c_decomposed, r2c_decomposed_transposed, r2c_transposed, c2c_padded, c2c, c2c_decomposed, c2r_transposed,
-                    c2r_decomposed, c2r_decomposed_transposed,  xcorr_transposed}; // Used to specify the origin of the data
+                    c2r_decomposed, c2r_decomposed_transposed,  xcorr_transposed, xcorr_decomposed}; // Used to specify the origin of the data
 
   // TODO: not sure this should be inlined. (Probably ignored by the compiler anyway.)
   inline LaunchParams SetLaunchParameters(const int& ept, KernelType kernel_type, bool do_forward_transform = true)
@@ -387,7 +387,6 @@ private:
       case c2c_decomposed: 
         L.threadsPerBlock = dim3(transform_divisor, 1, 1);
         L.Q =  transform_divisor; //  (dims_in / transform size)
-
         switch (transform_dimension)
         {
           case 1: {
@@ -448,7 +447,7 @@ private:
       case c2r_decomposed_transposed:
         if (transform_dimension == 1) { std::cerr << "c2r_decomposed_transposed is not supported for 1d transforms." << std::endl; exit(-1); }
         L.twiddle_in = 2*PIf/dims_out.x;
-        L.Q = 1; // Already full size - FIXME when working out limited number of output pixels  
+        L.Q = transform_divisor; //  (dims_in / transform size)
         L.threadsPerBlock = dim3(transform_divisor, 1, 1); 
         L.gridDims = dim3(1, dims_out.y, 1);
         L.mem_offsets.shared_input = 0;
@@ -473,6 +472,21 @@ private:
         L.Q = dims_out.y / dims_in.y; // FIXME assuming for now this is already divisible
 
         break;
+
+      case xcorr_decomposed:
+        if (transform_dimension == 1 || transform_dimension == 3) { std::cerr << "xcorr_decomposed is not supported for 1d/3d yet." << std::endl; exit(-1); } // FIXME
+
+        L.threadsPerBlock = dim3(transform_divisor, 1, 1);
+        L.Q =  transform_divisor; //  (dims_in / transform size)
+
+        L.gridDims = dim3(1, dims_out.w, 1); 
+        L.mem_offsets.shared_input = 0;
+        L.mem_offsets.shared_output = dims_out.y; 
+        L.mem_offsets.pixel_pitch_input = dims_out.y; // scalar type, natural 
+        L.mem_offsets.pixel_pitch_output = dims_out.y; // complex type
+        L.twiddle_in = -2*PIf/dims_out.y; // this is negated on the inverse xform in the kernel
+        break;
+       
       default:
         std::cerr << "ERROR: Unrecognized fft_status" << std::endl;
         exit(-1);
@@ -518,6 +532,8 @@ private:
 
 
   void FFT_C2C_WithPadding_ConjMul_C2C(float2* image_to_search, bool swap_real_space_quadrants = false);
+  void FFT_C2C_decomposed_ConjMul_C2C(float2* image_to_search, bool swap_real_space_quadrants = false);
+
 
   template<class FFT> void FFT_R2C_decomposed_t(bool transpose_output);
   template<class FFT> void FFT_R2C_t(bool transpose_output);
@@ -530,6 +546,7 @@ private:
 
 
   template<class FFT, class invFFT> void FFT_C2C_WithPadding_ConjMul_C2C_t(float2* image_to_search, bool swap_real_space_quadrants);
+  template<class FFT, class invFFT> void FFT_C2C_decomposed_ConjMul_C2C_t(float2* image_to_search, bool swap_real_space_quadrants);
 
 
 

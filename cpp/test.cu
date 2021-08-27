@@ -72,7 +72,10 @@ void const_image_test(short4 input_size, short4 output_size)
     if (host_output.complex_values[index].x != 0.0f && host_output.complex_values[index].y != 0.0f) { std::cout << host_output.complex_values[index].x  << " " << host_output.complex_values[index].y << " " << std::endl; test_passed = false;}
   }
   if (host_output.complex_values[0].x != (float)output_size.x * (float)output_size.y * (float)output_size.z) test_passed = false;
-  std::cout << "FFTW unit " << host_output.complex_values[0].x << " " << host_output.complex_values[0].y << std::endl;
+  for (int i = 0; i < 10; i++)
+  {
+    std::cout << "FFTW unit " << host_output.complex_values[i].x << " " << host_output.complex_values[i].y << std::endl;
+  }
 
   MyFFTDebugAssertTestTrue( test_passed, "FFTW unit impulse forward FFT");
   
@@ -91,7 +94,22 @@ void const_image_test(short4 input_size, short4 output_size)
     if (host_output.complex_values[index].x != 0.0f && host_output.complex_values[index].y != 0.0f) {test_passed = false;} // std::cout << host_output.complex_values[index].x  << " " << host_output.complex_values[index].y << " " << std::endl;}
   }
   if (host_output.complex_values[0].x != (float)output_size.x * (float)output_size.y * (float)output_size.z) test_passed = false;
-  std::cout << "fastFFT unit " << host_output.complex_values[0].x << " " << host_output.complex_values[0].y << std::endl;
+  // int n=0;
+  // for (int x = 0; x <  host_output.size.y ; x++)
+  // {
+    
+  //   std::cout << x << "[ ";
+  //   for (int y = 0; y < host_output.size.w; y++)
+  //   {  
+  //     std::cout << host_output.complex_values[x + y*host_output.size.y].x << "," << host_output.complex_values[x + y*host_output.size.y].y << " ";
+  //     n++;
+  //     if (n == 34) {n = 0; std::cout << std::endl ;} // line wrapping
+  //   }
+  //   std::cout << "] " << std::endl;
+  //   n = 0;
+  // }
+
+
   MyFFTDebugAssertTestTrue( test_passed, "FastFFT unit impulse forward FFT");
   FT.SetToConstant<float>(host_input.real_values, host_input.real_memory_allocated, 2.0f);
   
@@ -101,6 +119,37 @@ void const_image_test(short4 input_size, short4 output_size)
   
   // Assuming the outputs are always even dimensions, padding_jump_val is always 2.
   sum = ReturnSumOfReal(host_output.real_values, output_size);
+
+  // COMPLEX TODO make these functions.
+  //   int n=0;
+  //   for (int x = 0; x <  host_output.size.y ; x++)
+  // {
+    
+  //   std::cout << x << "[ ";
+  //   for (int y = 0; y < host_output.size.w; y++)
+  //   {  
+  //     std::cout << host_output.complex_values[x + y*host_output.size.y].x << "," << host_output.complex_values[x + y*host_output.size.y].y << " ";
+  //     n++;
+  //     if (n == 34) {n = 0; std::cout << std::endl ;} // line wrapping
+  //   }
+  //   std::cout << "] " << std::endl;
+  //   n = 0;
+  // }
+    // REAL
+  //  int n=0;
+  // for (int x = 0; x <  host_output.size.x ; x++)
+  // {
+    
+  //   std::cout << x << "[ ";
+  //   for (int y = 0; y < host_output.size.y; y++)
+  //   {  
+  //     std::cout << host_output.real_values[x + y*host_output.size.w*2] <<  " ";
+  //     n++;
+  //     if (n == 32) {n = 0; std::cout << std::endl ;} // line wrapping
+  //   }
+  //   std::cout << "] " << std::endl;
+  //   n = 0;
+  // } 
   
   MyFFTDebugAssertTestTrue( sum == powf(input_size.x*input_size.y*input_size.z,2),"FastFFT unit impulse round trip FFT");
   
@@ -247,9 +296,14 @@ void unit_impulse_test(short4 input_size, short4 output_size)
 void compare_libraries(short4 input_size, short4 output_size)
 {
 
-  bool set_padding_callback = true;
+  bool set_padding_callback = false; // the padding callback is slower than pasting in b/c the read size of the pointers is larger than the actual data. do not use.
   bool set_conjMult_callback = true;
-  if (input_size.x == output_size.x && input_size.y == output_size.y && input_size.z == output_size.z) set_padding_callback = false;
+  if (input_size.x == output_size.x && input_size.y == output_size.y && input_size.z == output_size.z) 
+  {
+    // Also will change the path called in FastFFT to just be fwd/inv xform.
+    set_conjMult_callback = false;
+  }
+
   bool test_passed = true;
   long address = 0;
 
@@ -342,33 +396,33 @@ void compare_libraries(short4 input_size, short4 output_size)
   positive_control.InvFFT();
 
 
-  address = 0;
-  test_passed = true;
-  for (int z = 1; z <  positive_control.size.z ; z++)
-  {   
-    for (int y = 1; y < positive_control.size.y; y++)
-    {  
-      for (int x = 1; x < positive_control.size.x; x++)
-      {
-        if (positive_control.real_values[address] != 0.0f) test_passed = false;
-      }
-    }
-  }
-  if (test_passed) 
-  {
-    if (positive_control.real_values[address] == positive_control.size.x*positive_control.size.y*positive_control.size.z*testVal_1*testVal_2)
-    {
-      std::cout << "Test passed for FFTW positive control.\n" << std::endl;
-    }
-    else
-    {
-      std::cout << "Test failed for FFTW positive control. Value at zero is  " << positive_control.real_values[address] << std::endl;
-    }
-  }
-  else
-  {
-    std::cout << "Test failed for positive control, non-zero values found away from the origin." << std::endl;
-  }
+  // address = 0;
+  // test_passed = true;
+  // for (int z = 1; z <  positive_control.size.z ; z++)
+  // {   
+  //   for (int y = 1; y < positive_control.size.y; y++)
+  //   {  
+  //     for (int x = 1; x < positive_control.size.x; x++)
+  //     {
+  //       if (positive_control.real_values[address] != 0.0f) test_passed = false;
+  //     }
+  //   }
+  // }
+  // if (test_passed) 
+  // {
+  //   if (positive_control.real_values[address] == positive_control.size.x*positive_control.size.y*positive_control.size.z*testVal_1*testVal_2)
+  //   {
+  //     std::cout << "Test passed for FFTW positive control.\n" << std::endl;
+  //   }
+  //   else
+  //   {
+  //     std::cout << "Test failed for FFTW positive control. Value at zero is  " << positive_control.real_values[address] << std::endl;
+  //   }
+  // }
+  // else
+  // {
+  //   std::cout << "Test failed for positive control, non-zero values found away from the origin." << std::endl;
+  // }
 
 
   cuFFT_output.create_timing_events(); 
@@ -378,36 +432,44 @@ void compare_libraries(short4 input_size, short4 output_size)
   //////////////////////////////////////////
   //////////////////////////////////////////
   // Warm up and check for accuracy
-  FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
-  FT.CopyDeviceToHost(FT_output.real_values,false, false);
-
-  address = 0;
-  test_passed = true;
-  for (int z = 1; z <  FT_output.size.z ; z++)
-  {   
-    for (int y = 1; y < FT_output.size.y; y++)
-    {  
-      for (int x = 1; x < FT_output.size.x; x++)
-      {
-        if (FT_output.real_values[address] != 0.0f) test_passed = false;
-      }
-    }
-  }
-  if (test_passed) 
+  if (set_conjMult_callback)
   {
-    if (FT_output.real_values[address] == FT_output.size.x*FT_output.size.y*FT_output.size.z*testVal_1*testVal_2)
-    {
-      std::cout << "Test passed for FastFFT positive control.\n" << std::endl;
-    }
-    else
-    {
-      std::cout << "Test failed for FastFFT positive control. Value at zero is  " << FT_output.real_values[address] << std::endl;
-    }
+    FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
   }
   else
   {
-    std::cout << "Test failed for FastFFT control, non-zero values found away from the origin." << std::endl;
+    FT.FwdFFT();
+    FT.InvFFT();
   }
+  FT.CopyDeviceToHost(FT_output.real_values,false, false);
+
+  // address = 0;
+  // test_passed = true;
+  // for (int z = 1; z <  FT_output.size.z ; z++)
+  // {   
+  //   for (int y = 1; y < FT_output.size.y; y++)
+  //   {  
+  //     for (int x = 1; x < FT_output.size.x; x++)
+  //     {
+  //       if (FT_output.real_values[address] != 0.0f) test_passed = false;
+  //     }
+  //   }
+  // }
+  // if (test_passed) 
+  // {
+  //   if (FT_output.real_values[address] == FT_output.size.x*FT_output.size.y*FT_output.size.z*testVal_1*testVal_2)
+  //   {
+  //     std::cout << "Test passed for FastFFT positive control.\n" << std::endl;
+  //   }
+  //   else
+  //   {
+  //     std::cout << "Test failed for FastFFT positive control. Value at zero is  " << FT_output.real_values[address] << std::endl;
+  //   }
+  // }
+  // else
+  // {
+  //   std::cout << "Test failed for FastFFT control, non-zero values found away from the origin." << std::endl;
+  // }
 
   //////////////////////////////////////////
   // //////////////////////////////////////////
@@ -431,15 +493,21 @@ void compare_libraries(short4 input_size, short4 output_size)
   cuFFT_output.record_start();
   for (int i = 0; i < n_loops; ++i)
   {
-    // FT.FwdFFT();
-    // FT.InvFFT();
-    FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
+    if (set_conjMult_callback)
+    {
+      FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
+    }
+    else
+    {
+      FT.FwdFFT();
+      FT.InvFFT();
+    }
   }
   cuFFT_output.record_stop();
   cuFFT_output.synchronize();
   cuFFT_output.print_time("FastFFT");
+  float FastFFT_time = cuFFT_output.elapsed_gpu_ms;
 
-  set_padding_callback = false;
   if (set_padding_callback) 
   {
     precheck
@@ -474,33 +542,33 @@ void compare_libraries(short4 input_size, short4 output_size)
   postcheck  
   cuFFT.CopyDeviceToHost(cuFFT_output.real_values,false, false);
 
-  address = 0;
-  test_passed = true;
-  for (int z = 1; z <  cuFFT_output.size.z ; z++)
-  {   
-    for (int y = 1; y < cuFFT_output.size.y; y++)
-    {  
-      for (int x = 1; x < cuFFT_output.size.x; x++)
-      {
-        if (cuFFT_output.real_values[address] != 0.0f) test_passed = false;
-      }
-    }
-  }
-  if (test_passed) 
-  {
-    if (cuFFT_output.real_values[address] == cuFFT_output.size.x*cuFFT_output.size.y*cuFFT_output.size.z*testVal_1*testVal_2)
-    {
-      std::cout << "Test passed for cuFFT positive control.\n" << std::endl;
-    }
-    else
-    {
-      std::cout << "Test failed for cuFFT positive control. Value at zero is  " << cuFFT_output.real_values[address] << std::endl;
-    }
-  }
-  else
-  {
-    std::cout << "Test failed for cuFFT control, non-zero values found away from the origin." << std::endl;
-  }
+  // address = 0;
+  // test_passed = true;
+  // for (int z = 1; z <  cuFFT_output.size.z ; z++)
+  // {   
+  //   for (int y = 1; y < cuFFT_output.size.y; y++)
+  //   {  
+  //     for (int x = 1; x < cuFFT_output.size.x; x++)
+  //     {
+  //       if (cuFFT_output.real_values[address] != 0.0f) test_passed = false;
+  //     }
+  //   }
+  // }
+  // if (test_passed) 
+  // {
+  //   if (cuFFT_output.real_values[address] == cuFFT_output.size.x*cuFFT_output.size.y*cuFFT_output.size.z*testVal_1*testVal_2)
+  //   {
+  //     std::cout << "Test passed for cuFFT positive control.\n" << std::endl;
+  //   }
+  //   else
+  //   {
+  //     std::cout << "Test failed for cuFFT positive control. Value at zero is  " << cuFFT_output.real_values[address] << std::endl;
+  //   }
+  // }
+  // else
+  // {
+  //   std::cout << "Test failed for cuFFT control, non-zero values found away from the origin." << std::endl;
+  // }
   //////////////////////////////////////////
   //////////////////////////////////////////
   // n = 0;
@@ -521,7 +589,7 @@ void compare_libraries(short4 input_size, short4 output_size)
   cuFFT_output.record_start();
   for (int i = 0; i < n_loops; ++i)
   {
-    cuFFT.ClipIntoTopLeft();
+    if (set_conjMult_callback) cuFFT.ClipIntoTopLeft();
     // cuFFT.ClipIntoReal(input_size.x/2, input_size.y/2, input_size.z/2);
 
     precheck
@@ -535,6 +603,8 @@ void compare_libraries(short4 input_size, short4 output_size)
   cuFFT_output.record_stop();
   cuFFT_output.synchronize();
   cuFFT_output.print_time("cuFFT");
+
+  std::cout << "Ratio cuFFT/FastFFT : " << cuFFT_output.elapsed_gpu_ms/FastFFT_time << std::endl;
 
 }
 
@@ -660,22 +730,22 @@ int main(int argc, char** argv) {
   std::printf("Standard is %i\n\n",__cplusplus);
 
 
-  bool run_validation_tests = true;
-  bool run_performance_tests = false;
+  bool run_validation_tests = false;
+  bool run_performance_tests = true;
   // Input and output dimensions, with simple checks. I'm sure there are better checks on argv.
   short4 input_size;
   short4 output_size;
 
   constexpr const int n_tests = 6;
-  const int test_size[n_tests] = {384, 1536, 4480, 512, 1024, 4096};
+  const int test_size[n_tests] = {64, 128, 320, 640, 1536, 4096};
 
   std::vector<int> test_sizes =  {32};//,64,128,256,320,480,512,544,608,768,1024,1056,1536,2048,2560,3072,3584,4096,5120,6144};
 
   if (run_validation_tests)  {
 
     // change onde these to just report the pass/fail.
-    run_oned(test_sizes);
-    exit(0);
+    // run_oned(test_sizes);
+    // exit(0);
 
     for (int iSize = 0; iSize < n_tests; iSize++) {
 
@@ -684,6 +754,7 @@ int main(int argc, char** argv) {
       output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
 
       const_image_test(input_size, output_size);
+      exit(0);
 
     }
 
@@ -721,7 +792,7 @@ int main(int argc, char** argv) {
       compare_libraries(input_size, output_size);
 
     }
-
+    exit(12); 
     for (int iSize = 0; iSize < n_tests - 1; iSize++) {
       int oSize = iSize + 1;
       while (oSize < n_tests)

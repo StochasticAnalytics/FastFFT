@@ -242,7 +242,6 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CopyHostToDevice()
 
     // Allocate enough for the out of place buffer as well.
     // MyFFTPrintWithDetails("Allocating device memory for input pointer");
-    std::cout << "Compute mem allocated , size of " << compute_memory_allocated << " " << sizeof(ComputeType) << std::endl;
     precheck
 		cudaErr(cudaMalloc(&d_ptr.position_space, compute_memory_allocated * sizeof(ComputeType)));
     postcheck
@@ -370,7 +369,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::FwdFFT(bool swap_re
         case none: {
           // FFT_R2C(transpose_output);
           // FFT_C2C(true);
-          FFT_R2C_decomposed(transpose_output);
+          FFT_R2C_decomposed(true);
           FFT_C2C_decomposed(true);
           break;
         }
@@ -415,7 +414,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::InvFFT(bool transpo
           // FFT_C2C(false);
           // FFT_C2R_Transposed();
           FFT_C2C_decomposed(false);
-          FFT_C2R_decomposed(false);
+          FFT_C2R_decomposed(true);
           break;
         }
         case increase: {
@@ -456,7 +455,9 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CrossCorrelate(floa
       switch (size_change_type)
       {
         case none: {
-          // not defined
+          FFT_R2C_decomposed(true);
+          FFT_C2C_decomposed_ConjMul_C2C(image_to_search, false);
+          FFT_C2R_decomposed(true);
         }
         case increase: {
     
@@ -947,9 +948,7 @@ void block_fft_kernel_R2C_WithPadding(const ScalarType* __restrict__  input_valu
   // To re-map the thread index to the data ... these really could be short ints, but I don't know how that will perform. TODO benchmark
   // It is also questionable whether storing these vs, recalculating makes more sense.
   int input_MAP[FFT::storage_size];
-  // To re-map the decomposed frequency to the full output frequency
   int output_MAP[FFT::storage_size];
-  // For a given decomposed fragment
   float twiddle_factor_args[FFT::storage_size];
 
   // No need to __syncthreads as each thread only accesses its own shared mem anyway
@@ -996,6 +995,112 @@ void block_fft_kernel_R2C_WithPadding(const ScalarType* __restrict__  input_valu
 
 
 } // end of block_fft_kernel_R2C_WithPadding
+
+template <class ComputeType, class InputType, class OutputType>
+template<class FFT, class invFFT> 
+void FourierTransformer<ComputeType, InputType, OutputType>::FFT_C2C_decomposed_ConjMul_C2C_t(float2* image_to_search, bool swap_real_space_quadrants)
+{
+
+    // Note unlike block transforms, we get the transform size here, it must be before LaunchParams. TODO add logical checks
+  // Temporary fix to check for 1d, this is not to be sustained. FIXME
+  if (dims_in.y == 1) GetTransformSize_thread(dims_in.x, size_of<FFT>::value); // FIXME should probably throw an error for now.
+  else GetTransformSize_thread(dims_in.y, size_of<FFT>::value); // does dims_in make sense?
+  
+
+  LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, xcorr_decomposed);
+
+  using complex_type = typename invFFT::value_type;
+  using scalar_type  = typename complex_type::value_type;
+
+  complex_type* input_pointer;
+  complex_type* output_pointer;
+
+  if (is_in_buffer_memory)
+  {
+    input_pointer  = (complex_type*)d_ptr.momentum_space_buffer;
+    output_pointer = (complex_type*)d_ptr.momentum_space;
+    is_in_buffer_memory = false;
+  }
+  else
+  {
+    input_pointer  = (complex_type*)d_ptr.momentum_space;
+    output_pointer = (complex_type*)d_ptr.momentum_space_buffer;
+    is_in_buffer_memory = true;
+  }
+
+  int shared_mem = LP.mem_offsets.shared_output * sizeof(complex_type);
+
+
+  if (swap_real_space_quadrants)
+  {
+    MyFFTRunTimeAssertTrue(false, "decomposed xcorr with swap real space quadrants is not implemented.");
+    // precheck
+    // block_fft_kernel_C2C_WithPadding_ConjMul_C2C_SwapRealSpaceQuadrants<FFT,invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
+    // ( (complex_type*) image_to_search, (complex_type*)  d_ptr.momentum_space_buffer,  (complex_type*) d_ptr.momentum_space, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace_fwd, workspace_inv);
+    // postcheck
+  }
+  else
+  {
+    precheck
+    thread_fft_kernel_C2C_decomposed_ConjMul<FFT, invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
+    (  (complex_type*) image_to_search, input_pointer,  output_pointer, LP.mem_offsets, LP.twiddle_in,LP.Q);
+    postcheck
+  }
+
+  is_in_buffer_memory = false;
+
+}
+
+template <class ComputeType, class InputType, class OutputType>
+void FourierTransformer<ComputeType, InputType, OutputType>::FFT_C2C_decomposed_ConjMul_C2C(float2* image_to_search, bool swap_real_space_quadrants)
+{
+
+	// This is the first set of 1d ffts when the input data are real valued, accessing the strided dimension. Since we need the full length, it will actually run a C2C xform
+
+  int device, arch;
+  GetCudaDeviceArch( device, arch );
+
+  switch (arch)
+  {
+    case 700: { using FFT = decltype(FFT_thread_base() + Type<fft_type::c2c>() + SM<700>() + Direction<fft_direction::forward>());  using invFFT = decltype(FFT_thread_base() + Type<fft_type::c2c>() + SM<700>() + Direction<fft_direction::inverse>()); FFT_C2C_decomposed_ConjMul_C2C_t<FFT, invFFT>(image_to_search,swap_real_space_quadrants); break;}
+    case 750: { using FFT = decltype(FFT_thread_base() + Type<fft_type::c2c>() + SM<750>() + Direction<fft_direction::forward>());  using invFFT = decltype(FFT_thread_base() + Type<fft_type::c2c>() + SM<750>() + Direction<fft_direction::inverse>()); FFT_C2C_decomposed_ConjMul_C2C_t<FFT, invFFT>(image_to_search,swap_real_space_quadrants); break;}
+    case 800: { using FFT = decltype(FFT_thread_base() + Type<fft_type::c2c>() + SM<800>() + Direction<fft_direction::forward>());  using invFFT = decltype(FFT_thread_base() + Type<fft_type::c2c>() + SM<800>() + Direction<fft_direction::inverse>()); FFT_C2C_decomposed_ConjMul_C2C_t<FFT, invFFT>(image_to_search,swap_real_space_quadrants); break;}
+  }
+
+}
+
+template<class FFT, class invFFT, class ComplexType>
+__global__
+void thread_fft_kernel_C2C_decomposed_ConjMul(const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q)
+{
+
+
+  using complex_type = ComplexType;
+  // The data store is non-coalesced, so don't aggregate the data in shared mem.
+	extern __shared__  complex_type shared_mem[];
+
+	// Memory used by FFT - for Thread() type, FFT::storage_size == FFT::elements_per_thread == size_of<FFT>::value
+  complex_type thread_data[FFT::storage_size];
+ 
+  io_thread<FFT>::load_c2c(&input_values[blockIdx.y*mem_offsets.pixel_pitch_input], thread_data, Q);
+
+  // We then have Q FFTs of size size_of<FFT>::value (P in the paper)
+	FFT().execute(thread_data);
+
+  // Now we need to aggregate each of the Q transforms into each output block of size P
+  io_thread<FFT>::remap_decomposed_segments(thread_data, shared_mem, twiddle_in, Q, mem_offsets.pixel_pitch_output);
+
+  // 
+  io_thread<invFFT>::load_shared_and_conj_multiply(&image_to_search[blockIdx.y*mem_offsets.pixel_pitch_input], shared_mem, thread_data, Q);
+
+	invFFT().execute(thread_data);
+
+  // Now we need to aggregate each of the Q transforms into each output block of size P
+  io_thread<invFFT>::remap_decomposed_segments(thread_data, shared_mem, -twiddle_in, Q, mem_offsets.pixel_pitch_output);
+
+  io_thread<invFFT>::store_c2c(shared_mem, &output_values[blockIdx.y*mem_offsets.pixel_pitch_output], Q);
+
+}
 
 template <class ComputeType, class InputType, class OutputType>
 template<class FFT, class invFFT> 
@@ -1689,7 +1794,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::FFT_C2C_decomposed_
   // Note unlike block transforms, we get the transform size here, it must be before LaunchParams. TODO add logical checks
   // Temporary fix to check for 1d, this is not to be sustained. FIXME
   if (dims_in.y == 1) GetTransformSize_thread(dims_in.x, size_of<FFT_nodir>::value);
-  else GetTransformSize_thread(dims_in.y, size_of<FFT_nodir>::value);
+  else GetTransformSize_thread(dims_in.y, size_of<FFT_nodir>::value); // does dims_in make sense?
   
 
   LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_decomposed, do_forward_transform);

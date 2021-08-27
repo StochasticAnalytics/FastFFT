@@ -12,7 +12,7 @@
 // 1 - basic checks without blocking
 // 2 - full checks, including blocking
 
-#define HEAVYERRORCHECKING_FFT 
+//#define HEAVYERRORCHECKING_FFT 
 
 // #ifdef DEBUG
 #define MyFFTPrint(...)	{std::cerr << __VA_ARGS__  << std::endl;}
@@ -91,7 +91,7 @@ constexpr const int elements_per_thread_complex = 8;
 
 // All transforms are 
 using FFT_base   = decltype(Block() + Precision<float>() + ElementsPerThread<elements_per_thread_complex>()  + FFTsPerBlock<1>()  );
-using FFT_thread_base = decltype(Thread() + Size<32>() + Precision<float>());
+using FFT_thread_base = decltype(Thread() + Size<4>() + Precision<float>());
 
 //////////////////////////////
 // Kernel definitions
@@ -143,6 +143,10 @@ void block_fft_kernel_C2C_WithPadding_ConjMul_C2C_SwapRealSpaceQuadrants( const 
 template<class FFT, class ComplexType = typename FFT::value_type>
 __global__
 void thread_fft_kernel_C2C_decomposed(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q);
+
+template<class FFT, class invFFT, class ComplexType = typename FFT::value_type>
+__global__
+void thread_fft_kernel_C2C_decomposed_ConjMul(const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q);
 
 template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
@@ -646,12 +650,12 @@ struct io_thread
     unsigned int index  = threadIdx.x;
     for (unsigned int i = 0; i < size_of<FFT>::value/2; i++) 
     {
-      output[index*pixel_pitch + blockIdx.y] = shared_output[index];
+      output[index*pixel_pitch] = shared_output[index];
       index += stride;
     }
     if (index < memory_limit)
     {
-      output[index*pixel_pitch + blockIdx.y] = shared_output[index];
+      output[index*pixel_pitch] = shared_output[index];
     }
   } // store_r2c_transposed
 
@@ -788,23 +792,23 @@ struct io_thread
   {
     // Each thread reads in the input data at stride = mem_offsets.Q
     unsigned int index  = threadIdx.x;
-    unsigned int offset = 2*memory_limit - 2;
+    // unsigned int offset = 2*memory_limit - 2;
     for (unsigned int i = 0; i < size_of<FFT>::value; i++) 
-
-    if (index <  memory_limit)
     {
-      thread_data[i] = input[index*pixel_pitch + blockIdx.y];
+      if (index <  memory_limit)
+      {
+        thread_data[i] = input[index*pixel_pitch];
+      }
+      else
+      {
+        // input[2*memory_limit - index - 2];
+        // assuming even dimension
+        // FIXME shouldn't need to read in from global for an even stride
+        thread_data[i] = input[(2*memory_limit - index)*pixel_pitch];
+        thread_data[i].y = -thread_data[i].y; // conjugate
+      }
+      index += stride;
     }
-    else
-    {
-      input[2*memory_limit - index - 2];
-      // assuming even dimension
-      // FIXME shouldn't need to read in from global for an even stride
-      thread_data[i] = input[(offset - index)*pixel_pitch + blockIdx.y];
-      thread_data[i].y = -thread_data[i].y; // conjugate
-    }
-    index += stride;
-
   } // load c2r_transposed
 
   static inline __device__ void remap_decomposed_segments_c2r(const complex_type* thread_data,
@@ -852,6 +856,27 @@ struct io_thread
       index += stride;
     }
   } // store_c2c
+
+
+  static inline __device__ void load_shared_and_conj_multiply(const complex_type*  image_to_search,
+                                                              const complex_type*  shared_mem,
+                                                              complex_type*        thread_data,
+                                                              const int            stride)
+  {
+    unsigned int       index  = threadIdx.x;
+    complex_type c;
+    for (unsigned int i = 0; i < FFT::elements_per_thread; i++)
+    {
+      c.x =  (shared_mem[index].x * image_to_search[index].x + shared_mem[index].y * image_to_search[index].y);
+      c.y =  (shared_mem[index].y * image_to_search[index].x - shared_mem[index].x * image_to_search[index].y) ;
+      // a * conj b
+      thread_data[i] = c;//ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
+      index += stride;
+    }
+    __syncthreads();
+  } // load_shared_and_conj_multiply
+
+
 
 }; // struct thread_io
 
