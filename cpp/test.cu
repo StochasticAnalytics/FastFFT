@@ -296,9 +296,14 @@ void unit_impulse_test(short4 input_size, short4 output_size)
 void compare_libraries(short4 input_size, short4 output_size)
 {
 
-  bool set_padding_callback = true;
+  bool set_padding_callback = false; // the padding callback is slower than pasting in b/c the read size of the pointers is larger than the actual data. do not use.
   bool set_conjMult_callback = true;
-  if (input_size.x == output_size.x && input_size.y == output_size.y && input_size.z == output_size.z) set_padding_callback = false;
+  if (input_size.x == output_size.x && input_size.y == output_size.y && input_size.z == output_size.z) 
+  {
+    // Also will change the path called in FastFFT to just be fwd/inv xform.
+    set_conjMult_callback = false;
+  }
+
   bool test_passed = true;
   long address = 0;
 
@@ -427,7 +432,15 @@ void compare_libraries(short4 input_size, short4 output_size)
   //////////////////////////////////////////
   //////////////////////////////////////////
   // Warm up and check for accuracy
-  FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
+  if (set_conjMult_callback)
+  {
+    FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
+  }
+  else
+  {
+    FT.FwdFFT();
+    FT.InvFFT();
+  }
   FT.CopyDeviceToHost(FT_output.real_values,false, false);
 
   // address = 0;
@@ -480,16 +493,21 @@ void compare_libraries(short4 input_size, short4 output_size)
   cuFFT_output.record_start();
   for (int i = 0; i < n_loops; ++i)
   {
-    // FT.FwdFFT();
-    // FT.InvFFT();
-    FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
+    if (set_conjMult_callback)
+    {
+      FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
+    }
+    else
+    {
+      FT.FwdFFT();
+      FT.InvFFT();
+    }
   }
   cuFFT_output.record_stop();
   cuFFT_output.synchronize();
   cuFFT_output.print_time("FastFFT");
   float FastFFT_time = cuFFT_output.elapsed_gpu_ms;
 
-  set_padding_callback = false;
   if (set_padding_callback) 
   {
     precheck
@@ -571,7 +589,7 @@ void compare_libraries(short4 input_size, short4 output_size)
   cuFFT_output.record_start();
   for (int i = 0; i < n_loops; ++i)
   {
-    cuFFT.ClipIntoTopLeft();
+    if (set_conjMult_callback) cuFFT.ClipIntoTopLeft();
     // cuFFT.ClipIntoReal(input_size.x/2, input_size.y/2, input_size.z/2);
 
     precheck
@@ -719,7 +737,7 @@ int main(int argc, char** argv) {
   short4 output_size;
 
   constexpr const int n_tests = 6;
-  const int test_size[n_tests] = {64, 128, 256, 512, 1024, 4096};
+  const int test_size[n_tests] = {64, 128, 320, 640, 1536, 4096};
 
   std::vector<int> test_sizes =  {32};//,64,128,256,320,480,512,544,608,768,1024,1056,1536,2048,2560,3072,3584,4096,5120,6144};
 
@@ -759,11 +777,11 @@ int main(int argc, char** argv) {
 
   if (run_performance_tests) {
 
-    // #ifdef HEAVYERRORCHECKING_FFT
-    //   std::cout << "Running performance tests with heavy error checking.\n";
-    //   std::cout << "This doesn't make sense as the synchronizations are invalidating.\n";
-    //   exit(1);
-    // #endif
+    #ifdef HEAVYERRORCHECKING_FFT
+      std::cout << "Running performance tests with heavy error checking.\n";
+      std::cout << "This doesn't make sense as the synchronizations are invalidating.\n";
+      exit(1);
+    #endif
 
     for (int iSize = 0; iSize < n_tests; iSize++) {
 
