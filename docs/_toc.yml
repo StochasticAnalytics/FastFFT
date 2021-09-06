@@ -1,0 +1,13 @@
+format: jb-book
+root: intro
+parts:
+- caption: Manuscript
+  chapters:
+  - file: _docs/MS/intro
+    sections:
+    - file: _docs/MS/testfile
+- caption: Appendix
+  chapters:
+  - file: _appendix
+    sections:
+    - file: _docs/MS/dummy
