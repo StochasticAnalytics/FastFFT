@@ -1,0 +1,942 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tutorials &#8212; dev and user guides</title>
+    
+  <link href="../../../_static/css/theme.css" rel="stylesheet" />
+  <link href="../../../_static/css/index.c5995385ac14fb8791e8eb36b4908be2.css" rel="stylesheet" />
+
+    
+  <link rel="stylesheet"
+    href="../../../_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../../../_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../../../_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    
+      
+
+    
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/sphinx-book-theme.e8e5499552300ddf5d7adccae7cc3b70.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/togglebutton.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/mystnb.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sphinx-thebe.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/panels-main.c949a650a448cc0ae9fd3441c0e17fb0.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/panels-variables.06eb56fa6e07937060861dad626602ad.css" />
+    
+  <link rel="preload" as="script" href="../../../_static/js/index.1c5a1a01449ed65a7b51.js">
+
+    <script id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/togglebutton.js"></script>
+    <script src="../../../_static/clipboard.min.js"></script>
+    <script src="../../../_static/copybutton.js"></script>
+    <script >var togglebuttonSelector = '.toggle, .admonition.dropdown, .tag_hide_input div.cell_input, .tag_hide-input div.cell_input, .tag_hide_output div.cell_output, .tag_hide-output div.cell_output, .tag_hide_cell.cell, .tag_hide-cell.cell';</script>
+    <script src="../../../_static/sphinx-book-theme.12a9622fbb08dcb3a2a40b2c02b83a57.js"></script>
+    <script async="async" src="https://unpkg.com/thebelab@latest/lib/index.js"></script>
+    <script >
+        const thebe_selector = ".thebe"
+        const thebe_selector_input = "pre"
+        const thebe_selector_output = ".output"
+    </script>
+    <script async="async" src="../../../_static/sphinx-thebe.js"></script>
+    <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["\\(", "\\)"]], "displayMath": [["\\[", "\\]"]], "processRefs": false, "processEnvironments": false}})</script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Reference" href="../reference/reference.html" />
+    <link rel="prev" title="Intro" href="../intro.html" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="en" />
+    
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
+    
+    <div class="container-fluid" id="banner"></div>
+
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+<div class="col-12 col-md-3 bd-sidebar site-navigation show" id="site-navigation">
+    
+        <div class="navbar-brand-box">
+    <a class="navbar-brand text-wrap" href="../../../index.html">
+      
+      <img src="../../../_static/cisTEM_logo_dev.png" class="logo" alt="logo">
+      
+      
+      <h1 class="site-logo" id="site-title">dev and user guides</h1>
+      
+    </a>
+</div><form class="bd-search d-flex align-items-center" action="../../../search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search this book..." aria-label="Search this book..." autocomplete="off" >
+</form><nav class="bd-links" id="bd-docs-nav" aria-label="Main navigation">
+    <div class="bd-toc-item active">
+        <ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../../intro.html">
+   Welcome to your source for info about cisTEM
+  </a>
+ </li>
+</ul>
+<p class="caption">
+ <span class="caption-text">
+  Simulation
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../sim/intro.html">
+   <span style="color: darkred">
+    <strong>
+     Intro
+    </strong>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../sim/tutorials/tutorials.html">
+   <span style="color: darkred">
+    <em>
+     <strong>
+      Tutorials
+     </strong>
+    </em>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../sim/reference/reference.html">
+   <span style="color: darkred">
+    <strong>
+     Reference
+    </strong>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../sim/discussions/discussions.html">
+   <span style="color: darkred">
+    <strong>
+     Discussions
+    </strong>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1 has-children">
+  <a class="reference internal" href="../../sim/howto/howto.html">
+   <span style="color: darkred">
+    <strong>
+     How-to guides
+    </strong>
+   </span>
+  </a>
+  <input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/>
+  <label for="toctree-checkbox-1">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul class="simple">
+  </ul>
+ </li>
+</ul>
+<p class="caption">
+ <span class="caption-text">
+  in situ particle detection
+ </span>
+</p>
+<ul class="current nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../intro.html">
+   <span style="color: #e87502">
+    <strong>
+     Intro
+    </strong>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1 current active">
+  <a class="current reference internal" href="#">
+   <span style="color: #e87502">
+    <em>
+     <strong>
+      Tutorials
+     </strong>
+    </em>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../reference/reference.html">
+   <span style="color: #e87502">
+    <strong>
+     Reference
+    </strong>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../discussions/discussions.html">
+   <span style="color: #e87502">
+    <strong>
+     Discussions
+    </strong>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../howto/howto.html">
+   <span style="color: #e87502">
+    <strong>
+     How-to guides
+    </strong>
+   </span>
+  </a>
+ </li>
+</ul>
+<p class="caption">
+ <span class="caption-text">
+  Development
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../dev/intro.html">
+   <span style="color: darkgreen">
+    <strong>
+     Intro
+    </strong>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../dev/tutorials/tutorials.html">
+   <span style="color: darkgreen">
+    <em>
+     <strong>
+      Tutorials
+     </strong>
+    </em>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1 has-children">
+  <a class="reference internal" href="../../dev/reference/reference.html">
+   <span style="color: darkgreen">
+    <strong>
+     Reference
+    </strong>
+   </span>
+  </a>
+  <input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/>
+  <label for="toctree-checkbox-2">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul>
+   <li class="toctree-l2">
+    <a class="reference internal" href="../../dev/reference/alphabetical.html">
+     Methods (alphabetical)
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="../../dev/reference/classes/intro.html">
+     classes
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../dev/discussions/discussions.html">
+   <span style="color: darkgreen">
+    <strong>
+     Discussions
+    </strong>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1 has-children">
+  <a class="reference internal" href="../../dev/howto/howto.html">
+   <span style="color: darkgreen">
+    <strong>
+     How-to guides
+    </strong>
+   </span>
+  </a>
+  <input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/>
+  <label for="toctree-checkbox-3">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul>
+   <li class="toctree-l2 has-children">
+    <a class="reference internal" href="../../dev/howto/Collaboration/intro.html">
+     collaborate with us
+    </a>
+    <input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/>
+    <label for="toctree-checkbox-4">
+     <i class="fas fa-chevron-down">
+     </i>
+    </label>
+    <ul>
+     <li class="toctree-l3">
+      <a class="reference internal" href="../../dev/howto/Collaboration/git_workflow.html">
+       Git workflow
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toctree-l2 has-children">
+    <a class="reference internal" href="../../dev/howto/ImageProcessing/how_to_image_processing.html">
+     build image processing progs
+    </a>
+    <input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" type="checkbox"/>
+    <label for="toctree-checkbox-5">
+     <i class="fas fa-chevron-down">
+     </i>
+    </label>
+    <ul>
+     <li class="toctree-l3">
+      <a class="reference internal" href="../../dev/howto/ImageProcessing/cpu_data_io.html">
+       CPU data io
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toctree-l2 has-children">
+    <a class="reference internal" href="../../dev/howto/Utilities/utilities.html">
+     Utilities
+    </a>
+    <input class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" type="checkbox"/>
+    <label for="toctree-checkbox-6">
+     <i class="fas fa-chevron-down">
+     </i>
+    </label>
+    <ul>
+     <li class="toctree-l3">
+      <a class="reference internal" href="../../dev/howto/Utilities/debugging_profiling.html">
+       Simple debugging and profiling
+      </a>
+     </li>
+    </ul>
+   </li>
+  </ul>
+ </li>
+</ul>
+<p class="caption">
+ <span class="caption-text">
+  Single Particle Cryo-EM
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1 has-children">
+  <a class="reference internal" href="../../spa/intro.html">
+   <span style="color: #0048d8">
+    <strong>
+     Intro
+    </strong>
+   </span>
+  </a>
+  <input class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" type="checkbox"/>
+  <label for="toctree-checkbox-7">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul class="simple">
+  </ul>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../spa/tutorials/tutorials.html">
+   <span style="color: #0048d8">
+    <em>
+     <strong>
+      Tutorial
+     </strong>
+    </em>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../spa/reference/reference.html">
+   <span style="color: #0048d8">
+    <strong>
+     Reference
+    </strong>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../spa/discussions/discussions.html">
+   <span style="color: #0048d8">
+    <strong>
+     Discussions
+    </strong>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../spa/howto/howto.html">
+   <span style="color: #0048d8">
+    <strong>
+     How-to guide
+    </strong>
+   </span>
+  </a>
+ </li>
+</ul>
+<p class="caption">
+ <span class="caption-text">
+  Tomography
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../tomo/intro.html">
+   <span style="color: #5d02a5">
+    <strong>
+     Intro
+    </strong>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../tomo/tutorials/tutorials.html">
+   <span style="color: #5d02a5">
+    <em>
+     <strong>
+      Tutorials
+     </strong>
+    </em>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../tomo/reference/reference.html">
+   <span style="color: #5d02a5">
+    <em>
+     <strong>
+      Reference
+     </strong>
+    </em>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1 has-children">
+  <a class="reference internal" href="../../tomo/discussions/discussions.html">
+   <span style="color: #6805b6">
+    <strong>
+     Discussions
+    </strong>
+   </span>
+  </a>
+  <input class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" type="checkbox"/>
+  <label for="toctree-checkbox-8">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul>
+   <li class="toctree-l2">
+    <a class="reference internal" href="../../tomo/discussions/ctftilt.html">
+     Measuring the defocus in images of tilted specimen
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../tomo/howto/howto.html">
+   <span style="color: #5d02a5">
+    <strong>
+     How-to guides
+    </strong>
+   </span>
+  </a>
+ </li>
+</ul>
+<p class="caption">
+ <span class="caption-text">
+  Appendix
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1 has-children">
+  <a class="reference internal" href="../../../_appendix.html">
+   Supress warnings - not intended for readers
+  </a>
+  <input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" type="checkbox"/>
+  <label for="toctree-checkbox-9">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul>
+   <li class="toctree-l2">
+    <a class="reference internal" href="make_3d_ref.html">
+     3d reference script
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="../../dev/reference/classes/Image/QuickAndDirtyReadSlice.html">
+     Title
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="../../dev/reference/classes/MRCFile/MRCFile.html">
+     MRCFile
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="../../dev/reference/classes/MRCFile/OpenFile.html">
+     Description
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="../../dev/reference/classes/MRCFile/ReadSliceFromDisk.html">
+     Description
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="../../sim/tutorials/get_cistem.html">
+     <em>
+      Download an Install
+     </em>
+    </a>
+   </li>
+  </ul>
+ </li>
+</ul>
+
+    </div>
+</nav> <!-- To handle the deprecated key -->
+
+<div class="navbar_extra_footer">
+  Powered by <a href="https://jupyterbook.org">Jupyter Book</a>
+</div>
+
+</div>
+
+
+          
+
+
+          
+<main class="col py-md-3 pl-md-4 bd-content overflow-auto" role="main">
+    
+    <div class="topbar container-xl fixed-top">
+    <div class="topbar-contents row">
+        <div class="col-12 col-md-3 bd-topbar-whitespace site-navigation show"></div>
+        <div class="col pl-md-4 topbar-main">
+            
+            <button id="navbar-toggler" class="navbar-toggler ml-0" type="button" data-toggle="collapse"
+                data-toggle="tooltip" data-placement="bottom" data-target=".site-navigation" aria-controls="navbar-menu"
+                aria-expanded="true" aria-label="Toggle navigation" aria-controls="site-navigation"
+                title="Toggle navigation" data-toggle="tooltip" data-placement="left">
+                <i class="fas fa-bars"></i>
+                <i class="fas fa-arrow-left"></i>
+                <i class="fas fa-arrow-up"></i>
+            </button>
+            
+            
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn" aria-label="Download this page"><i
+            class="fas fa-download"></i></button>
+
+    <div class="dropdown-buttons">
+        <!-- ipynb file if we had a myst markdown file -->
+        
+        <!-- Download raw file -->
+        <a class="dropdown-buttons" href="../../../_sources/docs/TM/tutorials/tutorials.md"><button type="button"
+                class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
+                data-placement="left">.md</button></a>
+        <!-- Download PDF via print -->
+        <button type="button" id="download-print" class="btn btn-secondary topbarbtn" title="Print to PDF"
+            onClick="window.print()" data-toggle="tooltip" data-placement="left">.pdf</button>
+    </div>
+</div>
+
+            <!-- Source interaction buttons -->
+
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn"
+        aria-label="Connect with source repository"><i class="fab fa-github"></i></button>
+    <div class="dropdown-buttons sourcebuttons">
+        <a class="repository-button"
+            href="https://github.com/bHimes/cisTEM_docs"><button type="button" class="btn btn-secondary topbarbtn"
+                data-toggle="tooltip" data-placement="left" title="Source repository"><i
+                    class="fab fa-github"></i>repository</button></a>
+        <a class="issues-button"
+            href="https://github.com/bHimes/cisTEM_docs/issues/new?title=Issue%20on%20page%20%2Fdocs/TM/tutorials/tutorials.html&body=Your%20issue%20content%20here."><button
+                type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip" data-placement="left"
+                title="Open an issue"><i class="fas fa-lightbulb"></i>open issue</button></a>
+        
+    </div>
+</div>
+
+            <!-- Full screen (wrap in <a> to have style consistency -->
+
+<a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
+        data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
+        title="Fullscreen mode"><i
+            class="fas fa-expand"></i></button></a>
+
+            <!-- Launch buttons -->
+
+        </div>
+
+        <!-- Table of contents -->
+        <div class="d-none d-md-block col-md-2 bd-toc show">
+            
+            <div class="tocsection onthispage pt-5 pb-3">
+                <i class="fas fa-list"></i> Contents
+            </div>
+            <nav id="bd-toc-nav">
+                <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#dtm-using-the-gui">
+   1 - 2DTM using the GUI
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#project-setup">
+     Project Setup
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#download-the-em-data">
+       Download the EM data
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#download-the-pdb-model">
+       Download the PDB model
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#pre-process-the-data">
+     Pre-process the data
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#create-project">
+       <strong>
+        create project
+       </strong>
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#import-movie-asset">
+       <strong>
+        import movie asset
+       </strong>
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#align-your-movie">
+       <strong>
+        align your movie
+       </strong>
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#measure-your-ctf">
+       <strong>
+        measure your ctf
+       </strong>
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#generate-your-template">
+     Generate your template
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#import-your-template">
+     Import your template
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#setup-run-profile">
+     Setup run profile
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#search">
+     Search
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#analyze-results">
+     Analyze results
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#dtm-using-the-cli">
+   2 - 2DTM using the CLI
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#refine-2dtm-results-gui">
+   3 - Refine 2DTM results GUI
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#refine-2dtm-results-cli">
+   4 - Refine 2DTM results CLI
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#end-matter">
+   End matter
+  </a>
+ </li>
+</ul>
+
+            </nav>
+        </div>
+    </div>
+</div>
+    <div id="main-content" class="row">
+        <div class="col-12 col-md-9 pl-md-3 pr-md-0">
+        
+              <div>
+                
+  <div class="section" id="span-style-color-e87502-tutorials-span">
+<h1><span style="color: #e87502"><em><strong>Tutorials</strong></em></span><a class="headerlink" href="#span-style-color-e87502-tutorials-span" title="Permalink to this headline">¶</a></h1>
+<p>Template matching intro TODO:</p>
+<div class="section" id="dtm-using-the-gui">
+<h2>1 - 2DTM using the GUI<a class="headerlink" href="#dtm-using-the-gui" title="Permalink to this headline">¶</a></h2>
+<hr class="docutils" />
+<p><strong>Prerequisite</strong> - 2DTM requires an alpha version of <em>cis</em>TEM. If you have not done so, please start by <a class="reference internal" href="../../sim/tutorials/get_cistem.html"><span class="doc std std-doc">installing one</span></a>, and return here when finished.</p>
+<div class="section" id="project-setup">
+<h3>Project Setup<a class="headerlink" href="#project-setup" title="Permalink to this headline">¶</a></h3>
+<hr class="docutils" />
+<div class="section" id="download-the-em-data">
+<h4>Download the EM data<a class="headerlink" href="#download-the-em-data" title="Permalink to this headline">¶</a></h4>
+<p>We first need to obtain the data for the tutorial. If you have gone through the <em>cis</em>TEM single particle tutorial, then you already have it on hand. If not, we will be processing a single movie from that data set, which may be obtained from the CLI:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mkdir <span class="si">${</span><span class="nv">HOME</span><span class="si">}</span>/cistem_tm_tutorial_1 <span class="si">${</span><span class="nv">HOME</span><span class="si">}</span>/cistem_tm_tutorial_1/movies
+<span class="nb">cd</span> <span class="si">${</span><span class="nv">HOME</span><span class="si">}</span>/cistem_tm_tutorial_1/movies
+wget -m ftp://ftp.ebi.ac.uk/empiar/world_availability/10146/data/May08_03.05.02.bin.mrc
+
+<span class="c1"># The full file structure is also created, so to save us some clicking, we link to the downloaded movie. Note, this is not necessary.</span>
+ln -s ftp.ebi.ac.uk/empiar/world_availability/10146/data/May08_03.05.02.bin.mrc  movie.mrc
+</pre></div>
+</div>
+</div>
+<div class="section" id="download-the-pdb-model">
+<h4>Download the PDB model<a class="headerlink" href="#download-the-pdb-model" title="Permalink to this headline">¶</a></h4>
+<p>Because these movies are binned, they are not particularly well compressed, so while you wait for your download to finish, we’ll also grab the <a class="reference external" href="https://www.rcsb.org/structure/2w0o">PDB for horse spleen apoferritin</a> that we’ll use to generate our template.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>You’ll need to download the PDB format. Support for PDBx/mmCIF is brewing, but not yet available.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>Some pdb files only include coordinates for the asymmetric unit, like 2w0o.pdb apoferritin. When you click to download, select the “Biological Assembly” to get a PDB with all the atoms specified.</p>
+</div>
+</div>
+</div>
+<div class="section" id="pre-process-the-data">
+<h3>Pre-process the data<a class="headerlink" href="#pre-process-the-data" title="Permalink to this headline">¶</a></h3>
+<hr class="docutils" />
+<div class="section" id="create-project">
+<h4><strong>create project</strong><a class="headerlink" href="#create-project" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li><p>open <em>cis</em>TEM</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="si">${</span><span class="nv">HOME</span><span class="si">}</span>/cisTEM_alpha/src/cisTEM
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>create a new project in the cistem_tm_tutorial_1 folder</p></li>
+</ul>
+<p><img alt="create project" src="../../../_images/TM_tutorial_1_pic1.svg" /></p>
+</div>
+<div class="section" id="import-movie-asset">
+<h4><strong>import movie asset</strong><a class="headerlink" href="#import-movie-asset" title="Permalink to this headline">¶</a></h4>
+<p>Different types of data in <em>cis</em>TEM are referred to as assets. Import your movie assest, with data parameters:</p>
+<div class="margin sidebar">
+<p class="sidebar-title"><span style="color: purple"><em>Discussion</em>:</span></p>
+<p>These images were collected with a spherical aberration corrector [see discussion TODO].</p>
+</div>
+<ul class="simple">
+<li><p>Voltage: <span class="math notranslate nohighlight">\(300 ~keV\)</span></p></li>
+<li><p>Spherical Aberration: <span class="math notranslate nohighlight">\(0.001~ mm\)</span></p></li>
+<li><p>Pixel Size: <span class="math notranslate nohighlight">\(1.5 ~\mathring{A}\)</span></p></li>
+<li><p>Exposure Per Frame: <span class="math notranslate nohighlight">\(2.0~ e^{-}/\mathring{A}^2\)</span></p></li>
+</ul>
+<p><img alt="create project" src="../../../_images/TM_tutorial_1_pic2.svg" /></p>
+</div>
+<div class="section" id="align-your-movie">
+<h4><strong>align your movie</strong><a class="headerlink" href="#align-your-movie" title="Permalink to this headline">¶</a></h4>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>We tend to see the best detection with a total exposure between 30-50 <span class="math notranslate nohighlight">\(e^{-}/\mathring{A}^2\)</span>. When aligning your movies, you may select a range of frames to average together, we we choose 20 frames, corresponding to 40 <span class="math notranslate nohighlight">\(e^{-}/\mathring{A}^2\)</span>.</p>
+</div>
+<p><img alt="create project" src="../../../_images/TM_tutorial_1_pic3.svg" /></p>
+</div>
+<div class="section" id="measure-your-ctf">
+<h4><strong>measure your ctf</strong><a class="headerlink" href="#measure-your-ctf" title="Permalink to this headline">¶</a></h4>
+<hr class="docutils" />
+<p>You can use the default settings for this step. Your results should be similar to below:</p>
+<p><img alt="create project" src="../../../_images/TM_tutorial_1_pic4.svg" /></p>
+</div>
+</div>
+<div class="section" id="generate-your-template">
+<h3>Generate your template<a class="headerlink" href="#generate-your-template" title="Permalink to this headline">¶</a></h3>
+<hr class="docutils" />
+<p>Instructions for this step can be found in <a class="reference internal" href="../../sim/tutorials/tutorials.html#calc-3d-scattering"><span class="std std-ref">simulation tutorial 2.</span></a></p>
+</div>
+<div class="section" id="import-your-template">
+<h3>Import your template<a class="headerlink" href="#import-your-template" title="Permalink to this headline">¶</a></h3>
+<hr class="docutils" />
+<ol class="simple">
+<li><p>Use the left toolbar to open the assets panel</p></li>
+<li><p>Select 3D volumes</p></li>
+<li><p>Select import</p></li>
+<li><p>Select add files, and choose the template you generated in the previous step</p></li>
+<li><p>Enter 1.5 for the pixel size, which will enable the “Import” button</p></li>
+</ol>
+<p><img alt="create project" src="../../../_images/TM_tutorial_1_pic5.svg" /></p>
+</div>
+<div class="section" id="setup-run-profile">
+<h3>Setup run profile<a class="headerlink" href="#setup-run-profile" title="Permalink to this headline">¶</a></h3>
+<hr class="docutils" />
+<div class="margin sidebar">
+<p class="sidebar-title"><span style="color: purple"><em>How-to</em>:</span></p>
+<p>We let cisTEM pick the GPU with the most available memory. For better control on systems with multiple gpus, see this how-to page TODO:</p>
+</div>
+<ol class="simple">
+<li><p>Use the left toolbar to open the settings panel</p></li>
+<li><p>Duplicate your default run profile, then click rename and type in gpu_1</p></li>
+<li><p>2x click the run profile entry to edit</p></li>
+<li><p>Change the number of threads to 4</p></li>
+<li><p>Be sure to click save!</p></li>
+</ol>
+<p><img alt="create project" src="../../../_images/TM_tutorial_1_pic6.svg" /></p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>On some screens, this edit run profile dialog doesn’t automaticallyexpand the whole way to expose the “ok” and “cancel” buttons. As a workaround, expand to full screen with the square icon.</p>
+</div>
+</div>
+<div class="section" id="search">
+<h3>Search<a class="headerlink" href="#search" title="Permalink to this headline">¶</a></h3>
+<ol class="simple">
+<li><p>Use the left toolbar to open the experimental panel</p></li>
+<li><p>Change the symmetry to octahedral (o) in the dropdown, and togel the defocus seasrch off</p></li>
+<li><p>Select our gpu_1 run profile</p></li>
+<li><p>2x check that the Use GPU radio button is selected</p></li>
+<li><p>Start your search!</p></li>
+</ol>
+<p><img alt="create project" src="../../../_images/TM_tutorial_1_pic7.svg" /></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>With the symmetry, no defocus search, and small image size, this search should only take 2-3 minutes depending on your GPU.</p>
+</div>
+</div>
+<div class="section" id="analyze-results">
+<h3>Analyze results<a class="headerlink" href="#analyze-results" title="Permalink to this headline">¶</a></h3>
+<ol class="simple">
+<li><p>Select the MT Results icon</p></li>
+<li><p>Check the number of statistically significant detections</p></li>
+<li><p>Check to see how well the search conformed to gaussian statistics</p></li>
+<li><p>Scroll through the peak list, which highlights detections in your …</p></li>
+<li><p>image display options
+a) image
+b) scaled mip
+c) plotted result</p></li>
+</ol>
+<p><img alt="create project" src="../../../_images/TM_tutorial_1_pic8.svg" /></p>
+</div>
+</div>
+<div class="section" id="dtm-using-the-cli">
+<h2>2 - 2DTM using the CLI<a class="headerlink" href="#dtm-using-the-cli" title="Permalink to this headline">¶</a></h2>
+<hr class="docutils" />
+<p>TODO</p>
+</div>
+<div class="section" id="refine-2dtm-results-gui">
+<h2>3 - Refine 2DTM results GUI<a class="headerlink" href="#refine-2dtm-results-gui" title="Permalink to this headline">¶</a></h2>
+<hr class="docutils" />
+<p>TODO</p>
+</div>
+<div class="section" id="refine-2dtm-results-cli">
+<h2>4 - Refine 2DTM results CLI<a class="headerlink" href="#refine-2dtm-results-cli" title="Permalink to this headline">¶</a></h2>
+<hr class="docutils" />
+<p>TODO</p>
+</div>
+<div class="section" id="end-matter">
+<h2>End matter<a class="headerlink" href="#end-matter" title="Permalink to this headline">¶</a></h2>
+<p>If you’ve made it through these tutorials, you are ready for some more advanced usage. Please have a look over the discussion into link TODO for an overview of how you might design an experiment where you use 2DTM.</p>
+<p>Once you are better oriented to the theory, please have a look at the How-to guides which give recipes for more specific scenerios, with relevant links to detailed discussion and reference material.</p>
+<p>Get matchin’!</p>
+</div>
+</div>
+
+    <script type="text/x-thebe-config">
+    {
+        requestKernel: true,
+        binderOptions: {
+            repo: "binder-examples/jupyter-stacks-datascience",
+            ref: "master",
+        },
+        codeMirrorConfig: {
+            theme: "abcdef",
+            mode: "python"
+        },
+        kernelOptions: {
+            kernelName: "python3",
+            path: "./docs/TM/tutorials"
+        },
+        predefinedOutput: true
+    }
+    </script>
+    <script>kernelName = 'python3'</script>
+
+              </div>
+              
+        
+        <div class='prev-next-bottom'>
+            
+    <a class='left-prev' id="prev-link" href="../intro.html" title="previous page"><span style="color: #e87502"><strong>Intro</strong></span></a>
+    <a class='right-next' id="next-link" href="../reference/reference.html" title="next page"><span style="color: #e87502"><strong>Reference</strong></span></a>
+
+        </div>
+        
+        </div>
+    </div>
+    <footer class="footer mt-5 mt-md-0">
+    <div class="container">
+      <p>
+        
+          By The cisTEM cryoEM Community<br/>
+        
+            &copy; Copyright 2021.<br/>
+      </p>
+    </div>
+  </footer>
+</main>
+
+
+      </div>
+    </div>
+  
+  <script src="../../../_static/js/index.1c5a1a01449ed65a7b51.js"></script>
+
+  
+  </body>
+</html>

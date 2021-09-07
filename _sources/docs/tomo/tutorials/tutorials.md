@@ -1,0 +1,3 @@
+# <span style="color: #5d02a5">***Tutorials***</span>
+
+The tutorial for ***emClarity*** covers the full processing pipeline from tilt-series alignment, through to final averaging or direct reconstruction from the input projections, and can be [**found here.**](https://raw.githubusercontent.com/ffyr2w/emClarity-tutorial/master/emClarity-tutorial.pdf) This work was built by  Thomas Frosio, and the source code can be found on his [**git repo**.](https://github.com/ffyr2w/emClarity-tutorial)

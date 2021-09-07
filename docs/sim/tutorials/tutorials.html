@@ -1,0 +1,902 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tutorials &#8212; dev and user guides</title>
+    
+  <link href="../../../_static/css/theme.css" rel="stylesheet" />
+  <link href="../../../_static/css/index.c5995385ac14fb8791e8eb36b4908be2.css" rel="stylesheet" />
+
+    
+  <link rel="stylesheet"
+    href="../../../_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../../../_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../../../_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    
+      
+
+    
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/sphinx-book-theme.e8e5499552300ddf5d7adccae7cc3b70.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/togglebutton.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/mystnb.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sphinx-thebe.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/panels-main.c949a650a448cc0ae9fd3441c0e17fb0.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/panels-variables.06eb56fa6e07937060861dad626602ad.css" />
+    
+  <link rel="preload" as="script" href="../../../_static/js/index.1c5a1a01449ed65a7b51.js">
+
+    <script id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/togglebutton.js"></script>
+    <script src="../../../_static/clipboard.min.js"></script>
+    <script src="../../../_static/copybutton.js"></script>
+    <script >var togglebuttonSelector = '.toggle, .admonition.dropdown, .tag_hide_input div.cell_input, .tag_hide-input div.cell_input, .tag_hide_output div.cell_output, .tag_hide-output div.cell_output, .tag_hide_cell.cell, .tag_hide-cell.cell';</script>
+    <script src="../../../_static/sphinx-book-theme.12a9622fbb08dcb3a2a40b2c02b83a57.js"></script>
+    <script async="async" src="https://unpkg.com/thebelab@latest/lib/index.js"></script>
+    <script >
+        const thebe_selector = ".thebe"
+        const thebe_selector_input = "pre"
+        const thebe_selector_output = ".output"
+    </script>
+    <script async="async" src="../../../_static/sphinx-thebe.js"></script>
+    <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["\\(", "\\)"]], "displayMath": [["\\[", "\\]"]], "processRefs": false, "processEnvironments": false}})</script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Reference" href="../reference/reference.html" />
+    <link rel="prev" title="Intro" href="../intro.html" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="en" />
+    
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
+    
+    <div class="container-fluid" id="banner"></div>
+
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+<div class="col-12 col-md-3 bd-sidebar site-navigation show" id="site-navigation">
+    
+        <div class="navbar-brand-box">
+    <a class="navbar-brand text-wrap" href="../../../index.html">
+      
+      <img src="../../../_static/cisTEM_logo_dev.png" class="logo" alt="logo">
+      
+      
+      <h1 class="site-logo" id="site-title">dev and user guides</h1>
+      
+    </a>
+</div><form class="bd-search d-flex align-items-center" action="../../../search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search this book..." aria-label="Search this book..." autocomplete="off" >
+</form><nav class="bd-links" id="bd-docs-nav" aria-label="Main navigation">
+    <div class="bd-toc-item active">
+        <ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../../intro.html">
+   Welcome to your source for info about cisTEM
+  </a>
+ </li>
+</ul>
+<p class="caption">
+ <span class="caption-text">
+  Simulation
+ </span>
+</p>
+<ul class="current nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../intro.html">
+   <span style="color: darkred">
+    <strong>
+     Intro
+    </strong>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1 current active">
+  <a class="current reference internal" href="#">
+   <span style="color: darkred">
+    <em>
+     <strong>
+      Tutorials
+     </strong>
+    </em>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../reference/reference.html">
+   <span style="color: darkred">
+    <strong>
+     Reference
+    </strong>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../discussions/discussions.html">
+   <span style="color: darkred">
+    <strong>
+     Discussions
+    </strong>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1 has-children">
+  <a class="reference internal" href="../howto/howto.html">
+   <span style="color: darkred">
+    <strong>
+     How-to guides
+    </strong>
+   </span>
+  </a>
+  <input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/>
+  <label for="toctree-checkbox-1">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul class="simple">
+  </ul>
+ </li>
+</ul>
+<p class="caption">
+ <span class="caption-text">
+  in situ particle detection
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../TM/intro.html">
+   <span style="color: #e87502">
+    <strong>
+     Intro
+    </strong>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../TM/tutorials/tutorials.html">
+   <span style="color: #e87502">
+    <em>
+     <strong>
+      Tutorials
+     </strong>
+    </em>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../TM/reference/reference.html">
+   <span style="color: #e87502">
+    <strong>
+     Reference
+    </strong>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../TM/discussions/discussions.html">
+   <span style="color: #e87502">
+    <strong>
+     Discussions
+    </strong>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../TM/howto/howto.html">
+   <span style="color: #e87502">
+    <strong>
+     How-to guides
+    </strong>
+   </span>
+  </a>
+ </li>
+</ul>
+<p class="caption">
+ <span class="caption-text">
+  Development
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../dev/intro.html">
+   <span style="color: darkgreen">
+    <strong>
+     Intro
+    </strong>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../dev/tutorials/tutorials.html">
+   <span style="color: darkgreen">
+    <em>
+     <strong>
+      Tutorials
+     </strong>
+    </em>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1 has-children">
+  <a class="reference internal" href="../../dev/reference/reference.html">
+   <span style="color: darkgreen">
+    <strong>
+     Reference
+    </strong>
+   </span>
+  </a>
+  <input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/>
+  <label for="toctree-checkbox-2">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul>
+   <li class="toctree-l2">
+    <a class="reference internal" href="../../dev/reference/alphabetical.html">
+     Methods (alphabetical)
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="../../dev/reference/classes/intro.html">
+     classes
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../dev/discussions/discussions.html">
+   <span style="color: darkgreen">
+    <strong>
+     Discussions
+    </strong>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1 has-children">
+  <a class="reference internal" href="../../dev/howto/howto.html">
+   <span style="color: darkgreen">
+    <strong>
+     How-to guides
+    </strong>
+   </span>
+  </a>
+  <input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/>
+  <label for="toctree-checkbox-3">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul>
+   <li class="toctree-l2 has-children">
+    <a class="reference internal" href="../../dev/howto/Collaboration/intro.html">
+     collaborate with us
+    </a>
+    <input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/>
+    <label for="toctree-checkbox-4">
+     <i class="fas fa-chevron-down">
+     </i>
+    </label>
+    <ul>
+     <li class="toctree-l3">
+      <a class="reference internal" href="../../dev/howto/Collaboration/git_workflow.html">
+       Git workflow
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toctree-l2 has-children">
+    <a class="reference internal" href="../../dev/howto/ImageProcessing/how_to_image_processing.html">
+     build image processing progs
+    </a>
+    <input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" type="checkbox"/>
+    <label for="toctree-checkbox-5">
+     <i class="fas fa-chevron-down">
+     </i>
+    </label>
+    <ul>
+     <li class="toctree-l3">
+      <a class="reference internal" href="../../dev/howto/ImageProcessing/cpu_data_io.html">
+       CPU data io
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toctree-l2 has-children">
+    <a class="reference internal" href="../../dev/howto/Utilities/utilities.html">
+     Utilities
+    </a>
+    <input class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" type="checkbox"/>
+    <label for="toctree-checkbox-6">
+     <i class="fas fa-chevron-down">
+     </i>
+    </label>
+    <ul>
+     <li class="toctree-l3">
+      <a class="reference internal" href="../../dev/howto/Utilities/debugging_profiling.html">
+       Simple debugging and profiling
+      </a>
+     </li>
+    </ul>
+   </li>
+  </ul>
+ </li>
+</ul>
+<p class="caption">
+ <span class="caption-text">
+  Single Particle Cryo-EM
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1 has-children">
+  <a class="reference internal" href="../../spa/intro.html">
+   <span style="color: #0048d8">
+    <strong>
+     Intro
+    </strong>
+   </span>
+  </a>
+  <input class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" type="checkbox"/>
+  <label for="toctree-checkbox-7">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul class="simple">
+  </ul>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../spa/tutorials/tutorials.html">
+   <span style="color: #0048d8">
+    <em>
+     <strong>
+      Tutorial
+     </strong>
+    </em>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../spa/reference/reference.html">
+   <span style="color: #0048d8">
+    <strong>
+     Reference
+    </strong>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../spa/discussions/discussions.html">
+   <span style="color: #0048d8">
+    <strong>
+     Discussions
+    </strong>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../spa/howto/howto.html">
+   <span style="color: #0048d8">
+    <strong>
+     How-to guide
+    </strong>
+   </span>
+  </a>
+ </li>
+</ul>
+<p class="caption">
+ <span class="caption-text">
+  Tomography
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../tomo/intro.html">
+   <span style="color: #5d02a5">
+    <strong>
+     Intro
+    </strong>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../tomo/tutorials/tutorials.html">
+   <span style="color: #5d02a5">
+    <em>
+     <strong>
+      Tutorials
+     </strong>
+    </em>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../tomo/reference/reference.html">
+   <span style="color: #5d02a5">
+    <em>
+     <strong>
+      Reference
+     </strong>
+    </em>
+   </span>
+  </a>
+ </li>
+ <li class="toctree-l1 has-children">
+  <a class="reference internal" href="../../tomo/discussions/discussions.html">
+   <span style="color: #6805b6">
+    <strong>
+     Discussions
+    </strong>
+   </span>
+  </a>
+  <input class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" type="checkbox"/>
+  <label for="toctree-checkbox-8">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul>
+   <li class="toctree-l2">
+    <a class="reference internal" href="../../tomo/discussions/ctftilt.html">
+     Measuring the defocus in images of tilted specimen
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../tomo/howto/howto.html">
+   <span style="color: #5d02a5">
+    <strong>
+     How-to guides
+    </strong>
+   </span>
+  </a>
+ </li>
+</ul>
+<p class="caption">
+ <span class="caption-text">
+  Appendix
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1 has-children">
+  <a class="reference internal" href="../../../_appendix.html">
+   Supress warnings - not intended for readers
+  </a>
+  <input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" type="checkbox"/>
+  <label for="toctree-checkbox-9">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul>
+   <li class="toctree-l2">
+    <a class="reference internal" href="../../TM/tutorials/make_3d_ref.html">
+     3d reference script
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="../../dev/reference/classes/Image/QuickAndDirtyReadSlice.html">
+     Title
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="../../dev/reference/classes/MRCFile/MRCFile.html">
+     MRCFile
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="../../dev/reference/classes/MRCFile/OpenFile.html">
+     Description
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="../../dev/reference/classes/MRCFile/ReadSliceFromDisk.html">
+     Description
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="get_cistem.html">
+     <em>
+      Download an Install
+     </em>
+    </a>
+   </li>
+  </ul>
+ </li>
+</ul>
+
+    </div>
+</nav> <!-- To handle the deprecated key -->
+
+<div class="navbar_extra_footer">
+  Powered by <a href="https://jupyterbook.org">Jupyter Book</a>
+</div>
+
+</div>
+
+
+          
+
+
+          
+<main class="col py-md-3 pl-md-4 bd-content overflow-auto" role="main">
+    
+    <div class="topbar container-xl fixed-top">
+    <div class="topbar-contents row">
+        <div class="col-12 col-md-3 bd-topbar-whitespace site-navigation show"></div>
+        <div class="col pl-md-4 topbar-main">
+            
+            <button id="navbar-toggler" class="navbar-toggler ml-0" type="button" data-toggle="collapse"
+                data-toggle="tooltip" data-placement="bottom" data-target=".site-navigation" aria-controls="navbar-menu"
+                aria-expanded="true" aria-label="Toggle navigation" aria-controls="site-navigation"
+                title="Toggle navigation" data-toggle="tooltip" data-placement="left">
+                <i class="fas fa-bars"></i>
+                <i class="fas fa-arrow-left"></i>
+                <i class="fas fa-arrow-up"></i>
+            </button>
+            
+            
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn" aria-label="Download this page"><i
+            class="fas fa-download"></i></button>
+
+    <div class="dropdown-buttons">
+        <!-- ipynb file if we had a myst markdown file -->
+        
+        <!-- Download raw file -->
+        <a class="dropdown-buttons" href="../../../_sources/docs/sim/tutorials/tutorials.md"><button type="button"
+                class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
+                data-placement="left">.md</button></a>
+        <!-- Download PDF via print -->
+        <button type="button" id="download-print" class="btn btn-secondary topbarbtn" title="Print to PDF"
+            onClick="window.print()" data-toggle="tooltip" data-placement="left">.pdf</button>
+    </div>
+</div>
+
+            <!-- Source interaction buttons -->
+
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn"
+        aria-label="Connect with source repository"><i class="fab fa-github"></i></button>
+    <div class="dropdown-buttons sourcebuttons">
+        <a class="repository-button"
+            href="https://github.com/bHimes/cisTEM_docs"><button type="button" class="btn btn-secondary topbarbtn"
+                data-toggle="tooltip" data-placement="left" title="Source repository"><i
+                    class="fab fa-github"></i>repository</button></a>
+        <a class="issues-button"
+            href="https://github.com/bHimes/cisTEM_docs/issues/new?title=Issue%20on%20page%20%2Fdocs/sim/tutorials/tutorials.html&body=Your%20issue%20content%20here."><button
+                type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip" data-placement="left"
+                title="Open an issue"><i class="fas fa-lightbulb"></i>open issue</button></a>
+        
+    </div>
+</div>
+
+            <!-- Full screen (wrap in <a> to have style consistency -->
+
+<a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
+        data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
+        title="Fullscreen mode"><i
+            class="fas fa-expand"></i></button></a>
+
+            <!-- Launch buttons -->
+
+        </div>
+
+        <!-- Table of contents -->
+        <div class="d-none d-md-block col-md-2 bd-toc show">
+            
+            <div class="tocsection onthispage pt-5 pb-3">
+                <i class="fas fa-list"></i> Contents
+            </div>
+            <nav id="bd-toc-nav">
+                <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#get-an-alpha-version-of-cistem">
+   1 - Get an alpha version of
+   <em>
+    cis
+   </em>
+   TEM
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#calculate-a-3d-scattering-potential">
+   2 - Calculate a 3D scattering potential
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#materials-needed">
+     Materials needed
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#calculate-a-stack-of-noisy-particles">
+   3 - Calculate a stack of noisy particles
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#id1">
+     Materials needed
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#overview">
+     Overview
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#a-simulate-an-isolated-protein">
+     A) Simulate an isolated protein
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#b-simulate-a-more-realistic-protein">
+     B) Simulate a more realistic protein
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#summary">
+     Summary
+    </a>
+   </li>
+  </ul>
+ </li>
+</ul>
+
+            </nav>
+        </div>
+    </div>
+</div>
+    <div id="main-content" class="row">
+        <div class="col-12 col-md-9 pl-md-3 pr-md-0">
+        
+              <div>
+                
+  <div class="section" id="span-style-color-darkred-tutorials-span">
+<h1><span style="color: darkred"><em><strong>Tutorials</strong></em></span><a class="headerlink" href="#span-style-color-darkred-tutorials-span" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="get-an-alpha-version-of-cistem">
+<span id="seeabove1"></span><h2>1 - Get an alpha version of <em>cis</em>TEM<a class="headerlink" href="#get-an-alpha-version-of-cistem" title="Permalink to this headline">¶</a></h2>
+<p>To run the simulator or template matching you will need an alpha version of <em>cis</em>TEM. For most people, the best choice will be to download a pre-compiled binary, following the instuctions here: <a class="reference internal" href="get_cistem.html"><span class="doc std std-doc"><strong>get cistem tutorial</strong></span></a> For those interested in compiling form source code, you will need to add the “–enable-experimental” flag to your configure line, as well as following the instructions <a class="reference external" href="https://github.com/bHimes/cisTEM_downstream_bah/wiki/Compiling-cisTEM">here.</a></p>
+</div>
+<div class="section" id="calculate-a-3d-scattering-potential">
+<span id="calc-3d-scattering"></span><h2>2 - Calculate a 3D scattering potential<a class="headerlink" href="#calculate-a-3d-scattering-potential" title="Permalink to this headline">¶</a></h2>
+<p>Simulation in TEM involves describing</p>
+<ol class="simple">
+<li><p>The Coulomb potential of the sample</p></li>
+<li><p>The relativistic wave function of the imaging electrons</p></li>
+<li><p>The interaction of 1 &amp; 2</p></li>
+<li><p>The influence of the microscope optics, including the lenses, detectors etc.</p></li>
+</ol>
+<p>Step one is also the first step in a template matching experiment, were the detection efficiency is directly tied to the output SNR from the matched filter used in 2DTM. The SNR in turn depends strongly on how well your calculated specimen potential matches the imaged specimen potential recorded in your micrographs(s). To improve detection, both points 1 &amp; 4 from above need to be carefully handled.</p>
+<div class="section" id="materials-needed">
+<h3>Materials needed<a class="headerlink" href="#materials-needed" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li><p>An alpha version of <em>cis</em>TEM <a class="reference internal" href="#seeabove1"><span class="std std-ref">see above.</span></a></p></li>
+<li><p>Information about the imaging conditions used in the data you wish to search.</p></li>
+<li><p>A PDB representing your molecule</p></li>
+<li><p>You may <a class="reference internal" href="../../TM/tutorials/make_3d_ref.html"><span class="doc std std-doc"><strong>adapt this script</strong></span></a> to your specific use case.</p></li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Only classic <a class="reference external" href="https://en.wikipedia.org/wiki/Protein_Data_Bank_(file_format)">PDB format</a> is supported at the moment. Support for newer PDBx/mmCIF is planned, but in the interm, you will need to manually convert to PDB using a tool like Chimera for example. Simply open your mmCIF and then “save as PDB.”</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>Some pdb files only include coordinates for the asymmetric unit, like 2w0o.pdb apoferritin. When you click to download, select the “Biological Assembly” to get a PDB with all the atoms specified.</p>
+</div>
+</div>
+</div>
+<div class="section" id="calculate-a-stack-of-noisy-particles">
+<h2>3 - Calculate a stack of noisy particles<a class="headerlink" href="#calculate-a-stack-of-noisy-particles" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id1">
+<h3>Materials needed<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h3>
+<p>a test string</p>
+<ul class="simple">
+<li><p>An alpha version of <em>cis</em>TEM <a class="reference internal" href="#seeabove1"><span class="std std-ref">see above.</span></a></p></li>
+</ul>
+<div class="margin sidebar">
+<p class="sidebar-title"></p>
+<p>Tip: Hover over the right side of the code box and click the clipboard icon to copy the link.</p>
+</div>
+<ul class="simple">
+<li><p>The beta galactosidase PDB and a run script</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wget https://github.com/bHimes/cisTEM_docs/raw/main/tutorial_materials/bgal_flat.pdb https://github.com/bHimes/cisTEM_docs/raw/main/tutorial_materials/bgal_flat.sh
+</pre></div>
+</div>
+<ul class="simple">
+<li></li>
+</ul>
+</div>
+<div class="section" id="overview">
+<h3>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h3>
+<p>In this tutorial, you will use the script you downloaded to understand the fundamentals of what is produced in the image simulation, and the primary sources of shot noise and structural noise.</p>
+</div>
+<div class="section" id="a-simulate-an-isolated-protein">
+<h3>A) Simulate an isolated protein<a class="headerlink" href="#a-simulate-an-isolated-protein" title="Permalink to this headline">¶</a></h3>
+<p><strong>You will first run your bgal_flat.sh script as is. In subsequent steps we will modify parameters and command line options to change the results.</strong></p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>Make sure that your script has the permissions to run after you download it.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>chmod u+x bgal_flat.sh
+</pre></div>
+</div>
+</div>
+<p>The first run is set to produce the projected Coulomb potential of the atoms in the enzyme betagalactosidase. Normally, when simulating a particle stack, we want to have a random set of orientations, however, to compare to the results in the following figures, we disable the randomization of the angles. <em><strong>Note</strong></em> that that what is produced is really the complex modulus of the detector wavefunction. This includes the abberations of the objective lens for standard cryoEM imaging, as shown in Figure 1A.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">optional_args</span><span class="o">=</span><span class="s2">&quot; --save-detector-wavefunction --skip-random-angles &quot;</span>
+</pre></div>
+</div>
+<p>You may want to adjust the number of threads used in your run to match your computer’s hardware. Even 16 is probably overkill for these simple simulations.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">output_filename</span><span class="o">=</span><span class="s2">&quot;betgal_vacuum.mrc&quot;</span>
+<span class="nv">input_pdb_file</span><span class="o">=</span><span class="s2">&quot;bgal_flat.pdb&quot;</span> <span class="c1"># the parser is fairly good with PDB format, but will probably break in some cases.</span>
+<span class="nv">output_size</span><span class="o">=</span>-320 <span class="c1"># pixels - if &lt; 0 a hack to set a fixed size for 2d image simulation, if &gt; 0 the size of a 3D reference volume to simulate.</span>
+<span class="nv">n_threads</span><span class="o">=</span><span class="m">16</span> <span class="c1"># Not so important for a a 3d, it will be fast either way.</span>
+</pre></div>
+</div>
+<div class="figure align-center" id="id2">
+<a class="reference internal image-reference" href="../../../_images/Sim_tutorial2_1.svg"><img alt="../../../_images/Sim_tutorial2_1.svg" src="../../../_images/Sim_tutorial2_1.svg" /></a>
+<p class="caption"><span class="caption-number">Fig. 1 </span><span class="caption-text"><strong>A) simulation <em><strong>in vacuuo</strong></em> B) adding pseudo-water molecules C) low-dose with  <span class="math notranslate nohighlight">\(1.0~ e^{-}/\mathring{A}^2\)</span> D) low-dose with  <span class="math notranslate nohighlight">\(30.0~ e^{-}/\mathring{A}^2\)</span> E) same as (D) farther from focus (<span class="math notranslate nohighlight">\(2.4\mu{m}\)</span>)</strong></span><a class="headerlink" href="#id2" title="Permalink to this image">¶</a></p>
+</div>
+<p>Of course, proteins do not exist in a vacuum, they are embedded in solvent. We can include the solvent, by resetting the scaling factor to its default value of 1.0. Doing this, you should get an image that looks like Figure 1B.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">output_filename</span><span class="o">=</span><span class="s2">&quot;betgal_water.mrc&quot;</span>
+.
+<span class="nv">water_scaling</span><span class="o">=</span><span class="m">1</span>.0 <span class="c1"># Linear scaling of water molecules - normally not used, except for demonstration purposes</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Be careful to modify the parameters specified in each code block before executing the run script. In practice, you don’t need the script, and can run the program interactively.</p>
+</div>
+<p>It is important to realize that this is still a “perfect” image, even though it is far noisier than that in (A). The additional signal from the solvent is one form of <em><strong>structural noise.</strong></em> Fortunately for us, this image is not actually a “perfect” image, because the water molecules move much more than the protein, which somewhat improves the contrast between protein and solvent. [TODO link to discussion]. One of the primary sources of noise in cryoEM is due to the low-dose imaging conditions that lead to an uncertainty in how many electrons arrive at the detector in a given time interval. This is called shot noise, which we observe in Figure 1C by removing the *** –save-detector-wavefunction*** argument.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">output_filename</span><span class="o">=</span><span class="s2">&quot;betgal_1elec_per_angSq.mrc&quot;</span>
+.
+<span class="nv">optional_args</span><span class="o">=</span><span class="s2">&quot; --skip-random-angles &quot;</span>
+</pre></div>
+</div>
+<p>To get a more realistic picture, we can simulate a short movie, with a total of <span class="math notranslate nohighlight">\(30.0~ e^{-}/\mathring{A}^2\)</span>. The length of the timestep in each movie frame is set by the exposure per frame. You’ll need to change the number of frames to be 20 in order to reproduce Figure 1D.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">output_filename</span><span class="o">=</span><span class="s2">&quot;betgal_30elec_per_angSq.mrc&quot;</span>
+.
+<span class="nv">exposure_per_frame</span><span class="o">=</span><span class="m">1</span>.5 <span class="c1"># e-/Ang^2 ;; Dose rate doesn&#39;t affect 3D sim (only 2d) here it is used with n_frames to get the total exposure</span>
+<span class="nv">exposure_rate</span><span class="o">=</span><span class="m">3</span>.0 <span class="c1"># e-/ pixel /s</span>
+<span class="nv">n_frames</span><span class="o">=</span><span class="m">20</span>
+<span class="nv">pre_exposure</span><span class="o">=</span><span class="m">0</span> <span class="c1"># If you&#39;ve left off some early frames, account for that here</span>
+</pre></div>
+</div>
+<p>Even with the longer exposure, this protein is still very hard to see. If you increase the defocus from <strong><span class="math notranslate nohighlight">\(8000\mathring{A}\)</span></strong> to <strong><span class="math notranslate nohighlight">\(24000\mathring{A}\)</span></strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">output_filename</span><span class="o">=</span><span class="s2">&quot;betgal_30elec_per_angSq_highdefocus.mrc&quot;</span>
+.
+<span class="nv">wanted_defocus</span><span class="o">=</span><span class="m">240000</span> <span class="c1"># Angstrom</span>
+</pre></div>
+</div>
+<p><strong>You should have now reproduced Figure 1, learning about shot noise and structural noise along the way. It is important to point out that the improved visibility of the protein by imaging farther from focus does not mean the image has more information, in fact it has less.</strong></p>
+</div>
+<hr class="docutils" />
+<div class="section" id="b-simulate-a-more-realistic-protein">
+<h3>B) Simulate a more realistic protein<a class="headerlink" href="#b-simulate-a-more-realistic-protein" title="Permalink to this headline">¶</a></h3>
+<p>So far, we have been simulating a single lonely protein devoid of neighbors, in a minimally thick layer of solvent. The first thing we will do, is stop supressing the random angles and simulate a small particle stack so you can see what a more realistic output will look like. For visualization purposes, we will again downweight the water, this time by a factor of 0.5, and turn back on the <em><strong>–save-detector-wavefunction</strong></em> option. After changing these parameters, you should be able to reproduce Figure 2.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">output_filename</span><span class="o">=</span><span class="s2">&quot;betgal.mrc&quot;</span>
+<span class="nv">wanted_defocus</span><span class="o">=</span><span class="m">8000</span> <span class="c1"># Angstrom</span>
+<span class="nv">n_frames</span><span class="o">=</span><span class="m">1</span>
+<span class="nv">water_scaling</span><span class="o">=</span><span class="m">0</span>.5 <span class="c1"># Linear scaling of water molecules - normally not used, except for demonstration purposes</span>
+<span class="nv">optional_args</span><span class="o">=</span><span class="s2">&quot; --save-detector-wavefunction&quot;</span>
+</pre></div>
+</div>
+<div class="margin sidebar">
+<p class="sidebar-title"></p>
+<p><em><strong>NOTE</strong></em> your particles will be in a different orientation than mine. You also may need to adjust the global image contrast in your image display software, as each particle in this case may have a different solvent thickness.</p>
+</div>
+<div class="figure align-center" id="id3">
+<a class="reference internal image-reference" href="../../../_images/Sim_tutorial2_2.svg"><img alt="../../../_images/Sim_tutorial2_2.svg" src="../../../_images/Sim_tutorial2_2.svg" /></a>
+<p class="caption"><span class="caption-number">Fig. 2 </span><span class="caption-text"><strong>Random particles in solvent</strong></span><a class="headerlink" href="#id3" title="Permalink to this image">¶</a></p>
+</div>
+<p>The default behavior is to specify a layer of solvent just big enough to hold your protein, so an oblong protein like betagal (<strong><span class="math notranslate nohighlight">\(~190\mathring{A}\)</span></strong> in the longest dimension) will produce variable contrast. You can set the minimum thickness of your ice layer, assuming it is at least as big as the default. Here we’ll set the thickness to 200nm to illustrate how more solvent reduces contrast.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">output_filename</span><span class="o">=</span><span class="s2">&quot;betgal_thick.mrc&quot;</span>
+<span class="nv">minimum_thickness</span><span class="o">=</span><span class="m">2000</span> <span class="c1"># Angstrom</span>
+</pre></div>
+</div>
+<div class="margin sidebar">
+<p class="sidebar-title"></p>
+<p>Remember that the solvent is artificially multiplied by 0.5 in this tutorial example. Do you think you’ll be able to see a ~450kDa protein in 200nm ice?</p>
+</div>
+<div class="figure align-center" id="id4">
+<a class="reference internal image-reference" href="../../../_images/Sim_tutorial2_3.svg"><img alt="../../../_images/Sim_tutorial2_3.svg" src="../../../_images/Sim_tutorial2_3.svg" /></a>
+<p class="caption"><span class="caption-number">Fig. 3 </span><span class="caption-text"><strong>Random particles in thick layer of solvent</strong></span><a class="headerlink" href="#id4" title="Permalink to this image">¶</a></p>
+</div>
+<p>In the previous example we added more solvent molecules. Obviously, other protein molecules are another source of structural noise. You can add up to six random neighboring particles by including the <em><strong>–max_number_of_noise_particles=6</strong></em> command line flag. We’ll also reduce the thickness of our solvent layer to 25nm.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">output_filename</span><span class="o">=</span><span class="s2">&quot;betgal_neighbors.mrc&quot;</span>
+<span class="nv">minimum_thickness</span><span class="o">=</span><span class="m">250</span> <span class="c1"># Angstrom</span>
+<span class="nv">optional_args</span><span class="o">=</span><span class="s2">&quot; --save-detector-wavefunction --max_number_of_noise_particles=6 &quot;</span>
+</pre></div>
+</div>
+<div class="figure align-center" id="id5">
+<a class="reference internal image-reference" href="../../../_images/Sim_tutorial2_4.svg"><img alt="../../../_images/Sim_tutorial2_4.svg" src="../../../_images/Sim_tutorial2_4.svg" /></a>
+<p class="caption"><span class="caption-number">Fig. 4 </span><span class="caption-text"><strong>Particle stack with neighbors</strong></span><a class="headerlink" href="#id5" title="Permalink to this image">¶</a></p>
+</div>
+<p>Finally, we’ll put it all together, setting a higher defocus, moderate ice thickness, noise particles, full water intensity, and a movie with 45 electrons total exposure.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">output_filename</span><span class="o">=</span><span class="s2">&quot;betgal_realistic.mrc&quot;</span>
+<span class="nv">minimum_thickness</span><span class="o">=</span><span class="m">250</span> <span class="c1"># Angstrom</span>
+<span class="nv">water_scaling</span><span class="o">=</span><span class="m">1</span>.0
+<span class="nv">wanted_defocus</span><span class="o">=</span><span class="m">12000</span> <span class="c1"># Angstrom</span>
+<span class="nv">n_frames</span><span class="o">=</span><span class="m">30</span>
+<span class="nv">optional_args</span><span class="o">=</span><span class="s2">&quot; --max_number_of_noise_particles=6 &quot;</span>
+</pre></div>
+</div>
+<div class="figure align-center" id="id6">
+<a class="reference internal image-reference" href="../../../_images/Sim_tutorial2_5.svg"><img alt="../../../_images/Sim_tutorial2_5.svg" src="../../../_images/Sim_tutorial2_5.svg" /></a>
+<p class="caption"><span class="caption-number">Fig. 5 </span><span class="caption-text"><strong>Realistic particle stack</strong></span><a class="headerlink" href="#id6" title="Permalink to this image">¶</a></p>
+</div>
+</div>
+<hr class="docutils" />
+<div class="section" id="summary">
+<h3>Summary<a class="headerlink" href="#summary" title="Permalink to this headline">¶</a></h3>
+<p>TODO: List of key concepts and links to How-tos (e.g. modify the distribution of random noise particles) and discussions (e.g. limits on expsoure/frame, exposure rate etc.)</p>
+</div>
+</div>
+</div>
+
+    <script type="text/x-thebe-config">
+    {
+        requestKernel: true,
+        binderOptions: {
+            repo: "binder-examples/jupyter-stacks-datascience",
+            ref: "master",
+        },
+        codeMirrorConfig: {
+            theme: "abcdef",
+            mode: "python"
+        },
+        kernelOptions: {
+            kernelName: "python3",
+            path: "./docs/sim/tutorials"
+        },
+        predefinedOutput: true
+    }
+    </script>
+    <script>kernelName = 'python3'</script>
+
+              </div>
+              
+        
+        <div class='prev-next-bottom'>
+            
+    <a class='left-prev' id="prev-link" href="../intro.html" title="previous page"><span style="color: darkred"><strong>Intro</strong></span></a>
+    <a class='right-next' id="next-link" href="../reference/reference.html" title="next page"><span style="color: darkred"><strong>Reference</strong></span></a>
+
+        </div>
+        
+        </div>
+    </div>
+    <footer class="footer mt-5 mt-md-0">
+    <div class="container">
+      <p>
+        
+          By The cisTEM cryoEM Community<br/>
+        
+            &copy; Copyright 2021.<br/>
+      </p>
+    </div>
+  </footer>
+</main>
+
+
+      </div>
+    </div>
+  
+  <script src="../../../_static/js/index.1c5a1a01449ed65a7b51.js"></script>
+
+  
+  </body>
+</html>

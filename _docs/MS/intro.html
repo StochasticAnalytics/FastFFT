@@ -1,0 +1,677 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FastFFT &#8212; dev and user guides</title>
+    
+  <link href="../../_static/css/theme.css" rel="stylesheet" />
+  <link href="../../_static/css/index.c5995385ac14fb8791e8eb36b4908be2.css" rel="stylesheet" />
+
+    
+  <link rel="stylesheet"
+    href="../../_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../../_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../../_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    
+      
+
+    
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/sphinx-book-theme.e8f53015daec13862f6db5e763c41738.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/togglebutton.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sphinx-thebe.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/panels-main.c949a650a448cc0ae9fd3441c0e17fb0.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/panels-variables.06eb56fa6e07937060861dad626602ad.css" />
+    
+  <link rel="preload" as="script" href="../../_static/js/index.1c5a1a01449ed65a7b51.js">
+
+    <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+    <script src="../../_static/jquery.js"></script>
+    <script src="../../_static/underscore.js"></script>
+    <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/togglebutton.js"></script>
+    <script src="../../_static/clipboard.min.js"></script>
+    <script src="../../_static/copybutton.js"></script>
+    <script >var togglebuttonSelector = '.toggle, .admonition.dropdown, .tag_hide_input div.cell_input, .tag_hide-input div.cell_input, .tag_hide_output div.cell_output, .tag_hide-output div.cell_output, .tag_hide_cell.cell, .tag_hide-cell.cell';</script>
+    <script src="../../_static/sphinx-book-theme.12a9622fbb08dcb3a2a40b2c02b83a57.js"></script>
+    <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["\\(", "\\)"]], "displayMath": [["\\[", "\\]"]], "processRefs": false, "processEnvironments": false}})</script>
+    <script async="async" src="https://unpkg.com/thebe@0.5.1/lib/index.js"></script>
+    <script >
+        const thebe_selector = ".thebe"
+        const thebe_selector_input = "pre"
+        const thebe_selector_output = ".output"
+    </script>
+    <script async="async" src="../../_static/sphinx-thebe.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="&lt;no title&gt;" href="testfile.html" />
+    <link rel="prev" title="Welcome to your source for info about FastFFT" href="../../intro.html" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="en" />
+    
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
+    
+    <div class="container-fluid" id="banner"></div>
+
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+<div class="col-12 col-md-3 bd-sidebar site-navigation show" id="site-navigation">
+    
+        <div class="navbar-brand-box">
+    <a class="navbar-brand text-wrap" href="../../index.html">
+      
+      
+      <h1 class="site-logo" id="site-title">dev and user guides</h1>
+      
+    </a>
+</div><form class="bd-search d-flex align-items-center" action="../../search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search this book..." aria-label="Search this book..." autocomplete="off" >
+</form><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item active">
+        <ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../intro.html">
+   Welcome to your source for info about FastFFT
+  </a>
+ </li>
+</ul>
+<p class="caption">
+ <span class="caption-text">
+  Manuscript
+ </span>
+</p>
+<ul class="current nav bd-sidenav">
+ <li class="toctree-l1 current active has-children">
+  <a class="current reference internal" href="#">
+   FastFFT
+  </a>
+  <input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/>
+  <label for="toctree-checkbox-1">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul class="simple">
+  </ul>
+ </li>
+</ul>
+<p class="caption">
+ <span class="caption-text">
+  Appendix
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1 has-children">
+  <a class="reference internal" href="../../_appendix.html">
+   Supress warnings - not intended for readers
+  </a>
+  <input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/>
+  <label for="toctree-checkbox-2">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul class="simple">
+  </ul>
+ </li>
+</ul>
+
+    </div>
+</nav> <!-- To handle the deprecated key -->
+
+<div class="navbar_extra_footer">
+  Powered by <a href="https://jupyterbook.org">Jupyter Book</a>
+</div>
+
+</div>
+
+
+          
+
+
+          
+<main class="col py-md-3 pl-md-4 bd-content overflow-auto" role="main">
+    
+    <div class="topbar container-xl fixed-top">
+    <div class="topbar-contents row">
+        <div class="col-12 col-md-3 bd-topbar-whitespace site-navigation show"></div>
+        <div class="col pl-md-4 topbar-main">
+            
+            <button id="navbar-toggler" class="navbar-toggler ml-0" type="button" data-toggle="collapse"
+                data-toggle="tooltip" data-placement="bottom" data-target=".site-navigation" aria-controls="navbar-menu"
+                aria-expanded="true" aria-label="Toggle navigation" aria-controls="site-navigation"
+                title="Toggle navigation" data-toggle="tooltip" data-placement="left">
+                <i class="fas fa-bars"></i>
+                <i class="fas fa-arrow-left"></i>
+                <i class="fas fa-arrow-up"></i>
+            </button>
+            
+            
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn" aria-label="Download this page"><i
+            class="fas fa-download"></i></button>
+
+    <div class="dropdown-buttons">
+        <!-- ipynb file if we had a myst markdown file -->
+        
+        <!-- Download raw file -->
+        <a class="dropdown-buttons" href="../../_sources/_docs/MS/intro.md"><button type="button"
+                class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
+                data-placement="left">.md</button></a>
+        <!-- Download PDF via print -->
+        <button type="button" id="download-print" class="btn btn-secondary topbarbtn" title="Print to PDF"
+            onClick="window.print()" data-toggle="tooltip" data-placement="left">.pdf</button>
+    </div>
+</div>
+
+            <!-- Source interaction buttons -->
+
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn"
+        aria-label="Connect with source repository"><i class="fab fa-github"></i></button>
+    <div class="dropdown-buttons sourcebuttons">
+        <a class="repository-button"
+            href="https://github.com/bHimes/FastFFT"><button type="button" class="btn btn-secondary topbarbtn"
+                data-toggle="tooltip" data-placement="left" title="Source repository"><i
+                    class="fab fa-github"></i>repository</button></a>
+        <a class="issues-button"
+            href="https://github.com/bHimes/FastFFT/issues/new?title=Issue%20on%20page%20%2F_docs/MS/intro.html&body=Your%20issue%20content%20here."><button
+                type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip" data-placement="left"
+                title="Open an issue"><i class="fas fa-lightbulb"></i>open issue</button></a>
+        
+    </div>
+</div>
+
+            <!-- Full screen (wrap in <a> to have style consistency -->
+
+<a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
+        data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
+        title="Fullscreen mode"><i
+            class="fas fa-expand"></i></button></a>
+
+            <!-- Launch buttons -->
+
+        </div>
+
+        <!-- Table of contents -->
+        <div class="d-none d-md-block col-md-2 bd-toc show">
+            
+            <div class="tocsection onthispage pt-5 pb-3">
+                <i class="fas fa-list"></i> Contents
+            </div>
+            <nav id="bd-toc-nav" aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#project-summary">
+   Project Summary
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#goals">
+     Goals:
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#design">
+     Design:
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#abstract">
+   Abstract
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#introduction">
+   Introduction
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#the-fourier-transform">
+     The Fourier Transform
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#the-discrete-fourier-trasnform">
+     The discrete Fourier Trasnform
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#the-fast-discrete-fourier-transform">
+     the fast (discrete) Fourier Transform
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#exploiting-zero-values">
+     exploiting zero values
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#theory">
+   Theory
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#the-dft-and-fft">
+     The DFT and FFT
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#summary-of-gpu-memory-hierarchy-as-it-pertains-to-this-work">
+     Summary of GPU memory hierarchy as it pertains to this work
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#graphic-to-illustrate-how-the-implicit-transpose-and-real-space-shifting-reduces-memory-access-for-forward-padding">
+     Graphic to illustrate how the implicit transpose and real-space shifting reduces memory access for forward padding
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#maths-for-further-reduced-memory-access-and-computation-using-transform-decomposition-on-sparse-inputs">
+     Maths for further reduced memory access and computation using transform decomposition on sparse inputs
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#maths-for-partial-outputs">
+     Maths for partial outputs
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#id1">
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#results">
+   Results
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#basic-performance">
+     Basic performance
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#comparing-2d-ffts-using-cufftdx-w-o-reordering">
+       Comparing 2D FFTs using cufftdx w/o reordering
+      </a>
+      <ul class="nav section-nav flex-column">
+       <li class="toc-h5 nav-item toc-entry">
+        <a class="reference internal nav-link" href="#table-1-fft-ifft-pairs">
+         Table 1: FFT/iFFT pairs
+        </a>
+       </li>
+      </ul>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#comparing-2d-fft-based-convolution">
+       Comparing 2D FFT based convolution
+      </a>
+      <ul class="nav section-nav flex-column">
+       <li class="toc-h5 nav-item toc-entry">
+        <a class="reference internal nav-link" href="#table-2-zero-padded-convolution-of-4096-pixel-sq-image">
+         Table 2: zero padded convolution of 4096 pixel sq. image
+        </a>
+       </li>
+      </ul>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#input-movies-are-sparse-speed-up">
+       Input movies are sparse (speed-up)
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#movies-have-a-predictable-shift-range">
+       Movies have a predictable shift range
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#d-template-matching">
+       2D template matching
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#id2">
+       3D template matching
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#subtomogram-averaging">
+       Subtomogram averaging
+      </a>
+     </li>
+    </ul>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#discussion">
+   Discussion
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#conclusion">
+   Conclusion
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#references">
+   References
+  </a>
+ </li>
+</ul>
+
+            </nav>
+        </div>
+    </div>
+</div>
+    <div id="main-content" class="row">
+        <div class="col-12 col-md-9 pl-md-3 pr-md-0">
+        
+              <div>
+                
+  <div class="section" id="fastfft">
+<h1>FastFFT<a class="headerlink" href="#fastfft" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="project-summary">
+<h2>Project Summary<a class="headerlink" href="#project-summary" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="goals">
+<h3>Goals:<a class="headerlink" href="#goals" title="Permalink to this headline">¶</a></h3>
+<p>This project aims to accelerate a specific subset of Fast Fourier Transforms (FFTs) especially important image processing, my particular flavor of which is  high-resolution phase-contrast cryo-Electron Microscopy. The gist is to take advantage of the cufftdx library from Nvidia, currently in early access, as well as algorithmic ideas from <em>Sorensen et. al</em> <a class="reference external" href="#1">[1]</a>. I became aware of <a class="reference external" href="https://github.com/DTolm/VkFFT">VkFFT</a> after I had finished my initial <a class="reference external" href="https://github.com/bHimes/cisTEM_downstream_bah/blob/DFT/src/gpu/DFTbyDecomposition.cu">proof of principle</a> experiments with cufftdx in Oct 2020. It may be entirely possible to do the same things using that library, though I haven’t had a chance to look through the source.</p>
+<p>An additional experiment tied to this project, is the development of the scientific manuscript “live” alongside the development of the code. While most of my projects are pretty safe from being scooped, this one is decidedly “scoopable” as it should have broad impact, and also shouldn’t be to hard to implement once the info is presented.</p>
+</div>
+<div class="section" id="design">
+<h3>Design:<a class="headerlink" href="#design" title="Permalink to this headline">¶</a></h3>
+<p>The FourierTransformer class, in the FastFFT namespace may be used in your cpp/cuda project by including the <em>header.</em> The basic usage is as follows:</p>
+<ul class="simple">
+<li><p>The input/output data pointers, size and type are set. (analagous to the cufftXtMakePlanMany)</p></li>
+<li><p>Class methods are provided to handle memory allocation on the gpu as well as transfer to/from host/device.</p></li>
+<li><p>Simple methods for FwdFFT, InvFFT, CrossCorrelation etc. are public and call the correct combination of substranforms based on the data and padding/trimming wanted.</p></li>
+</ul>
+</div>
+</div>
+<hr class="docutils" />
+<div class="section" id="abstract">
+<h2>Abstract<a class="headerlink" href="#abstract" title="Permalink to this headline">¶</a></h2>
+<p>The Fast Fourier transform is one of the most widely used and heavily optimized algorithms in digital signal processing. cryoEM makes heavy use of the FFT as it can accelerate convolution operations used for image alignment, and also in reconstruction algorithms that operate most accurately in Fourier space. FFT libraries like FFTW and cuFFT provide routines for highly-optimized general purpose multi-dimensional FFTs; however, they overlook several use-cases where only a subset of the input or output points are required. We show here algorithms based on transform decomposition are well suited to the memory hierarchy on moden GPUs, and can be implemented using the cufftdx header library to accelerate several important algorithms by factors of 3-10x over Nvidia’s cuFFT library. These include movie-frame alignment, image resampling via Fourier cropping, 2d and 3d template matching, and subtomogram averaging and alignment.</p>
+</div>
+<div class="section" id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="the-fourier-transform">
+<h3>The Fourier Transform<a class="headerlink" href="#the-fourier-transform" title="Permalink to this headline">¶</a></h3>
+<p>The Fourier Trasnform is a mathematical operation that converts a function between two dual spaces, for example, time and frequency, or position and momentum ⚠️. A function that is well localized in postion (commonly “real” space) will be delocalized in momentum (commonly “Fourier” or “K” space) and vice-versa. Converting between different representations of the same function has many practical uses; of particular interest to the author is in image filtering. [⚠️Provide some examples, low/high pass, frequency marching algs etc.] [⚠️ provide equation, maybe explain different conventions (wolfram is useful.)]</p>
+<p><span class="math notranslate nohighlight">\( \int_{-\inf}^{\inf}x(n)e^{-2i{\pi}kn}dn \)</span></p>
+</div>
+<div class="section" id="the-discrete-fourier-trasnform">
+<h3>The discrete Fourier Trasnform<a class="headerlink" href="#the-discrete-fourier-trasnform" title="Permalink to this headline">¶</a></h3>
+<p>The discrete Fourier Transform (DFT) extends the operation of the Fourier Transform to a band-limited sequence of evenly spaced samples of a continous function ⚠️.</p>
+<div class="math notranslate nohighlight" id="equation-dft-equation">
+<span class="eqno">(1)<a class="headerlink" href="#equation-dft-equation" title="Permalink to this equation">¶</a></span>\[X(k) = \sum_{n=0}^{N-1} x(n) \exp\left( -2\pi i k n \right) \]</div>
+<ul class="simple">
+<li><p>list properties (And brief example with a few citations for where each is capitalized on.)</p>
+<ul>
+<li><p>linearity</p></li>
+<li><p>Parsevals</p></li>
+<li><p>Convolution theorem</p></li>
+<li><p>sinc interpolation</p></li>
+<li><p>Fourier Slice theorem</p></li>
+<li></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="the-fast-discrete-fourier-transform">
+<h3>the fast (discrete) Fourier Transform<a class="headerlink" href="#the-fast-discrete-fourier-transform" title="Permalink to this headline">¶</a></h3>
+<p>In looking at [⚠️ DFT equation above] it is clear that the DFT requires <span class="math notranslate nohighlight">\( O(N^2) \)</span>
+complex exponential, multiplications and additions. The fast Fourier Transform (FFT) reduces the compuational complexity to <span class="math notranslate nohighlight">\( O(Nlog_2{N}) \)</span>
+with the most efficient algorithm, the split-radix FFT requiring just <span class="math notranslate nohighlight">\( 4Nlog_2{N} - 6N %2B 8 \)</span>
+operations <a class="reference external" href="#2">[2]</a>. While discussions on the FFT center on computational complexity from the standpoint of floating point operations, on modern GPU hardware they are memory-bandwidth limited, with an estimated 80% of the computational run-time being dedicated to moving data on and off chip ⚠️ .</p>
+</div>
+<div class="section" id="exploiting-zero-values">
+<h3>exploiting zero values<a class="headerlink" href="#exploiting-zero-values" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li><p>Concept, reduce ops, but especially i/o</p></li>
+<li><p>Mention pruning</p></li>
+<li><p>Introduce transform decomposition (Sorensen)</p></li>
+<li><p>Pictorial explanation for the major benefactors, also list estimate of ops.</p>
+<ul>
+<li><p>Movie alignment</p></li>
+<li><p>2D TM</p></li>
+<li><p>3D TM</p></li>
+<li><p>Subtomogram averaging</p></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<div class="section" id="theory">
+<h2>Theory<a class="headerlink" href="#theory" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="the-dft-and-fft">
+<h3>The DFT and FFT<a class="headerlink" href="#the-dft-and-fft" title="Permalink to this headline">¶</a></h3>
+<p>Fast Fourier Transform (FFT) is a mathematical operation that transforms a function <span class="math notranslate nohighlight">\( X(n) \)</span> from the real-valued plane into the complex-valued plane. The function <span class="math notranslate nohighlight">\( f(x) \)</span> is a function of <span class="math notranslate nohighlight">\( x \)</span> and is often a function of the real-valued signal <span class="math notranslate nohighlight">\( x \)</span> or a function of the complex-valued signal <span class="math notranslate nohighlight">\( x + i\cdot y \)</span>. The FFT is an optimized algorithm for copying the discrete Fourier transform (DFT) defined as:</p>
+<p>( I think this paragraph is probably belonging in the introduction )</p>
+<p>The FFT is useful in image analysis as it can help to isolate repetitive features of a given size. It is also useful in signal processing as it can be used to perform convolution operations. Multidimensional FFTs are fully seperable, such that in the simpliest case, FFTs in higher dimensions are composed of a sequence of 1D FFTs. For example, in two dimensions, the FFT of a 2D image is composed of the 1D FFTs of the rows and columns. A naive implementation is compuatationally ineffecient due to the strided memory access pattern⚠️. One solution is to transpose the data after the FFT and then transpose the result back ⚠️. This requires extra trips to and from main memory. Another solution is to decompose the 2D transform using vector-radix FFTs ⚠️.</p>
+</div>
+<div class="section" id="summary-of-gpu-memory-hierarchy-as-it-pertains-to-this-work">
+<h3>Summary of GPU memory hierarchy as it pertains to this work<a class="headerlink" href="#summary-of-gpu-memory-hierarchy-as-it-pertains-to-this-work" title="Permalink to this headline">¶</a></h3>
+<p>Working with a subset of input or output points for an FFT exposes several possibilites to exploit fine grained control of the memory hierarchy available on modern Nvidia GPUs.</p>
+</div>
+<div class="section" id="graphic-to-illustrate-how-the-implicit-transpose-and-real-space-shifting-reduces-memory-access-for-forward-padding">
+<h3>Graphic to illustrate how the implicit transpose and real-space shifting reduces memory access for forward padding<a class="headerlink" href="#graphic-to-illustrate-how-the-implicit-transpose-and-real-space-shifting-reduces-memory-access-for-forward-padding" title="Permalink to this headline">¶</a></h3>
+</div>
+<div class="section" id="maths-for-further-reduced-memory-access-and-computation-using-transform-decomposition-on-sparse-inputs">
+<h3>Maths for further reduced memory access and computation using transform decomposition on sparse inputs<a class="headerlink" href="#maths-for-further-reduced-memory-access-and-computation-using-transform-decomposition-on-sparse-inputs" title="Permalink to this headline">¶</a></h3>
+</div>
+<div class="section" id="maths-for-partial-outputs">
+<h3>Maths for partial outputs<a class="headerlink" href="#maths-for-partial-outputs" title="Permalink to this headline">¶</a></h3>
+</div>
+<div class="section" id="id1">
+<h3><a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h3>
+</div>
+</div>
+<div class="section" id="results">
+<h2>Results<a class="headerlink" href="#results" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="basic-performance">
+<h3>Basic performance<a class="headerlink" href="#basic-performance" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="comparing-2d-ffts-using-cufftdx-w-o-reordering">
+<h4>Comparing 2D FFTs using cufftdx w/o reordering<a class="headerlink" href="#comparing-2d-ffts-using-cufftdx-w-o-reordering" title="Permalink to this headline">¶</a></h4>
+<p>By design, the cufft library from Nvidia returns an FFT in the natural order [TODO check term] which requires two transpose operations, which in many cases seem to be optimized to reduce global memory access via vector-radix transforms. This means that the numbers we compare here are not quite apples to apples, as the result from FastFFT is transposed in memory in the Fourier domain.</p>
+<div class="section" id="table-1-fft-ifft-pairs">
+<h5>Table 1: FFT/iFFT pairs<a class="headerlink" href="#table-1-fft-ifft-pairs" title="Permalink to this headline">¶</a></h5>
+<table class="colwidths-auto table">
+<thead>
+<tr class="row-odd"><th class="head"><p>2D square size</p></th>
+<th class="head"><p>cufft/FastFFT runtime (10k iterations)</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>64</p></td>
+<td><p>2.34</p></td>
+</tr>
+<tr class="row-odd"><td><p>128</p></td>
+<td><p>2.39</p></td>
+</tr>
+<tr class="row-even"><td><p>256</p></td>
+<td><p>2.06</p></td>
+</tr>
+<tr class="row-odd"><td><p>512</p></td>
+<td><p>1.20</p></td>
+</tr>
+<tr class="row-even"><td><p>1024</p></td>
+<td><p>0.92</p></td>
+</tr>
+<tr class="row-odd"><td><p>4096</p></td>
+<td><p>1.17</p></td>
+</tr>
+</tbody>
+</table>
+<p>:biohazard: None of the kernels are even remotely optimized at this point, they have only been assembled and tested to pass expected behavior for FFTs of constant functions, unit impulse functions, and basic convolution ops.</p>
+<p>:plus: Add in results for using the decomposition method for non-powers of two, more computation but fewer local memory accesses vs Bluesteins.</p>
+</div>
+</div>
+<div class="section" id="comparing-2d-fft-based-convolution">
+<h4>Comparing 2D FFT based convolution<a class="headerlink" href="#comparing-2d-fft-based-convolution" title="Permalink to this headline">¶</a></h4>
+<div class="section" id="table-2-zero-padded-convolution-of-4096-pixel-sq-image">
+<h5>Table 2: zero padded convolution of 4096 pixel sq. image<a class="headerlink" href="#table-2-zero-padded-convolution-of-4096-pixel-sq-image" title="Permalink to this headline">¶</a></h5>
+<table class="colwidths-auto table">
+<thead>
+<tr class="row-odd"><th class="head"><p>2D square size kernel size</p></th>
+<th class="head"><p>cufft/FastFFT runtime (10k iterations)</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>64</p></td>
+<td><p>2.79</p></td>
+</tr>
+<tr class="row-odd"><td><p>128</p></td>
+<td><p>2.81</p></td>
+</tr>
+<tr class="row-even"><td><p>256</p></td>
+<td><p>2.71</p></td>
+</tr>
+<tr class="row-odd"><td><p>512</p></td>
+<td><p>2.66</p></td>
+</tr>
+<tr class="row-even"><td><p>1024</p></td>
+<td><p>2.48</p></td>
+</tr>
+</tbody>
+</table>
+<p>:biohazard: None of the kernels are even remotely optimized at this point, they have only been assembled and tested to pass expected behavior for FFTs of constant functions, unit impulse functions, and basic convolution ops.</p>
+<ul>
+<li><p>Movie alignment expense (Pre/post process and alignment percentages.)</p>
+<p>:soon:</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="section" id="input-movies-are-sparse-speed-up">
+<h4>Input movies are sparse (speed-up)<a class="headerlink" href="#input-movies-are-sparse-speed-up" title="Permalink to this headline">¶</a></h4>
+<p>The largest speed up for a subset of input points is had when those non-zero points are contiguous, however, the reduced memory transfers even for non-contiguous values is still dope. The low-exposure imaging conditions used in HR-cryoEM generally results in ~10% non-zeros. ⚠️ Something about EER format.</p>
+</div>
+<div class="section" id="movies-have-a-predictable-shift-range">
+<h4>Movies have a predictable shift range<a class="headerlink" href="#movies-have-a-predictable-shift-range" title="Permalink to this headline">¶</a></h4>
+<p>The shifts between subsequent exposures in cryoEM movie frames is relatively small, on the order of tens of Angstroms (usually 5-20 pixels) in early frames, down to angstroms (0.5-2 pixels) in later frames. Using this prior knowledge, we can use only a limited subset of the output pixels, dramatically decreasing runtime in the translational search.</p>
+</div>
+<div class="section" id="d-template-matching">
+<h4>2D template matching<a class="headerlink" href="#d-template-matching" title="Permalink to this headline">¶</a></h4>
+<p>Typical use case is to search an image of size ~ 4K x 4K over ~ 2 million cross correlations, with a template that is ~ 384-512 pixels square. Each of these searches requires padding the template to the size of the search image, taking the FFT, conj mul and iFFT. We currently optimize this by transforming the search image in single-precision, storing in FP16 to improve reads. Convert from FP16 and conj mul in single precision using cuFFT callbacks on the load, convert back to FP16 on the store with a store call back. Here we improve on this by …</p>
+</div>
+<div class="section" id="id2">
+<h4>3D template matching<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h4>
+<p>Pad something like 128 –&gt; 512^3 over X chunks. Far fewer orientations than 2DTM (number).</p>
+</div>
+<div class="section" id="subtomogram-averaging">
+<h4>Subtomogram averaging<a class="headerlink" href="#subtomogram-averaging" title="Permalink to this headline">¶</a></h4>
+<p>While the total zero padding is less (1.5x to 2x) than 3D template matching, there are typically many more cross-correlations in a given project. Like movie alignment, subtomogram averaging also benefits in both directions, as the translational search allows for a strictly limited set of output points to find the shifts. These combined lead to X speedup.</p>
+</div>
+</div>
+</div>
+<div class="section" id="discussion">
+<h2>Discussion<a class="headerlink" href="#discussion" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="conclusion">
+<h2>Conclusion<a class="headerlink" href="#conclusion" title="Permalink to this headline">¶</a></h2>
+<p>The FFT has many applications in signal and image processing, such that improving its efficiency for even a subset of problems can still have a broad impact. Here we demonstrate how fairly old algorithmic ideas, transform decomposition, can be mapped to new computational hardware to achieve substantial computational acceleration. The use cases presented in the results have typical run-times on the order of hours to days, such that even fractional speed ups, much less 2-5 fold acceleration are substantial. Gimme some oreos now.</p>
+</div>
+<div class="section" id="references">
+<h2>References<a class="headerlink" href="#references" title="Permalink to this headline">¶</a></h2>
+<p>&lt;a id=”1 $[1]</a>
+H. V. Sorensen and C. S. Burrus, “Efficient computation of the DFT with only a subset of input or output points,” in IEEE Transactions on Signal Processing, vol. 41, no. 3, pp. 1184-1200, March 1993, doi: 10.1109/78.205723.</p>
+<p>&lt;a id=”2 $[2]</a>
+H. V. Sorensen, M. T. Heideman, and C. S. Bums, “On computing
+the split-radix FFT,” IEEE Trans. Acoust., Speech, Signal Processing, vol. ASSP-34, no. 11, pp. 152-156, Feb. 1986</p>
+</div>
+<div class="toctree-wrapper compound">
+</div>
+</div>
+
+    <script type="text/x-thebe-config">
+    {
+        requestKernel: true,
+        binderOptions: {
+            repo: "binder-examples/jupyter-stacks-datascience",
+            ref: "master",
+        },
+        codeMirrorConfig: {
+            theme: "abcdef",
+            mode: "python"
+        },
+        kernelOptions: {
+            kernelName: "python3",
+            path: "./_docs/MS"
+        },
+        predefinedOutput: true
+    }
+    </script>
+    <script>kernelName = 'python3'</script>
+
+              </div>
+              
+        
+            
+
+
+
+<div class='prev-next-bottom'>
+    
+    <div id="prev">
+        <a class="left-prev" href="../../intro.html" title="previous page">
+            <i class="prevnext-label fas fa-angle-left"></i>
+            <div class="prevnext-info">
+                <p class="prevnext-label">previous</p>
+                <p class="prevnext-title">Welcome to your source for info about <em>Fast</em>FFT</p>
+            </div>
+        </a>
+    </div>
+     <div id="next">
+        <a class="right-next" href="testfile.html" title="next page">
+            <div class="prevnext-info">
+                <p class="prevnext-label">next</p>
+                <p class="prevnext-title">&lt;no title&gt;</p>
+            </div>
+            <i class="prevnext-label fas fa-angle-right"></i>
+        </a>
+     </div>
+
+</div>
+        
+        </div>
+    </div>
+    <footer class="footer mt-5 mt-md-0">
+    <div class="container">
+      <p>
+        
+          By The *Fast*FFT Community<br/>
+        
+            &copy; Copyright 2021.<br/>
+      </p>
+    </div>
+  </footer>
+</main>
+
+
+      </div>
+    </div>
+  
+  <script src="../../_static/js/index.1c5a1a01449ed65a7b51.js"></script>
+
+  
+  </body>
+</html>
