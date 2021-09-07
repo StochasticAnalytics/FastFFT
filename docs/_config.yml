@@ -1,9 +1,9 @@
 # Book settings
 # Learn more at https://jupyterbook.org/customize/config.html
 
-title: dev and user guides
+title: FastFFT
 author: The *Fast*FFT Community
-#logo: icons/cisTEM_logo_dev.png TODO
+logo: icons/logo1.svg
 # Patterns to skip when building the book.
 exclude_patterns: [README.md, _build, icons]
 
