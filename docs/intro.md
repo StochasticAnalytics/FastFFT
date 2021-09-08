@@ -2,9 +2,15 @@
 
 *Fast*FFT (Fast Fast Fourier Transforms) _n_ - 
 
+Testing this reference {cite:p}`hansen_dynamic-signaling-team_2010`
 
+And here is my test bibliography:
+```{bibliography}
+:style: unsrt
+```
 ## Project Summary
 
+hansen_dynamic-signaling-team_2010
 #### Goals:
 
 This project aims to accelerate a specific subset of Fast Fourier Transforms (FFTs) especially important image processing, my particular flavor of which is  high-resolution phase-contrast cryo-Electron Microscopy. The gist is to take advantage of the cufftdx library from Nvidia, currently in early access, as well as algorithmic ideas from *Sorensen et. al* [[1]](#1). I became aware of [VkFFT](https://github.com/DTolm/VkFFT) after I had finished my initial [proof of principle](https://github.com/bHimes/cisTEM_downstream_bah/blob/DFT/src/gpu/DFTbyDecomposition.cu) experiments with cufftdx in Oct 2020. It may be entirely possible to do the same things using that library, though I haven't had a chance to look through the source.
