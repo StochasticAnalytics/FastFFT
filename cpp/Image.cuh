@@ -105,7 +105,7 @@ float ReturnSumOfReal(float* input, short4 size)
     {
       for (int i = 0; i < size.x; i++)
       {
-        temp_sum += (input[address]);
+        temp_sum += double(input[address]);
         address++;
       }
       address += padding_jump_val;
