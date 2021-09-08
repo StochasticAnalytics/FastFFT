@@ -39,6 +39,7 @@ namespace FastFFT {
     int* position_space_buffer = nullptr;
     int* momentum_space = nullptr;
     int* momentum_space_buffer = nullptr;
+    int* image_to_search = nullptr;
   };
 
   // Input real, compute single-precision
@@ -48,6 +49,7 @@ namespace FastFFT {
     float*  position_space_buffer;
     float2* momentum_space;
     float2* momentum_space_buffer;
+    float2* image_to_search;
 
   };
 
@@ -58,6 +60,7 @@ namespace FastFFT {
     __half*  position_space_buffer;
     __half2* momentum_space;
     __half2* momentum_space_buffer;
+    __half2* image_to_search;
   };
 
   // Input complex, compute single-precision
@@ -67,6 +70,7 @@ namespace FastFFT {
     float2*  position_space_buffer;
     float2*  momentum_space;
     float2*  momentum_space_buffer;
+    float2*  image_to_search;
   };
 
   // Input complex, compute half-precision FP16
@@ -76,6 +80,7 @@ namespace FastFFT {
     __half2*  position_space_buffer;
     __half2*  momentum_space;
     __half2*  momentum_space_buffer;
+    __half2*  image_to_search;
 
   };
 
@@ -214,8 +219,41 @@ private:
   void SetDefaults();
   void CheckDimensions();
 
-  inline void GetTransformSize(int input_size)
+
+  enum KernelType { r2c_decomposed, r2c_decomposed_transposed, r2c_transposed, c2c_padded, c2c, c2c_decomposed,
+                    c2r_decomposed, c2r_decomposed_transposed, c2r_transposed, xcorr_transposed, xcorr_decomposed}; // Used to specify the origin of the data
+    
+  std::vector<std::string> 
+        KernelName{ "r2c_decomposed", "r2c_decomposed_transposed", "r2c_transposed", "c2c_padded", "c2c", "c2c_decomposed", 
+                    "c2r_decomposed", "c2r_decomposed_transposed", "c2r_transposed",  "xcorr_transposed", "xcorr_decomposed"};
+
+  void GetTransformSize(KernelType kernel_type)
   {
+    int input_size;
+
+    switch (kernel_type)
+    {
+      case r2c_transposed:
+        input_size = dims_in.x;
+        break;
+      case xcorr_decomposed:
+        input_size = dims_out.y;
+        break;
+      case c2c_padded:
+        input_size = dims_in.y;
+        break;
+      case c2c:
+        input_size = dims_out.y;
+        break;
+      case c2r_transposed:
+        input_size = dims_out.x;
+        break;
+      default:
+        std::cerr << "Function GetTransformSize does not recognize the kernel type ( " << KernelName[kernel_type] << " )" << std::endl;
+        exit(-1);
+    }
+
+
     if ( abs(fmod(log2(float(input_size)), 1)) < 1e-6 ) 
     {
       // For the time being, this also implies a block transform rather than a thread transform.
@@ -239,16 +277,44 @@ private:
     }
   };
 
-  inline void GetTransformSize_thread(int input_size, int thread_fft_size)
+  inline void GetTransformSize_thread(KernelType kernel_type, int thread_fft_size)
   {
+        int input_size;
+
+    switch (kernel_type)
+    {
+      case r2c_decomposed:
+        input_size = dims_in.x;
+        break;
+      case r2c_decomposed_transposed:
+        input_size = dims_in.x;
+        break;
+      case c2c_decomposed:
+        if (dims_in.y == 1) input_size = dims_in.x;
+        else input_size = dims_in.y;
+        break;
+      case c2r_decomposed:
+        input_size = dims_out.x;
+        break;
+      case c2r_decomposed_transposed:
+        input_size = dims_out.x;
+        break;
+      case xcorr_decomposed:
+        if (dims_in.y == 1) input_size = dims_out.x; // FIXME should probably throw an error for now.
+        else input_size = dims_out.y; // does dims_in make sense?
+
+        break;
+      default:
+        std::cerr << "Function GetTransformSize_thread does not recognize the kernel type ( " << KernelName[kernel_type] << " )" << std::endl;
+        exit(-1);
+    }
+
     if (input_size % thread_fft_size != 0) { std::cerr << "Thread based decompositions must factor by thread_fft_size (" << thread_fft_size << ") in the current implmentations." << std::endl; exit(-1); }
     transform_divisor = input_size / thread_fft_size;
     transform_size = thread_fft_size;
   };
 
 
-  enum KernelType { r2c_decomposed, r2c_decomposed_transposed, r2c_transposed, c2c_padded, c2c, c2c_decomposed, c2r_transposed,
-                    c2r_decomposed, c2r_decomposed_transposed,  xcorr_transposed, xcorr_decomposed}; // Used to specify the origin of the data
 
   // TODO: not sure this should be inlined. (Probably ignored by the compiler anyway.)
   inline LaunchParams SetLaunchParameters(const int& ept, KernelType kernel_type, bool do_forward_transform = true)
@@ -521,32 +587,25 @@ private:
     return wanted_memory;
   }
 
-  void FFT_R2C_decomposed(bool transpose_output = true);
-  void FFT_R2C(bool transpose_output = true); // non-transposed is not implemented and will fail at runtime.
-  void FFT_R2C_WithPadding(bool transpose_output = true) ;// non-transposed is not implemented and will fail at runtime.
-  void FFT_C2C_WithPadding(bool swap_real_space_quadrants = false);
-  void FFT_C2C( bool do_forward_transform );
-  void FFT_C2C_decomposed( bool do_forward_transform );
-  void FFT_C2R_Transposed();
-  void FFT_C2R_decomposed(bool transpose_output = true);
-
-
-  void FFT_C2C_WithPadding_ConjMul_C2C(float2* image_to_search, bool swap_real_space_quadrants = false);
-  void FFT_C2C_decomposed_ConjMul_C2C(float2* image_to_search, bool swap_real_space_quadrants = false);
-
-
-  template<class FFT> void FFT_R2C_decomposed_t(bool transpose_output);
-  template<class FFT> void FFT_R2C_t(bool transpose_output);
-  template<class FFT> void FFT_R2C_WithPadding_t(bool transpose_output);
-  template<class FFT> void FFT_C2C_WithPadding_t(bool swap_real_space_quadrants);
-  template<class FFT> void FFT_C2C_t( bool do_forward_transform );
-  template<class FFT> void FFT_C2C_decomposed_t( bool do_forward_transform );
-  template<class FFT> void FFT_C2R_Transposed_t();
-  template<class FFT> void FFT_C2R_decomposed_t(bool transpose_output);
 
 
   template<class FFT, class invFFT> void FFT_C2C_WithPadding_ConjMul_C2C_t(float2* image_to_search, bool swap_real_space_quadrants);
   template<class FFT, class invFFT> void FFT_C2C_decomposed_ConjMul_C2C_t(float2* image_to_search, bool swap_real_space_quadrants);
+
+  // 1. 
+  // First call passed from a public transform function, selects block or thread and the transform precision.
+  template <bool use_thread_method = false>
+  void SetPrecisionAndExectutionMethod(KernelType kernel_type, bool do_forward_transform);
+
+  // 2.
+  // Second call, sets size of the transform kernel, selects the appropriate GPU arch
+  template <class FFT_base>
+  void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform);
+
+  // 3.
+  // Third call, sets the input and output dimensions and type
+  template <class FFT_base_arch, bool use_thread_method = false>
+  void SetAndLaunchKernel(KernelType kernel_type, bool do_forward_transform);
 
 
 
