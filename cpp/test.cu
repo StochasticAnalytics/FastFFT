@@ -238,7 +238,6 @@ void unit_impulse_test(short4 input_size, short4 output_size)
   FT.SetToConstant<float>(host_output.real_values, host_output.real_memory_allocated, 0.0f);
 
   sum = ReturnSumOfReal(host_output.real_values, dims_out);
-  std::cout<< "    pre unit impulse test sum = " << sum << std::endl;
   // host_input.real_values[ dims_in.y/2 * (dims_in.x+host_input.padding_jump_value) + dims_in.x/2] = 1.0f;
   // short4 wanted_center = make_short4(0,0,0,0);
   // ClipInto(host_input.real_values, host_output.real_values, dims_in ,  dims_out,  wanted_center, 0.f);
@@ -249,7 +248,6 @@ void unit_impulse_test(short4 input_size, short4 output_size)
 
 
   sum = ReturnSumOfReal(host_output.real_values, dims_out);
-  std::cout<< "    unit impulse test sum = " << sum << std::endl;
   MyFFTDebugAssertTestTrue( sum == 1,"Unit impulse Init ");
   
   // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
@@ -258,7 +256,7 @@ void unit_impulse_test(short4 input_size, short4 output_size)
   host_output.FwdFFT();
   
   host_output.fftw_epsilon = ReturnSumOfComplexAmplitudes(host_output.complex_values, host_output.real_memory_allocated/2);  
-  std::cout << "host" << host_output.fftw_epsilon << " " << host_output.real_memory_allocated<< std::endl;
+  std::cout << "host " << host_output.fftw_epsilon << " " << host_output.real_memory_allocated<< std::endl;
 
   host_output.fftw_epsilon -= (host_output.real_memory_allocated/2 );
   MyFFTDebugAssertTestTrue( std::abs(host_output.fftw_epsilon) < 1e-8 , "FFTW unit impulse forward FFT");
@@ -295,7 +293,8 @@ void unit_impulse_test(short4 input_size, short4 output_size)
   sum -= (host_output.real_memory_allocated/2 );
 
 
-  std::cout << "FFT Unit Impulse Forward FFT: " << sum <<  " epsilon" << host_output.fftw_epsilon << std::endl;
+  std::cout << "FFT Unit Impulse Forward FFT: " << sum <<  " epsilon " << host_output.fftw_epsilon << std::endl;
+  std::cout << "epsilon " << abs(sum - host_output.fftw_epsilon) << std::endl;
   MyFFTDebugAssertTestTrue( abs(sum - host_output.fftw_epsilon) < 1e-8, "FastFFT unit impulse forward FFT");
   FT.SetToConstant<float>(host_output.real_values, host_output.real_memory_allocated, 2.0f);
   

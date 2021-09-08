@@ -788,7 +788,8 @@ void block_fft_kernel_C2C_WithPadding_ConjMul_C2C(const ComplexType* __restrict_
 //	// Initialize the shared memory, assuming everyting matches the input data X size in
   using complex_type = ComplexType;
 
-	__shared__ complex_type shared_mem[invFFT::shared_memory_size/sizeof(complex_type)]; // Storage for the input data that is re-used each blcok
+	// __shared__ complex_type shared_mem[invFFT::shared_memory_size/sizeof(complex_type)]; // Storage for the input data that is re-used each blcok
+	extern __shared__ complex_type shared_mem[]; // Storage for the input data that is re-used each blcok
 
   complex_type thread_data[FFT::storage_size];
 
@@ -817,7 +818,8 @@ void block_fft_kernel_C2C_WithPadding_ConjMul_C2C_SwapRealSpaceQuadrants(const C
 //	// Initialize the shared memory, assuming everyting matches the input data X size in
   using complex_type = ComplexType;
 
-	__shared__ complex_type shared_mem[invFFT::shared_memory_size/sizeof(complex_type)]; // Storage for the input data that is re-used each blcok
+	// __shared__ complex_type shared_mem[invFFT::shared_memory_size/sizeof(complex_type)]; // Storage for the input data that is re-used each blcok
+	extern __shared__ complex_type shared_mem[]; // Storage for the input data that is re-used each blcok
 
   complex_type thread_data[FFT::storage_size];
 
@@ -1614,12 +1616,14 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         cudaError_t error_code = cudaSuccess;
         auto workspace = make_workspace<FFT>(error_code);
         
-          // cudaErr(cudaFuncSetCacheConfig( (void*)block_fft_kernel_C2C_WithPadding<FFT,complex_type>,cudaFuncCachePreferShared ));
+        // cudaErr(cudaFuncSetCacheConfig( (void*)block_fft_kernel_C2C_WithPadding<FFT,complex_type>,cudaFuncCachePreferShared ));
           // cudaFuncSetSharedMemConfig ( (void*)block_fft_kernel_C2C_WithPadding<FFT,complex_type>, cudaSharedMemBankSizeEightByte );
+          cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_WithPadding<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, 64000));
       
         int shared_mem;
         // Aggregate the transformed frequency data in shared memory so that we can write to global coalesced.
         shared_mem = LP.mem_offsets.shared_output*sizeof(complex_type) + LP.mem_offsets.shared_input*sizeof(complex_type) + FFT::shared_memory_size;
+        std::cout << "shared_mem " << shared_mem << std::endl;
         // When it is the output dims being smaller, may need a logical or different method
         //FIXME
         bool swap_real_space_quadrants = false;

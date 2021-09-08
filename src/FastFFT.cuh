@@ -12,7 +12,7 @@
 // 1 - basic checks without blocking
 // 2 - full checks, including blocking
 
-//#define HEAVYERRORCHECKING_FFT 
+#define HEAVYERRORCHECKING_FFT 
 
 // #ifdef DEBUG
 #define MyFFTPrint(...)	{std::cerr << __VA_ARGS__  << std::endl;}
@@ -86,8 +86,8 @@ void GetCudaDeviceArch( int &device, int &arch ) {
 using namespace cufftdx;
 
 // TODO this probably needs to depend on the size of the xform, at least small vs large.
-constexpr const int elements_per_thread_real = 8;
-constexpr const int elements_per_thread_complex = 8;
+constexpr const int elements_per_thread_real = 16;
+constexpr const int elements_per_thread_complex = 16;
 
 // All transforms are 
 using FFT_base   = decltype(Block() + Precision<float>() + ElementsPerThread<elements_per_thread_complex>()  + FFTsPerBlock<1>()  );
