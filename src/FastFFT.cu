@@ -1280,6 +1280,24 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
 
     switch (transform_size)
     {
+      case 16: {
+        switch (arch)
+        {
+          case 700: { using FFT = decltype(FFT_base()  + Size<16>()  + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 750: { using FFT = decltype(FFT_base()  + Size<16>()  + SM<750>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 800: { using FFT = decltype(FFT_base()  + Size<16>()  + SM<800>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+        }
+        break; }
+
+      case 32: {
+        switch (arch)
+        {
+          case 700: { using FFT = decltype(FFT_base()  + Size<32>()  + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 750: { using FFT = decltype(FFT_base()  + Size<32>()  + SM<750>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 800: { using FFT = decltype(FFT_base()  + Size<32>()  + SM<800>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+        }
+        break; }
+
       case 64: {
         switch (arch)
         {
@@ -1369,6 +1387,10 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
           case 800: { using FFT = decltype(FFT_base()  + Size<8192>()  + SM<800>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
         break; } 
+
+      default: {
+        MyFFTRunTimeAssertTrue(false, "FFT size not supported");
+      }
     }
 
   }
