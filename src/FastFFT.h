@@ -207,6 +207,7 @@ private:
 
   InputType* host_pointer;
   InputType* pinnedPtr;
+  ComputeType* image_to_search; // This is used for cross-correlation, assumed float2 or __half2.
 
   void Deallocate();
   void UnPinHostMemory();
@@ -295,7 +296,9 @@ private:
         input_size = dims_out.x;
         break;
       case xcorr_decomposed:
-        input_size = dims_out.y;
+        if (dims_in.y == 1) input_size = dims_out.x; // FIXME should probably throw an error for now.
+        else input_size = dims_out.y; // does dims_in make sense?
+
         break;
       default:
         std::cerr << "Function GetTransformSize_thread does not recognize the kernel type ( " << KernelName[kernel_type] << " )" << std::endl;
@@ -580,28 +583,6 @@ private:
     return wanted_memory;
   }
 
-  void FFT_R2C_decomposed(bool transpose_output = true);
-  void FFT_R2C(bool transpose_output = true); // non-transposed is not implemented and will fail at runtime.
-  void FFT_R2C_WithPadding(bool transpose_output = true) ;// non-transposed is not implemented and will fail at runtime.
-  void FFT_C2C_WithPadding(bool swap_real_space_quadrants = false);
-  void FFT_C2C( bool do_forward_transform );
-  void FFT_C2C_decomposed( bool do_forward_transform );
-  void FFT_C2R_Transposed();
-  void FFT_C2R_decomposed(bool transpose_output = true);
-
-
-  void FFT_C2C_WithPadding_ConjMul_C2C(float2* image_to_search, bool swap_real_space_quadrants = false);
-  void FFT_C2C_decomposed_ConjMul_C2C(float2* image_to_search, bool swap_real_space_quadrants = false);
-
-
-  template<class FFT> void FFT_R2C_decomposed_t(bool transpose_output);
-  template<class FFT> void FFT_R2C_t(bool transpose_output);
-  template<class FFT> void FFT_R2C_WithPadding_t(bool transpose_output);
-  template<class FFT> void FFT_C2C_WithPadding_t(bool swap_real_space_quadrants);
-  template<class FFT> void FFT_C2C_t( bool do_forward_transform );
-  template<class FFT> void FFT_C2C_decomposed_t( bool do_forward_transform );
-  template<class FFT> void FFT_C2R_Transposed_t();
-  template<class FFT> void FFT_C2R_decomposed_t(bool transpose_output);
 
 
   template<class FFT, class invFFT> void FFT_C2C_WithPadding_ConjMul_C2C_t(float2* image_to_search, bool swap_real_space_quadrants);
