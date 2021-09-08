@@ -39,6 +39,7 @@ namespace FastFFT {
     int* position_space_buffer = nullptr;
     int* momentum_space = nullptr;
     int* momentum_space_buffer = nullptr;
+    int* image_to_search = nullptr;
   };
 
   // Input real, compute single-precision
@@ -48,6 +49,7 @@ namespace FastFFT {
     float*  position_space_buffer;
     float2* momentum_space;
     float2* momentum_space_buffer;
+    float2* image_to_search;
 
   };
 
@@ -58,6 +60,7 @@ namespace FastFFT {
     __half*  position_space_buffer;
     __half2* momentum_space;
     __half2* momentum_space_buffer;
+    __half2* image_to_search;
   };
 
   // Input complex, compute single-precision
@@ -67,6 +70,7 @@ namespace FastFFT {
     float2*  position_space_buffer;
     float2*  momentum_space;
     float2*  momentum_space_buffer;
+    float2*  image_to_search;
   };
 
   // Input complex, compute half-precision FP16
@@ -76,6 +80,7 @@ namespace FastFFT {
     __half2*  position_space_buffer;
     __half2*  momentum_space;
     __half2*  momentum_space_buffer;
+    __half2*  image_to_search;
 
   };
 
@@ -207,7 +212,6 @@ private:
 
   InputType* host_pointer;
   InputType* pinnedPtr;
-  ComputeType* image_to_search; // This is used for cross-correlation, assumed float2 or __half2.
 
   void Deallocate();
   void UnPinHostMemory();
@@ -216,12 +220,12 @@ private:
   void CheckDimensions();
 
 
-  enum KernelType { r2c_decomposed, r2c_decomposed_transposed, r2c_transposed, c2c_padded, c2c, c2c_decomposed, c2r_transposed,
-                    c2r_decomposed, c2r_decomposed_transposed,  xcorr_transposed, xcorr_decomposed}; // Used to specify the origin of the data
+  enum KernelType { r2c_decomposed, r2c_decomposed_transposed, r2c_transposed, c2c_padded, c2c, c2c_decomposed,
+                    c2r_decomposed, c2r_decomposed_transposed, c2r_transposed, xcorr_transposed, xcorr_decomposed}; // Used to specify the origin of the data
     
   std::vector<std::string> 
-        KernelName{ "r2c_decomposed", "r2c_decomposed_transposed", "r2c_transposed", "c2c_padded", "c2c", "c2c_decomposed", "c2r_transposed",
-                    "c2r_decomposed", """c2r_decomposed_transposed",  "xcorr_transposed", "xcorr_decomposed"};
+        KernelName{ "r2c_decomposed", "r2c_decomposed_transposed", "r2c_transposed", "c2c_padded", "c2c", "c2c_decomposed", 
+                    "c2r_decomposed", "c2r_decomposed_transposed", "c2r_transposed",  "xcorr_transposed", "xcorr_decomposed"};
 
   void GetTransformSize(KernelType kernel_type)
   {
@@ -238,7 +242,7 @@ private:
       case c2c_padded:
         input_size = dims_in.y;
         break;
-      case c2c;
+      case c2c:
         input_size = dims_out.y;
         break;
       case c2r_transposed:
@@ -590,7 +594,8 @@ private:
 
   // 1. 
   // First call passed from a public transform function, selects block or thread and the transform precision.
-  void SetPrecisionAndExectutionMethod(KernelType kernel_type, bool do_forward_transform, bool use_thread_method);
+  template <bool use_thread_method = false>
+  void SetPrecisionAndExectutionMethod(KernelType kernel_type, bool do_forward_transform);
 
   // 2.
   // Second call, sets size of the transform kernel, selects the appropriate GPU arch
@@ -599,7 +604,7 @@ private:
 
   // 3.
   // Third call, sets the input and output dimensions and type
-  template <class FFT_base_arch>
+  template <class FFT_base_arch, bool use_thread_method = false>
   void SetAndLaunchKernel(KernelType kernel_type, bool do_forward_transform);
 
 
