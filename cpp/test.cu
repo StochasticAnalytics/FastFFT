@@ -789,7 +789,7 @@ int main(int argc, char** argv) {
 
 
 
-    // const_image_test(test_size);
+    const_image_test(test_size);
       
     for (int iSize = 0; iSize < test_size.size() - 1; iSize++) {
       int oSize = iSize + 1;

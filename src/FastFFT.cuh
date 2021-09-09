@@ -70,15 +70,20 @@ namespace FastFFT {
   }
 
 // GetCudaDeviceArch from https://github.com/mnicely/cufft_examples/blob/master/Common/cuda_helper.h
-void GetCudaDeviceArch( int &device, int &arch ) {
+void GetCudaDeviceProps( DeviceProps& dp ) {
   int major;
   int minor;
-  cudaErr( cudaGetDevice( &device ) );
 
-  cudaErr( cudaDeviceGetAttribute( &major, cudaDevAttrComputeCapabilityMajor, device ) );
-  cudaErr( cudaDeviceGetAttribute( &minor, cudaDevAttrComputeCapabilityMinor, device ) );
+  cudaErr( cudaGetDevice( &dp.device_id ) );
+  cudaErr( cudaDeviceGetAttribute( &major, cudaDevAttrComputeCapabilityMajor, dp.device_id ) );
+  cudaErr( cudaDeviceGetAttribute( &minor, cudaDevAttrComputeCapabilityMinor, dp.device_id ) );
 
-  arch = major * 100 + minor * 10;
+  dp.device_arch = major * 100 + minor * 10;
+
+  cudaErr( cudaDeviceGetAttribute( &dp.max_shared_memory_per_block, cudaDevAttrMaxSharedMemoryPerBlock, dp.device_id ) );
+  cudaErr( cudaDeviceGetAttribute( &dp.max_shared_memory_per_SM, cudaDevAttrMaxSharedMemoryPerMultiprocessor, dp.device_id) );
+  cudaErr( cudaDeviceGetAttribute( &dp.max_registers_per_block, cudaDevAttrMaxRegistersPerBlock, dp.device_id ) );
+  cudaErr( cudaDeviceGetAttribute( &dp.max_persisting_L2_cache_size, cudaDevAttrMaxPersistingL2CacheSize, dp.device_id) );
 }
 
 //////////////////////
