@@ -5,155 +5,186 @@
 
 // The Fourier transform of a constant should be a unit impulse, and on back fft, without normalization, it should be a constant * N.
 // It is assumed the input/output have the same dimension (i.e. no padding)
-void const_image_test(short4 input_size, short4 output_size)
+void const_image_test(std::vector<int> size)
 {
 
-  MyFFTRunTimeAssertTrue(input_size.x == output_size.x && input_size.y == output_size.y && input_size.z == output_size.z, "Input/output size mismatch");
+  bool all_passed = true;
+  std::vector<bool> init_passed(size.size(), true);
+  std::vector<bool> FFTW_passed(size.size(), true);
+  std::vector<bool> FastFFT_forward_passed(size.size(), true);
+  std::vector<bool> FastFFT_roundTrip_passed(size.size(), true);
 
-  bool test_passed = true;
-  long address = 0;
-  float sum;
-  const float acceptable_epsilon = 1e-4;
-  float2 sum_complex;
-
-  Image< float, float2 > host_input(input_size);
-  Image< float, float2 > host_output(output_size);
-  Image< float, float2 > device_output(output_size);
-
-
-    // Pointers to the arrays on the host -- maybe make this a struct of some sort? I'm sure there is a parallel in cuda, look into cuarray/texture code
-
-  // We just make one instance of the FourierTransformer class, with calc type float.
-  // For the time being input and output are also float. TODO calc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
-  FastFFT::FourierTransformer<float, float, float> FT;
-  
-  // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
-  FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-  FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-
-  // Determine how much memory we need, working with FFTW/CUDA style in place transform padding.
-  // Note: there is no reason we really need this, because the xforms will always be out of place. 
-  //       For now, this is just in place because all memory in cisTEM is allocated accordingly.
-  host_input.real_memory_allocated = FT.ReturnInputMemorySize();
-  host_output.real_memory_allocated = FT.ReturnOutputMemorySize();
-  
-  // On the device, we will always allocate enough memory for the larger of input/output including the buffer array.
-  // Minmize the number of calls to malloc which are slow and can lead to fragmentation.
-  device_output.real_memory_allocated = std::max(host_input.real_memory_allocated, host_output.real_memory_allocated);
-  
-  
-  // In your own programs, you will be handling this memory allocation yourself. We'll just make something here.
-  // I think fftwf_malloc may potentially create a different alignment than new/delete, but kinda doubt it. For cisTEM consistency...
-  bool set_fftw_plan = true;
-  host_input.Allocate(set_fftw_plan);
-  host_output.Allocate(set_fftw_plan);
-
-    
-  // Set our input host memory to a constant. Then FFT[0] = host_input_memory_allocated
-  FT.SetToConstant<float>(host_output.real_values, host_output.real_memory_allocated, 1.0f);
-
-    
-
-  
-  // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
-  // ensures faster transfer. If false, it will be pinned for you.
-  FT.SetInputPointer(host_output.real_values, false);
-  sum = ReturnSumOfReal(host_output.real_values, output_size);
-  MyFFTDebugAssertTestTrue( sum == output_size.x*output_size.y*output_size.z,"Unit impulse Init ");
-  
-  // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
-  FT.CopyHostToDevice();
-    
-  host_output.FwdFFT();
-  
-  test_passed = true;
-  for (long index = 1; index < host_output.real_memory_allocated/2; index++)
+  for (int n = 0; n < size.size() ; n++)
   {
-    if (host_output.complex_values[index].x != 0.0f && host_output.complex_values[index].y != 0.0f) { std::cout << host_output.complex_values[index].x  << " " << host_output.complex_values[index].y << " " << std::endl; test_passed = false;}
+
+    short4 input_size = make_short4(size[n],size[n],1,0);
+    short4 output_size = make_short4(size[n],size[n],1,0);
+
+    bool test_passed = true;
+    long address = 0;
+    float sum;
+    const float acceptable_epsilon = 1e-4;
+    float2 sum_complex;
+
+    Image< float, float2 > host_input(input_size);
+    Image< float, float2 > host_output(output_size);
+    Image< float, float2 > device_output(output_size);
+
+
+      // Pointers to the arrays on the host -- maybe make this a struct of some sort? I'm sure there is a parallel in cuda, look into cuarray/texture code
+
+    // We just make one instance of the FourierTransformer class, with calc type float.
+    // For the time being input and output are also float. TODO calc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
+    FastFFT::FourierTransformer<float, float, float> FT;
+    
+    // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
+    FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+    FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+
+      // The padding (dims.w) is calculated based on the setup
+    short4 dims_in = FT.ReturnInputDimensions();
+    short4 dims_out = FT.ReturnOutputDimensions();
+
+    // Determine how much memory we need, working with FFTW/CUDA style in place transform padding.
+    // Note: there is no reason we really need this, because the xforms will always be out of place. 
+    //       For now, this is just in place because all memory in cisTEM is allocated accordingly.
+    host_input.real_memory_allocated = FT.ReturnInputMemorySize();
+    host_output.real_memory_allocated = FT.ReturnOutputMemorySize();
+    
+    // On the device, we will always allocate enough memory for the larger of input/output including the buffer array.
+    // Minmize the number of calls to malloc which are slow and can lead to fragmentation.
+    device_output.real_memory_allocated = std::max(host_input.real_memory_allocated, host_output.real_memory_allocated);
+    
+    
+    // In your own programs, you will be handling this memory allocation yourself. We'll just make something here.
+    // I think fftwf_malloc may potentially create a different alignment than new/delete, but kinda doubt it. For cisTEM consistency...
+    bool set_fftw_plan = true;
+    host_input.Allocate(set_fftw_plan);
+    host_output.Allocate(set_fftw_plan);
+
+      
+    // Set our input host memory to a constant. Then FFT[0] = host_input_memory_allocated
+    FT.SetToConstant<float>(host_output.real_values, host_output.real_memory_allocated, 1.0f);
+
+      
+
+    
+    // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
+    // ensures faster transfer. If false, it will be pinned for you.
+    FT.SetInputPointer(host_output.real_values, false);
+    sum = ReturnSumOfReal(host_output.real_values, dims_out);
+    if (sum != dims_out.x*dims_out.y*dims_out.z) {all_passed = false; init_passed[n] = false;}
+
+    // MyFFTDebugAssertTestTrue( sum == dims_out.x*dims_out.y*dims_out.z,"Unit impulse Init ");
+    
+    // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
+    FT.CopyHostToDevice();
+      
+    host_output.FwdFFT();
+    
+    test_passed = true;
+    for (long index = 1; index < host_output.real_memory_allocated/2; index++)
+    {
+      if (host_output.complex_values[index].x != 0.0f && host_output.complex_values[index].y != 0.0f) { std::cout << host_output.complex_values[index].x  << " " << host_output.complex_values[index].y << " " << std::endl; test_passed = false;}
+    }
+    if (host_output.complex_values[0].x != (float)dims_out.x * (float)dims_out.y * (float)dims_out.z) test_passed = false;
+    // for (int i = 0; i < 10; i++)
+    // {
+    //   std::cout << "FFTW unit " << host_output.complex_values[i].x << " " << host_output.complex_values[i].y << std::endl;
+    // }
+    if (test_passed == false) {all_passed = false; FFTW_passed[n] = false;}
+    // MyFFTDebugAssertTestTrue( test_passed, "FFTW unit impulse forward FFT");
+    
+    // Just to make sure we don't get a false positive, set the host memory to some undesired value.
+    FT.SetToConstant<float>(host_output.real_values, host_output.real_memory_allocated, 2.0f);
+    
+    // This method will call the regular FFT kernels given the input/output dimensions are equal when the class is instantiated.
+    bool swap_real_space_quadrants = false;
+    FT.FwdFFT(swap_real_space_quadrants);
+    
+    // in buffer, do not deallocate, do not unpin memory
+    FT.CopyDeviceToHost( false, false);
+    test_passed = true;
+    for (long index = 1; index < host_output.real_memory_allocated/2; index++)
+    {
+      if (host_output.complex_values[index].x != 0.0f && host_output.complex_values[index].y != 0.0f) {test_passed = false;} // std::cout << host_output.complex_values[index].x  << " " << host_output.complex_values[index].y << " " << std::endl;}
+    }
+    if (host_output.complex_values[0].x != (float)dims_out.x * (float)dims_out.y * (float)dims_out.z) test_passed = false;
+    // int n=0;
+    // for (int x = 0; x <  host_output.size.y ; x++)
+    // {
+      
+    //   std::cout << x << "[ ";
+    //   for (int y = 0; y < host_output.size.w; y++)
+    //   {  
+    //     std::cout << host_output.complex_values[x + y*host_output.size.y].x << "," << host_output.complex_values[x + y*host_output.size.y].y << " ";
+    //     n++;
+    //     if (n == 34) {n = 0; std::cout << std::endl ;} // line wrapping
+    //   }
+    //   std::cout << "] " << std::endl;
+    //   n = 0;
+    // }
+
+    if (test_passed == false) {all_passed = false; FastFFT_forward_passed[n] = false;}
+    // MyFFTDebugAssertTestTrue( test_passed, "FastFFT unit impulse forward FFT");
+    FT.SetToConstant<float>(host_input.real_values, host_input.real_memory_allocated, 2.0f);
+    
+
+    FT.InvFFT();
+    FT.CopyDeviceToHost( true, true);
+    
+    // Assuming the outputs are always even dimensions, padding_jump_val is always 2.
+    sum = ReturnSumOfReal(host_output.real_values, dims_out);
+
+    // COMPLEX TODO make these functions.
+    //   int n=0;
+    //   for (int x = 0; x <  host_output.size.y ; x++)
+    // {
+      
+    //   std::cout << x << "[ ";
+    //   for (int y = 0; y < host_output.size.w; y++)
+    //   {  
+    //     std::cout << host_output.complex_values[x + y*host_output.size.y].x << "," << host_output.complex_values[x + y*host_output.size.y].y << " ";
+    //     n++;
+    //     if (n == 34) {n = 0; std::cout << std::endl ;} // line wrapping
+    //   }
+    //   std::cout << "] " << std::endl;
+    //   n = 0;
+    // }
+      // REAL
+    //  int n=0;
+    // for (int x = 0; x <  host_output.size.x ; x++)
+    // {
+      
+    //   std::cout << x << "[ ";
+    //   for (int y = 0; y < host_output.size.y; y++)
+    //   {  
+    //     std::cout << host_output.real_values[x + y*host_output.size.w*2] <<  " ";
+    //     n++;
+    //     if (n == 32) {n = 0; std::cout << std::endl ;} // line wrapping
+    //   }
+    //   std::cout << "] " << std::endl;
+    //   n = 0;
+    // } 
+    if (sum != powf(dims_in.x*dims_in.y*dims_in.z,2)) {all_passed = false; FastFFT_roundTrip_passed[n] = false;}
+    // MyFFTDebugAssertTestTrue( sum == powf(dims_in.x*dims_in.y*dims_in.z,2),"FastFFT constant image round trip failed for size");
   }
-  if (host_output.complex_values[0].x != (float)output_size.x * (float)output_size.y * (float)output_size.z) test_passed = false;
-  for (int i = 0; i < 10; i++)
+  
+  if (all_passed)
   {
-    std::cout << "FFTW unit " << host_output.complex_values[i].x << " " << host_output.complex_values[i].y << std::endl;
+    std::cout << "    All const_image tests passed!" << std::endl;
   }
-
-  MyFFTDebugAssertTestTrue( test_passed, "FFTW unit impulse forward FFT");
-  
-  // Just to make sure we don't get a false positive, set the host memory to some undesired value.
-  FT.SetToConstant<float>(host_output.real_values, host_output.real_memory_allocated, 2.0f);
-  
-  // This method will call the regular FFT kernels given the input/output dimensions are equal when the class is instantiated.
-  bool swap_real_space_quadrants = false;
-  FT.FwdFFT(swap_real_space_quadrants);
-  
-  // in buffer, do not deallocate, do not unpin memory
-  FT.CopyDeviceToHost( false, false);
-  test_passed = true;
-  for (long index = 1; index < host_output.real_memory_allocated/2; index++)
+  else  
   {
-    if (host_output.complex_values[index].x != 0.0f && host_output.complex_values[index].y != 0.0f) {test_passed = false;} // std::cout << host_output.complex_values[index].x  << " " << host_output.complex_values[index].y << " " << std::endl;}
+    for (int n = 0; n < size.size() ; n++)
+    {
+      if ( ! init_passed[n] ) std::cout << "    Initialization failed for size " << size[n] << std::endl;
+      if ( ! FFTW_passed[n] ) std::cout << "    FFTW failed for size " << size[n] << std::endl;
+      if ( ! FastFFT_forward_passed[n] ) std::cout << "    FastFFT failed for forward transform size " << size[n] << std::endl;
+      if ( ! FastFFT_roundTrip_passed[n] ) std::cout << "    FastFFT failed for roundtrip transform size " << size[n] << std::endl;
+
+    }
   }
-  if (host_output.complex_values[0].x != (float)output_size.x * (float)output_size.y * (float)output_size.z) test_passed = false;
-  // int n=0;
-  // for (int x = 0; x <  host_output.size.y ; x++)
-  // {
-    
-  //   std::cout << x << "[ ";
-  //   for (int y = 0; y < host_output.size.w; y++)
-  //   {  
-  //     std::cout << host_output.complex_values[x + y*host_output.size.y].x << "," << host_output.complex_values[x + y*host_output.size.y].y << " ";
-  //     n++;
-  //     if (n == 34) {n = 0; std::cout << std::endl ;} // line wrapping
-  //   }
-  //   std::cout << "] " << std::endl;
-  //   n = 0;
-  // }
-
-
-  MyFFTDebugAssertTestTrue( test_passed, "FastFFT unit impulse forward FFT");
-  FT.SetToConstant<float>(host_input.real_values, host_input.real_memory_allocated, 2.0f);
-  
-
-  FT.InvFFT();
-  FT.CopyDeviceToHost( true, true);
-  
-  // Assuming the outputs are always even dimensions, padding_jump_val is always 2.
-  sum = ReturnSumOfReal(host_output.real_values, output_size);
-
-  // COMPLEX TODO make these functions.
-  //   int n=0;
-  //   for (int x = 0; x <  host_output.size.y ; x++)
-  // {
-    
-  //   std::cout << x << "[ ";
-  //   for (int y = 0; y < host_output.size.w; y++)
-  //   {  
-  //     std::cout << host_output.complex_values[x + y*host_output.size.y].x << "," << host_output.complex_values[x + y*host_output.size.y].y << " ";
-  //     n++;
-  //     if (n == 34) {n = 0; std::cout << std::endl ;} // line wrapping
-  //   }
-  //   std::cout << "] " << std::endl;
-  //   n = 0;
-  // }
-    // REAL
-  //  int n=0;
-  // for (int x = 0; x <  host_output.size.x ; x++)
-  // {
-    
-  //   std::cout << x << "[ ";
-  //   for (int y = 0; y < host_output.size.y; y++)
-  //   {  
-  //     std::cout << host_output.real_values[x + y*host_output.size.w*2] <<  " ";
-  //     n++;
-  //     if (n == 32) {n = 0; std::cout << std::endl ;} // line wrapping
-  //   }
-  //   std::cout << "] " << std::endl;
-  //   n = 0;
-  // } 
-  
-  MyFFTDebugAssertTestTrue( sum == powf(input_size.x*input_size.y*input_size.z,2),"FastFFT unit impulse round trip FFT");
-  
-
 }
 
 void unit_impulse_test(short4 input_size, short4 output_size)
@@ -176,13 +207,18 @@ void unit_impulse_test(short4 input_size, short4 output_size)
   // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
   FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
   FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural); 
-  
+ 
+  // The padding (dims.w) is calculated based on the setup
+  short4 dims_in = FT.ReturnInputDimensions();
+  short4 dims_out = FT.ReturnOutputDimensions();
   // Determine how much memory we need, working with FFTW/CUDA style in place transform padding.
   // Note: there is no reason we really need this, because the xforms will always be out of place. 
   //       For now, this is just in place because all memory in cisTEM is allocated accordingly.
   host_input.real_memory_allocated = FT.ReturnInputMemorySize();
   host_output.real_memory_allocated = FT.ReturnOutputMemorySize();
-  
+
+
+
   // On the device, we will always allocate enough memory for the larger of input/output including the buffer array.
   // Minmize the number of calls to malloc which are slow and can lead to fragmentation.
   device_output.real_memory_allocated = std::max(host_input.real_memory_allocated, host_output.real_memory_allocated);
@@ -201,27 +237,17 @@ void unit_impulse_test(short4 input_size, short4 output_size)
   FT.SetToConstant<float>(host_input.real_values, host_input.real_memory_allocated, 0.0f);
   FT.SetToConstant<float>(host_output.real_values, host_output.real_memory_allocated, 0.0f);
 
-  host_input.real_values[ input_size.y/2 * (input_size.x+host_input.padding_jump_value) + input_size.x/2] = 1.0f;
-  short4 wanted_center = make_short4(0,0,0,0);
-  ClipInto(host_input.real_values, host_output.real_values, input_size ,  output_size,  wanted_center, 0.f);
-  // for (int x = 0; x < 128; x++)
-  // {
-  //   int n=0;
-  //   std::cout << x << "[ ";
-  //   for (int y = 0; y < 128; y++)
-  //   {  
-  //     if (host_output[x + y*130]== 1) {host_output[x + y*130] = x; host_output[1 +x + y*130] = y;  n++;}
-  //     std::cout << host_output[x + y*130]<< " ";
-     
-  //   }
-  //   std::cout << "] " << n << std::endl;
-  // }
+  sum = ReturnSumOfReal(host_output.real_values, dims_out);
+  // host_input.real_values[ dims_in.y/2 * (dims_in.x+host_input.padding_jump_value) + dims_in.x/2] = 1.0f;
+  // short4 wanted_center = make_short4(0,0,0,0);
+  // ClipInto(host_input.real_values, host_output.real_values, dims_in ,  dims_out,  wanted_center, 0.f);
 
-  // Now set to origin and then phase swap quadrants
-  FT.SetToConstant<float>(host_input.real_values, host_input.real_memory_allocated, 0.0f);
+  // FT.SetToConstant<float>(host_input.real_values, host_input.real_memory_allocated, 0.0f);
   host_input.real_values[0] = 1.0f;
+  host_output.real_values[0] = 1.0f;
 
-  sum = ReturnSumOfReal(host_output.real_values, output_size);
+
+  sum = ReturnSumOfReal(host_output.real_values, dims_out);
   MyFFTDebugAssertTestTrue( sum == 1,"Unit impulse Init ");
   
   // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
@@ -230,7 +256,7 @@ void unit_impulse_test(short4 input_size, short4 output_size)
   host_output.FwdFFT();
   
   host_output.fftw_epsilon = ReturnSumOfComplexAmplitudes(host_output.complex_values, host_output.real_memory_allocated/2);  
-  std::cout << "host" << host_output.fftw_epsilon << " " << host_output.real_memory_allocated<< std::endl;
+  std::cout << "host " << host_output.fftw_epsilon << " " << host_output.real_memory_allocated<< std::endl;
 
   host_output.fftw_epsilon -= (host_output.real_memory_allocated/2 );
   MyFFTDebugAssertTestTrue( std::abs(host_output.fftw_epsilon) < 1e-8 , "FFTW unit impulse forward FFT");
@@ -267,7 +293,8 @@ void unit_impulse_test(short4 input_size, short4 output_size)
   sum -= (host_output.real_memory_allocated/2 );
 
 
-  std::cout << "FFT Unit Impulse Forward FFT: " << sum <<  " epsilon" << host_output.fftw_epsilon << std::endl;
+  std::cout << "FFT Unit Impulse Forward FFT: " << sum <<  " epsilon " << host_output.fftw_epsilon << std::endl;
+  std::cout << "epsilon " << abs(sum - host_output.fftw_epsilon) << std::endl;
   MyFFTDebugAssertTestTrue( abs(sum - host_output.fftw_epsilon) < 1e-8, "FastFFT unit impulse forward FFT");
   FT.SetToConstant<float>(host_output.real_values, host_output.real_memory_allocated, 2.0f);
   
@@ -285,8 +312,8 @@ void unit_impulse_test(short4 input_size, short4 output_size)
   //   std::cout << "] " << n << std::endl;
   // }
   // Assuming the outputs are always even dimensions, padding_jump_val is always 2.
-  sum = ReturnSumOfReal(host_output.real_values, output_size);
-  MyFFTDebugAssertTestTrue( sum == output_size.x*output_size.y*output_size.z,"FastFFT unit impulse round trip FFT");
+  sum = ReturnSumOfReal(host_output.real_values, dims_out);
+  MyFFTDebugAssertTestTrue( sum == dims_out.x*dims_out.y*dims_out.z,"FastFFT unit impulse round trip FFT");
   
 
 
@@ -730,14 +757,27 @@ int main(int argc, char** argv) {
   std::printf("Standard is %i\n\n",__cplusplus);
 
 
-  bool run_validation_tests = false;
-  bool run_performance_tests = true;
+  bool run_validation_tests;
+  bool run_performance_tests;
+
+  if (argc > 1)
+  {
+    run_validation_tests = false;
+    run_performance_tests = true;
+    std::cout << "Running performance tests.\n";
+  }
+  else
+  {
+    run_validation_tests = true;
+    run_performance_tests = false;
+    std::cout << "Running validation tests.\n";
+  }
   // Input and output dimensions, with simple checks. I'm sure there are better checks on argv.
   short4 input_size;
   short4 output_size;
 
-  constexpr const int n_tests = 6;
-  const int test_size[n_tests] = {64, 128, 320, 640, 1536, 4096};
+  constexpr const int n_tests = 8;
+  std::vector<int> test_size = { 64, 128, 256, 512, 1024, 2048, 4096};
 
   std::vector<int> test_sizes =  {32};//,64,128,256,320,480,512,544,608,768,1024,1056,1536,2048,2560,3072,3584,4096,5120,6144};
 
@@ -747,21 +787,13 @@ int main(int argc, char** argv) {
     // run_oned(test_sizes);
     // exit(0);
 
-    for (int iSize = 0; iSize < n_tests; iSize++) {
 
-      std::cout << std::endl << "Testing constant image size " << test_size[iSize] << " x" << std::endl;
-      input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
-      output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
 
-      const_image_test(input_size, output_size);
-      exit(0);
-
-    }
-
-   
-    for (int iSize = 0; iSize < n_tests - 1; iSize++) {
+    // const_image_test(test_size);
+      
+    for (int iSize = 0; iSize < test_size.size() - 1; iSize++) {
       int oSize = iSize + 1;
-      while (oSize < n_tests)
+      while (oSize < test_size.size())
       {
         std::cout << std::endl << "Testing padding from  " << test_size[iSize] << " to " << test_size[oSize] << std::endl;
         input_size = make_short4(test_size[iSize],test_size[iSize],1,0);

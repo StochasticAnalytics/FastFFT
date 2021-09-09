@@ -11,6 +11,7 @@ exclude_patterns: [README.md, _build, icons]
 sphinx:
   config: 
     suppress_warnings : ["myst.header"]
+    bibtex_reference_style: author_year
     latex_elements:
         preamble: |
           \newcommand\angstrom{\mathring{A}}
