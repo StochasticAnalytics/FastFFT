@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Welcome to your source for info about FastFFT &#8212; dev and user guides</title>
+    <title>Welcome to your source for info about FastFFT &#8212; FastFFT</title>
     
   <link href="_static/css/theme.css" rel="stylesheet" />
   <link href="_static/css/index.c5995385ac14fb8791e8eb36b4908be2.css" rel="stylesheet" />
@@ -70,8 +70,10 @@
         <div class="navbar-brand-box">
     <a class="navbar-brand text-wrap" href="index.html">
       
+      <img src="_static/logo1.svg" class="logo" alt="logo">
       
-      <h1 class="site-logo" id="site-title">dev and user guides</h1>
+      
+      <h1 class="site-logo" id="site-title">FastFFT</h1>
       
     </a>
 </div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
@@ -211,13 +213,25 @@
             <nav id="bd-toc-nav" aria-label="Page">
                 <ul class="visible nav section-nav flex-column">
  <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#request-new-documentation-or-report-bugs">
-   Request new documentation or report bugs
+  <a class="reference internal nav-link" href="#project-summary">
+   Project Summary
   </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#goals">
+     Goals:
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#design">
+     Design:
+    </a>
+   </li>
+  </ul>
  </li>
  <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#beyond-a-single-pipeline">
-   Beyond a single pipeline
+  <a class="reference internal nav-link" href="#request-new-documentation-or-report-bugs">
+   Request new documentation or report bugs
   </a>
  </li>
 </ul>
@@ -234,20 +248,34 @@
   <div class="section" id="welcome-to-your-source-for-info-about-fastfft">
 <h1>Welcome to your source for info about <em>Fast</em>FFT<a class="headerlink" href="#welcome-to-your-source-for-info-about-fastfft" title="Permalink to this headline">¶</a></h1>
 <p><em>Fast</em>FFT (Fast Fast Fourier Transforms) <em>n</em> -</p>
-<p><em>Fast</em>FFT is</p>
+<div class="section" id="project-summary">
+<h2>Project Summary<a class="headerlink" href="#project-summary" title="Permalink to this headline">¶</a></h2>
+<p>hansen_dynamic-signaling-team_2010</p>
+<div class="section" id="goals">
+<h3>Goals:<a class="headerlink" href="#goals" title="Permalink to this headline">¶</a></h3>
+<p>This project aims to accelerate a specific subset of Fast Fourier Transforms (FFTs) especially important image processing, my particular flavor of which is  high-resolution phase-contrast cryo-Electron Microscopy. The gist is to take advantage of the cufftdx library from Nvidia, currently in early access, as well as algorithmic ideas from <em>Sorensen et. al</em> <span id="id1">[<a class="reference internal" href="_docs/MS/intro.html#id8">Sorensen and Burrus, 1993</a>]</span>. I became aware of <a class="reference external" href="https://github.com/DTolm/VkFFT">VkFFT</a> after I had finished my initial <a class="reference external" href="https://github.com/bHimes/cisTEM_downstream_bah/blob/DFT/src/gpu/DFTbyDecomposition.cu">proof of principle</a> experiments with cufftdx in Oct 2020. It may be entirely possible to do the same things using that library, though I haven’t had a chance to look through the source.</p>
+<p>An additional experiment tied to this project, is the development of the <a class="reference internal" href="_docs/MS/intro.html#ms-label"><span class="std std-ref"><strong>scientific manuscript</strong></span></a> “live” alongside the development of the code. While most of my projects are pretty safe from being scooped, this one is decidedly “scoopable” as it should have broad impact, and also shouldn’t be to hard to implement once the info is presented.</p>
+</div>
+<div class="section" id="design">
+<h3>Design:<a class="headerlink" href="#design" title="Permalink to this headline">¶</a></h3>
+<p>The FourierTransformer class, in the FastFFT namespace may be used in your cpp/cuda project by including the <em>header.</em> The basic usage is as follows:</p>
+<ul class="simple">
+<li><p>The input/output data pointers, size and type are set. (analagous to the cufftXtMakePlanMany)</p></li>
+<li><p>Class methods are provided to handle memory allocation on the gpu as well as transfer to/from host/device.</p></li>
+<li><p>Simple methods for FwdFFT, InvFFT, CrossCorrelation etc. are public and call the correct combination of substranforms based on the data and padding/trimming wanted.</p></li>
+</ul>
+</div>
+</div>
 <div class="section" id="request-new-documentation-or-report-bugs">
 <h2>Request new documentation or report bugs<a class="headerlink" href="#request-new-documentation-or-report-bugs" title="Permalink to this headline">¶</a></h2>
 <div class="margin sidebar">
 <p class="sidebar-title"><em><strong>Formatting TIP</strong></em></p>
 <p>Use the <strong>write</strong> and <strong>preview</strong> tabs to see how the markdown you are editing in your github issue will look after submitting.</p>
 </div>
+<p>TODO add the these templates in the FastFFT repo</p>
 <!-- TODO add the these templates in the FastFFT repo
 If you do not find the info you need, please request it via [How Do I ... request](https://github.com/bHimes/cisTEM_docs/issues/new?assignees=&labels=documentation&template=how-do-i-do----.md&title=)
 If you find a bug, like a broken link, please report it [using this form](https://github.com/bHimes/cisTEM_docs/issues/new?assignees=&labels=bug&template=bug_report.md&title=) -->
-</div>
-<div class="section" id="beyond-a-single-pipeline">
-<h2>Beyond a single pipeline<a class="headerlink" href="#beyond-a-single-pipeline" title="Permalink to this headline">¶</a></h2>
-<p>The main objective of this documention is to enable you to use and/or contribute to the image processing library underlying <em>Fast</em>FFT.</p>
 </div>
 <div class="toctree-wrapper compound">
 </div>

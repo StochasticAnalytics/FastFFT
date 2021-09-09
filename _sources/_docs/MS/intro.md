@@ -1,50 +1,30 @@
+
 # FastFFT
-
-
-
-## Project Summary
-
-#### Goals:
-
-This project aims to accelerate a specific subset of Fast Fourier Transforms (FFTs) especially important image processing, my particular flavor of which is  high-resolution phase-contrast cryo-Electron Microscopy. The gist is to take advantage of the cufftdx library from Nvidia, currently in early access, as well as algorithmic ideas from *Sorensen et. al* [[1]](#1). I became aware of [VkFFT](https://github.com/DTolm/VkFFT) after I had finished my initial [proof of principle](https://github.com/bHimes/cisTEM_downstream_bah/blob/DFT/src/gpu/DFTbyDecomposition.cu) experiments with cufftdx in Oct 2020. It may be entirely possible to do the same things using that library, though I haven't had a chance to look through the source.
-
-An additional experiment tied to this project, is the development of the scientific manuscript "live" alongside the development of the code. While most of my projects are pretty safe from being scooped, this one is decidedly "scoopable" as it should have broad impact, and also shouldn't be to hard to implement once the info is presented.
-
-#### Design:
-
-The FourierTransformer class, in the FastFFT namespace may be used in your cpp/cuda project by including the *header.* The basic usage is as follows:
-
-- The input/output data pointers, size and type are set. (analagous to the cufftXtMakePlanMany)
-- Class methods are provided to handle memory allocation on the gpu as well as transfer to/from host/device.
-- Simple methods for FwdFFT, InvFFT, CrossCorrelation etc. are public and call the correct combination of substranforms based on the data and padding/trimming wanted.
-
 
 
 ---
 
+(MS-label)=
 ## Abstract
 
-The Fast Fourier transform is one of the most widely used and heavily optimized algorithms in digital signal processing. cryoEM makes heavy use of the FFT as it can accelerate convolution operations used for image alignment, and also in reconstruction algorithms that operate most accurately in Fourier space. FFT libraries like FFTW and cuFFT provide routines for highly-optimized general purpose multi-dimensional FFTs; however, they overlook several use-cases where only a subset of the input or output points are required. We show here algorithms based on transform decomposition are well suited to the memory hierarchy on moden GPUs, and can be implemented using the cufftdx header library to accelerate several important algorithms by factors of 3-10x over Nvidia’s cuFFT library. These include movie-frame alignment, image resampling via Fourier cropping, 2d and 3d template matching, and subtomogram averaging and alignment.
+The Fast Fourier transform is one of the most widely used and heavily optimized algorithms in digital signal processing. cryo-EM makes heavy use of the FFT as it can accelerate convolution operations used for image alignment, and also in reconstruction algorithms that operate most accurately in Fourier space. FFT libraries like FFTW and cuFFT provide routines for highly-optimized general purpose multi-dimensional FFTs; however, they overlook several use-cases where only a subset of the input or output points are required. We show here algorithms based on transform decomposition are well suited to the memory hierarchy on moden GPUs, and can be implemented using the cufftdx header library to accelerate several important algorithms by factors of 3-10x over Nvidia’s cuFFT library. These include movie-frame alignment, image resampling via Fourier cropping, 2d and 3d template matching, and subtomogram averaging and alignment.
 
 ## Introduction
 
-#### The Fourier Transform
 
-The Fourier Trasnform is a mathematical operation that converts a function between two dual spaces, for example, time and frequency, or position and momentum ⚠️. A function that is well localized in postion (commonly "real" space) will be delocalized in momentum (commonly "Fourier" or "K" space) and vice-versa. Converting between different representations of the same function has many practical uses; of particular interest to the author is in image filtering. [⚠️Provide some examples, low/high pass, frequency marching algs etc.] [⚠️ provide equation, maybe explain different conventions (wolfram is useful.)]
-
-$ \int_{-\inf}^{\inf}x(n)e^{-2i{\pi}kn}dn $
+The Discrete Fourier Transform (DFT) and linear filtering, *e.g.* convolution, are among the most common operations in digital signal processing. It is assumed that the reader has basic familiarity with Fourier Analysis and it's applications in their respective fields; we will focus here on digital image processing for convenience. For a detailed introduction to the reader is referred to the free book by Smith {cite:p}`smith_mathematics_2008`. 
 
 
 #### The discrete Fourier Trasnform
 
-The discrete Fourier Transform (DFT) extends the operation of the Fourier Transform to a band-limited sequence of evenly spaced samples of a continous function ⚠️.
+The discrete Fourier Transform (DFT) extends the operation of the Fourier Transform to a band-limited sequence of evenly spaced samples of a continous function. In one dimension, it is defined for a sequence of N samples $x(n)$ as:
 
 ```{math}
 : label : dft_equation
 X(k) = \sum_{n=0}^{N-1} x(n) \exp\left( -2\pi i k n \right) 
 ```
 
-  - list properties (And brief example with a few citations for where each is capitalized on.)
+  - ⚠️ TODO: list properties (And brief example with a few citations, preferably specific to cryo-EM where each is capitalized on.)
     - linearity
     - Parsevals
     - Convolution theorem
@@ -55,9 +35,20 @@ X(k) = \sum_{n=0}^{N-1} x(n) \exp\left( -2\pi i k n \right)
 #### the fast (discrete) Fourier Transform
 
 In looking at [⚠️ DFT equation above] it is clear that the DFT requires $ O(N^2) $
- complex exponential, multiplications and additions. The fast Fourier Transform (FFT) reduces the compuational complexity to $ O(Nlog_2{N}) $
- with the most efficient algorithm, the split-radix FFT requiring just $ 4Nlog_2{N} - 6N %2B 8 $
- operations [[2]](#2). While discussions on the FFT center on computational complexity from the standpoint of floating point operations, on modern GPU hardware they are memory-bandwidth limited, with an estimated 80% of the computational run-time being dedicated to moving data on and off chip ⚠️ .
+ complex exponential function evaluations, multiplications, and additions. The fast Fourier Transform (FFT) reduces the compuational complexity to $ O(Nlog_2{N}) $
+ with the most efficient algorithm, the split-radix FFT requiring just $ 4Nlog_2{N} - 6N  $. The Cooley-Tukey algorithm {cite:p}`cooley_algorithm_1965` was published little more than a decade after the first digitial computers became available. As is often the case in science, their discovery was really a re-discovery; the divide and conquer approach that underpins the FFT was already known to Gauss as early as 1805, predating Fourier's work itself! {cite:p}`heideman_gauss_1985` 
+
+ ```{epigraph}
+This story of the FFT can be used to give one incentive to investigate not
+only new and novel approaches, but to occasionally look over old papers and see the variety of tricks and clever ideas which were used when computing was, by itself, a laborious chore which gave clever people great incentive to develop efficient methods. Perhaps among the ideas discarded before the days of electronic computers, we may find more seeds of new
+algorithms.
+
+-- James W. Cooley {cite}`cooley_re-discovery_1987`
+```
+
+This present work itself follows from this same spirit of re-discovery; presently with respect to ideas discarded before the days of efficient graphics processing units (GPUs), rather than electronic computers on a whole.
+
+⚠️ Segue to include notes from FFTW - before last PP, something something FFTW is an example of dev since then - as those authors note, pruning something something, note on arithmetic vs caches (cite actual FFTW paper) something something.
 
 #### exploiting zero values
 
@@ -169,9 +160,7 @@ The FFT has many applications in signal and image processing, such that improvin
 
 ## References
 
-<a id="1 $[1]</a> 
-H. V. Sorensen and C. S. Burrus, "Efficient computation of the DFT with only a subset of input or output points," in IEEE Transactions on Signal Processing, vol. 41, no. 3, pp. 1184-1200, March 1993, doi: 10.1109/78.205723.
+```{bibliography}
+:style: unsrt
+```
 
-<a id="2 $[2]</a> 
-H. V. Sorensen, M. T. Heideman, and C. S. Bums, “On computing
-the split-radix FFT,” IEEE Trans. Acoust., Speech, Signal Processing, vol. ASSP-34, no. 11, pp. 152-156, Feb. 1986

@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FastFFT &#8212; dev and user guides</title>
+    <title>FastFFT &#8212; FastFFT</title>
     
   <link href="../../_static/css/theme.css" rel="stylesheet" />
   <link href="../../_static/css/index.c5995385ac14fb8791e8eb36b4908be2.css" rel="stylesheet" />
@@ -73,8 +73,10 @@
         <div class="navbar-brand-box">
     <a class="navbar-brand text-wrap" href="../../index.html">
       
+      <img src="../../_static/logo1.svg" class="logo" alt="logo">
       
-      <h1 class="site-logo" id="site-title">dev and user guides</h1>
+      
+      <h1 class="site-logo" id="site-title">FastFFT</h1>
       
     </a>
 </div><form class="bd-search d-flex align-items-center" action="../../search.html" method="get">
@@ -214,23 +216,6 @@
             <nav id="bd-toc-nav" aria-label="Page">
                 <ul class="visible nav section-nav flex-column">
  <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#project-summary">
-   Project Summary
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#goals">
-     Goals:
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#design">
-     Design:
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
   <a class="reference internal nav-link" href="#abstract">
    Abstract
   </a>
@@ -240,11 +225,6 @@
    Introduction
   </a>
   <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#the-fourier-transform">
-     The Fourier Transform
-    </a>
-   </li>
    <li class="toc-h3 nav-item toc-entry">
     <a class="reference internal nav-link" href="#the-discrete-fourier-trasnform">
      The discrete Fourier Trasnform
@@ -293,7 +273,7 @@
     </a>
    </li>
    <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id1">
+    <a class="reference internal nav-link" href="#id5">
     </a>
    </li>
   </ul>
@@ -348,7 +328,7 @@
       </a>
      </li>
      <li class="toc-h4 nav-item toc-entry">
-      <a class="reference internal nav-link" href="#id2">
+      <a class="reference internal nav-link" href="#id6">
        3D template matching
       </a>
      </li>
@@ -389,42 +369,21 @@
                 
   <div class="section" id="fastfft">
 <h1>FastFFT<a class="headerlink" href="#fastfft" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="project-summary">
-<h2>Project Summary<a class="headerlink" href="#project-summary" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="goals">
-<h3>Goals:<a class="headerlink" href="#goals" title="Permalink to this headline">¶</a></h3>
-<p>This project aims to accelerate a specific subset of Fast Fourier Transforms (FFTs) especially important image processing, my particular flavor of which is  high-resolution phase-contrast cryo-Electron Microscopy. The gist is to take advantage of the cufftdx library from Nvidia, currently in early access, as well as algorithmic ideas from <em>Sorensen et. al</em> <a class="reference external" href="#1">[1]</a>. I became aware of <a class="reference external" href="https://github.com/DTolm/VkFFT">VkFFT</a> after I had finished my initial <a class="reference external" href="https://github.com/bHimes/cisTEM_downstream_bah/blob/DFT/src/gpu/DFTbyDecomposition.cu">proof of principle</a> experiments with cufftdx in Oct 2020. It may be entirely possible to do the same things using that library, though I haven’t had a chance to look through the source.</p>
-<p>An additional experiment tied to this project, is the development of the scientific manuscript “live” alongside the development of the code. While most of my projects are pretty safe from being scooped, this one is decidedly “scoopable” as it should have broad impact, and also shouldn’t be to hard to implement once the info is presented.</p>
-</div>
-<div class="section" id="design">
-<h3>Design:<a class="headerlink" href="#design" title="Permalink to this headline">¶</a></h3>
-<p>The FourierTransformer class, in the FastFFT namespace may be used in your cpp/cuda project by including the <em>header.</em> The basic usage is as follows:</p>
-<ul class="simple">
-<li><p>The input/output data pointers, size and type are set. (analagous to the cufftXtMakePlanMany)</p></li>
-<li><p>Class methods are provided to handle memory allocation on the gpu as well as transfer to/from host/device.</p></li>
-<li><p>Simple methods for FwdFFT, InvFFT, CrossCorrelation etc. are public and call the correct combination of substranforms based on the data and padding/trimming wanted.</p></li>
-</ul>
-</div>
-</div>
 <hr class="docutils" />
 <div class="section" id="abstract">
-<h2>Abstract<a class="headerlink" href="#abstract" title="Permalink to this headline">¶</a></h2>
-<p>The Fast Fourier transform is one of the most widely used and heavily optimized algorithms in digital signal processing. cryoEM makes heavy use of the FFT as it can accelerate convolution operations used for image alignment, and also in reconstruction algorithms that operate most accurately in Fourier space. FFT libraries like FFTW and cuFFT provide routines for highly-optimized general purpose multi-dimensional FFTs; however, they overlook several use-cases where only a subset of the input or output points are required. We show here algorithms based on transform decomposition are well suited to the memory hierarchy on moden GPUs, and can be implemented using the cufftdx header library to accelerate several important algorithms by factors of 3-10x over Nvidia’s cuFFT library. These include movie-frame alignment, image resampling via Fourier cropping, 2d and 3d template matching, and subtomogram averaging and alignment.</p>
+<span id="ms-label"></span><h2>Abstract<a class="headerlink" href="#abstract" title="Permalink to this headline">¶</a></h2>
+<p>The Fast Fourier transform is one of the most widely used and heavily optimized algorithms in digital signal processing. cryo-EM makes heavy use of the FFT as it can accelerate convolution operations used for image alignment, and also in reconstruction algorithms that operate most accurately in Fourier space. FFT libraries like FFTW and cuFFT provide routines for highly-optimized general purpose multi-dimensional FFTs; however, they overlook several use-cases where only a subset of the input or output points are required. We show here algorithms based on transform decomposition are well suited to the memory hierarchy on moden GPUs, and can be implemented using the cufftdx header library to accelerate several important algorithms by factors of 3-10x over Nvidia’s cuFFT library. These include movie-frame alignment, image resampling via Fourier cropping, 2d and 3d template matching, and subtomogram averaging and alignment.</p>
 </div>
 <div class="section" id="introduction">
 <h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="the-fourier-transform">
-<h3>The Fourier Transform<a class="headerlink" href="#the-fourier-transform" title="Permalink to this headline">¶</a></h3>
-<p>The Fourier Trasnform is a mathematical operation that converts a function between two dual spaces, for example, time and frequency, or position and momentum ⚠️. A function that is well localized in postion (commonly “real” space) will be delocalized in momentum (commonly “Fourier” or “K” space) and vice-versa. Converting between different representations of the same function has many practical uses; of particular interest to the author is in image filtering. [⚠️Provide some examples, low/high pass, frequency marching algs etc.] [⚠️ provide equation, maybe explain different conventions (wolfram is useful.)]</p>
-<p><span class="math notranslate nohighlight">\( \int_{-\inf}^{\inf}x(n)e^{-2i{\pi}kn}dn \)</span></p>
-</div>
+<p>The Discrete Fourier Transform (DFT) and linear filtering, <em>e.g.</em> convolution, are among the most common operations in digital signal processing. It is assumed that the reader has basic familiarity with Fourier Analysis and it’s applications in their respective fields; we will focus here on digital image processing for convenience. For a detailed introduction to the reader is referred to the free book by Smith <span id="id1">[<a class="reference internal" href="#id17">Smith, 2008</a>]</span>.</p>
 <div class="section" id="the-discrete-fourier-trasnform">
 <h3>The discrete Fourier Trasnform<a class="headerlink" href="#the-discrete-fourier-trasnform" title="Permalink to this headline">¶</a></h3>
-<p>The discrete Fourier Transform (DFT) extends the operation of the Fourier Transform to a band-limited sequence of evenly spaced samples of a continous function ⚠️.</p>
+<p>The discrete Fourier Transform (DFT) extends the operation of the Fourier Transform to a band-limited sequence of evenly spaced samples of a continous function. In one dimension, it is defined for a sequence of N samples <span class="math notranslate nohighlight">\(x(n)\)</span> as:</p>
 <div class="math notranslate nohighlight" id="equation-dft-equation">
 <span class="eqno">(1)<a class="headerlink" href="#equation-dft-equation" title="Permalink to this equation">¶</a></span>\[X(k) = \sum_{n=0}^{N-1} x(n) \exp\left( -2\pi i k n \right) \]</div>
 <ul class="simple">
-<li><p>list properties (And brief example with a few citations for where each is capitalized on.)</p>
+<li><p>⚠️ TODO: list properties (And brief example with a few citations, preferably specific to cryo-EM where each is capitalized on.)</p>
 <ul>
 <li><p>linearity</p></li>
 <li><p>Parsevals</p></li>
@@ -439,9 +398,16 @@
 <div class="section" id="the-fast-discrete-fourier-transform">
 <h3>the fast (discrete) Fourier Transform<a class="headerlink" href="#the-fast-discrete-fourier-transform" title="Permalink to this headline">¶</a></h3>
 <p>In looking at [⚠️ DFT equation above] it is clear that the DFT requires <span class="math notranslate nohighlight">\( O(N^2) \)</span>
-complex exponential, multiplications and additions. The fast Fourier Transform (FFT) reduces the compuational complexity to <span class="math notranslate nohighlight">\( O(Nlog_2{N}) \)</span>
-with the most efficient algorithm, the split-radix FFT requiring just <span class="math notranslate nohighlight">\( 4Nlog_2{N} - 6N %2B 8 \)</span>
-operations <a class="reference external" href="#2">[2]</a>. While discussions on the FFT center on computational complexity from the standpoint of floating point operations, on modern GPU hardware they are memory-bandwidth limited, with an estimated 80% of the computational run-time being dedicated to moving data on and off chip ⚠️ .</p>
+complex exponential function evaluations, multiplications, and additions. The fast Fourier Transform (FFT) reduces the compuational complexity to <span class="math notranslate nohighlight">\( O(Nlog_2{N}) \)</span>
+with the most efficient algorithm, the split-radix FFT requiring just <span class="math notranslate nohighlight">\( 4Nlog_2{N} - 6N  \)</span>. The Cooley-Tukey algorithm <span id="id2">[<a class="reference internal" href="#id16">Cooley and Tukey, 1965</a>]</span> was published little more than a decade after the first digitial computers became available. As is often the case in science, their discovery was really a re-discovery; the divide and conquer approach that underpins the FFT was already known to Gauss as early as 1805, predating Fourier’s work itself! <span id="id3">[<a class="reference internal" href="#id15">Heideman and Burrus, 1985</a>]</span></p>
+<blockquote class="epigraph">
+<div><p>This story of the FFT can be used to give one incentive to investigate not
+only new and novel approaches, but to occasionally look over old papers and see the variety of tricks and clever ideas which were used when computing was, by itself, a laborious chore which gave clever people great incentive to develop efficient methods. Perhaps among the ideas discarded before the days of electronic computers, we may find more seeds of new
+algorithms.</p>
+<p class="attribution">—James W. Cooley <span id="id4">[<a class="reference internal" href="#id11">Cooley, 1987</a>]</span></p>
+</div></blockquote>
+<p>This present work itself follows from this same spirit of re-discovery; presently with respect to ideas discarded before the days of efficient graphics processing units (GPUs), rather than electronic computers on a whole.</p>
+<p>⚠️ Segue to include notes from FFTW - before last PP, something something FFTW is an example of dev since then - as those authors note, pruning something something, note on arithmetic vs caches (cite actual FFTW paper) something something.</p>
 </div>
 <div class="section" id="exploiting-zero-values">
 <h3>exploiting zero values<a class="headerlink" href="#exploiting-zero-values" title="Permalink to this headline">¶</a></h3>
@@ -481,8 +447,8 @@ operations <a class="reference external" href="#2">[2]</a>. While discussions on
 <div class="section" id="maths-for-partial-outputs">
 <h3>Maths for partial outputs<a class="headerlink" href="#maths-for-partial-outputs" title="Permalink to this headline">¶</a></h3>
 </div>
-<div class="section" id="id1">
-<h3><a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id5">
+<h3><a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h3>
 </div>
 </div>
 <div class="section" id="results">
@@ -573,8 +539,8 @@ operations <a class="reference external" href="#2">[2]</a>. While discussions on
 <h4>2D template matching<a class="headerlink" href="#d-template-matching" title="Permalink to this headline">¶</a></h4>
 <p>Typical use case is to search an image of size ~ 4K x 4K over ~ 2 million cross correlations, with a template that is ~ 384-512 pixels square. Each of these searches requires padding the template to the size of the search image, taking the FFT, conj mul and iFFT. We currently optimize this by transforming the search image in single-precision, storing in FP16 to improve reads. Convert from FP16 and conj mul in single precision using cuFFT callbacks on the load, convert back to FP16 on the store with a store call back. Here we improve on this by …</p>
 </div>
-<div class="section" id="id2">
-<h4>3D template matching<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h4>
+<div class="section" id="id6">
+<h4>3D template matching<a class="headerlink" href="#id6" title="Permalink to this headline">¶</a></h4>
 <p>Pad something like 128 –&gt; 512^3 over X chunks. Far fewer orientations than 2DTM (number).</p>
 </div>
 <div class="section" id="subtomogram-averaging">
@@ -592,11 +558,24 @@ operations <a class="reference external" href="#2">[2]</a>. While discussions on
 </div>
 <div class="section" id="references">
 <h2>References<a class="headerlink" href="#references" title="Permalink to this headline">¶</a></h2>
-<p>&lt;a id=”1 $[1]</a>
-H. V. Sorensen and C. S. Burrus, “Efficient computation of the DFT with only a subset of input or output points,” in IEEE Transactions on Signal Processing, vol. 41, no. 3, pp. 1184-1200, March 1993, doi: 10.1109/78.205723.</p>
-<p>&lt;a id=”2 $[2]</a>
-H. V. Sorensen, M. T. Heideman, and C. S. Bums, “On computing
-the split-radix FFT,” IEEE Trans. Acoust., Speech, Signal Processing, vol. ASSP-34, no. 11, pp. 152-156, Feb. 1986</p>
+<p id="id7"><dl class="citation">
+<dt class="label" id="id8"><span class="brackets">1</span></dt>
+<dd><p>H.V. Sorensen and C.S. Burrus. Efficient computation of the DFT with only a subset of input or output points. <em>IEEE Transactions on Signal Processing</em>, 41(3):1184–1200, March 1993. URL: <a class="reference external" href="http://ieeexplore.ieee.org/document/205723/">http://ieeexplore.ieee.org/document/205723/</a> (visited on 2021-03-18), <a class="reference external" href="https://doi.org/10.1109/78.205723">doi:10.1109/78.205723</a>.</p>
+</dd>
+<dt class="label" id="id17"><span class="brackets"><a class="fn-backref" href="#id1">2</a></span></dt>
+<dd><p>Julios O. III Smith. <em>Mathematics of the Discrete Fourier Transform (DFT) With Audio Applications</em>. W3k Publishing, 2 edition, May 2008. ISBN 978-0-9745607-4-8. URL: <a class="reference external" href="https://www.dsprelated.com/freebooks/mdft/">https://www.dsprelated.com/freebooks/mdft/</a> (visited on 2021-09-09).</p>
+</dd>
+<dt class="label" id="id16"><span class="brackets"><a class="fn-backref" href="#id2">3</a></span></dt>
+<dd><p>James W. Cooley and John W. Tukey. An algorithm for the machine calculation of complex Fourier series. <em>Mathematics of Computation</em>, 19(90):297–297, May 1965. URL: <a class="reference external" href="http://www.ams.org/jourcgi/jour-getitem?pii=S0025-5718-1965-0178586-1">http://www.ams.org/jourcgi/jour-getitem?pii=S0025-5718-1965-0178586-1</a> (visited on 2021-09-09), <a class="reference external" href="https://doi.org/10.1090/S0025-5718-1965-0178586-1">doi:10.1090/S0025-5718-1965-0178586-1</a>.</p>
+</dd>
+<dt class="label" id="id15"><span class="brackets"><a class="fn-backref" href="#id3">4</a></span></dt>
+<dd><p>Michael T Heideman and C Sidney Burrus. Gauss and the history of the fast Fourier transform. <em>Archive for History of Exact Sciences</em>, 34(3):265–277, February 1985. <a class="reference external" href="https://doi.org/DOI:10.1007/BF00348431">doi:DOI:10.1007/BF00348431</a>.</p>
+</dd>
+<dt class="label" id="id11"><span class="brackets"><a class="fn-backref" href="#id4">5</a></span></dt>
+<dd><p>James W. Cooley. The re-discovery of the fast Fourier transform algorithm. <em>Mikrochimica Acta</em>, 93(1-6):33–45, January 1987. URL: <a class="reference external" href="http://link.springer.com/10.1007/BF01201681">http://link.springer.com/10.1007/BF01201681</a> (visited on 2021-09-09), <a class="reference external" href="https://doi.org/10.1007/BF01201681">doi:10.1007/BF01201681</a>.</p>
+</dd>
+</dl>
+</p>
 </div>
 <div class="toctree-wrapper compound">
 </div>
