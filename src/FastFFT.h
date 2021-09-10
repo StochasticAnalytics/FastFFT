@@ -191,7 +191,7 @@ public:
 
 private:
 
-  DeviceProps device_properites;
+  DeviceProps device_properties;
   OriginType input_origin_type;
   OriginType output_origin_type;
 

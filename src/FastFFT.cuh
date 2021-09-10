@@ -12,7 +12,7 @@
 // 1 - basic checks without blocking
 // 2 - full checks, including blocking
 
-#define HEAVYERRORCHECKING_FFT 
+// #define HEAVYERRORCHECKING_FFT 
 
 // #ifdef DEBUG
 #define MyFFTPrint(...)	{std::cerr << __VA_ARGS__  << std::endl;}
@@ -36,7 +36,7 @@
 #define precheck { cudaErr(cudaGetLastError()); }
 #endif
 
-//#define USEFASTSINCOS
+#define USEFASTSINCOS
 // The __sincosf doesn't appear to be the problem with accuracy, likely just the extra additions, but it probably also is less flexible with other types. I don't see a half precision equivalent.
 #ifdef USEFASTSINCOS
 __device__ __forceinline__ void SINCOS(float arg, float* s, float* c)
@@ -85,18 +85,25 @@ void GetCudaDeviceProps( DeviceProps& dp ) {
   cudaErr( cudaDeviceGetAttribute( &dp.max_registers_per_block, cudaDevAttrMaxRegistersPerBlock, dp.device_id ) );
   cudaErr( cudaDeviceGetAttribute( &dp.max_persisting_L2_cache_size, cudaDevAttrMaxPersistingL2CacheSize, dp.device_id) );
 }
+void CheckSharedMemory(int& memory_requested, DeviceProps& dp) {
+
+  // Depends on GetCudaDeviceProps having been called, which should be happening in the constructor.
+  // Throw an error if requesting more than allowed, otherwise, we'll set to requested and let the rest be L1 Cache.
+  MyFFTRunTimeAssertFalse(memory_requested > dp.max_shared_memory_per_SM, "The shared memory requested is greater than permitted for this arch.") 
+  if (memory_requested > dp.max_shared_memory_per_block) { memory_requested = dp.max_shared_memory_per_block; }
+}
 
 //////////////////////
 // Base FFT kerenel types, direction (r2c, c2r, c2c) and direction are ommited, to be applied in the method calling afull kernel
 using namespace cufftdx;
 
 // TODO this probably needs to depend on the size of the xform, at least small vs large.
-constexpr const int elements_per_thread_real = 16;
-constexpr const int elements_per_thread_complex = 16;
+constexpr const int elements_per_thread_real = 8;
+constexpr const int elements_per_thread_complex = 8;
 
 // All transforms are 
-using FFT_base   = decltype(Block() + Precision<float>() + ElementsPerThread<elements_per_thread_complex>()  + FFTsPerBlock<1>()  );
-using FFT_thread_base = decltype(Thread() + Size<4>() + Precision<float>());
+// using FFT_base   = decltype(Block() + Precision<float>() + ElementsPerThread<elements_per_thread_complex>()  + FFTsPerBlock<1>()  );
+// using FFT_thread_base = decltype(Thread() + Size<4>() + Precision<float>());
 
 //////////////////////////////
 // Kernel definitions
