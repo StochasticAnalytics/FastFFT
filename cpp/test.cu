@@ -841,7 +841,7 @@ int main(int argc, char** argv) {
     #ifdef HEAVYERRORCHECKING_FFT
       std::cout << "Running performance tests with heavy error checking.\n";
       std::cout << "This doesn't make sense as the synchronizations are invalidating.\n";
-      // exit(1);
+      exit(1);
     #endif
 
     for (int iSize = 0; iSize < test_size.size(); iSize++) {
@@ -853,7 +853,7 @@ int main(int argc, char** argv) {
       compare_libraries(input_size, output_size);
 
     }
- 
+    exit(1);
     for (int iSize = 0; iSize < test_size.size() - 1; iSize++) {
       int oSize = iSize + 1;
       while (oSize < test_size.size())

@@ -248,7 +248,7 @@ private:
       case r2c_transposed:
         input_size = dims_in.x;
         break;
-      case xcorr_decomposed:
+      case xcorr_transposed:
         input_size = dims_out.y;
         break;
       case c2c_padded:
