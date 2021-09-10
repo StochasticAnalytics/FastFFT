@@ -844,16 +844,16 @@ int main(int argc, char** argv) {
       exit(1);
     #endif
 
-    for (int iSize = 0; iSize < test_size.size(); iSize++) {
+    // for (int iSize = 0; iSize < test_size.size(); iSize++) {
 
-      std::cout << std::endl << "Testing cufft comparison " << test_size[iSize] << " x" << std::endl;
-      input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
-      output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+    //   std::cout << std::endl << "Testing cufft comparison " << test_size[iSize] << " x" << std::endl;
+    //   input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+    //   output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
 
-      compare_libraries(input_size, output_size);
+    //   compare_libraries(input_size, output_size);
 
-    }
-    exit(1);
+    // }
+    // exit(1);
     for (int iSize = 0; iSize < test_size.size() - 1; iSize++) {
       int oSize = iSize + 1;
       while (oSize < test_size.size())

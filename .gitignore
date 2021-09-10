@@ -33,4 +33,5 @@
 
 .nfs*
 
-build/
+build/*
+!build/Makefile
