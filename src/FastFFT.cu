@@ -18,7 +18,8 @@ template <class ComputeType, class InputType, class OutputType>
 FourierTransformer<ComputeType, InputType, OutputType>::FourierTransformer() 
 {
   SetDefaults();
-
+  GetCudaDeviceProps( device_properties );
+  // std::cout << "DeviceProps " << device_properties.device_id << " arch " << device_properties.device_arch << " max mem block " << device_properties.max_shared_memory_per_block << " per sm " << device_properties.max_shared_memory_per_SM << " max reg " << device_properties.max_registers_per_block << " persisting " << device_properties.max_persisting_L2_cache_size << std::endl;
   // This assumption precludes the use of a packed _half2 that is really RRII layout for two arrays of __half.
   // TODO could is_real_valued_input be constexpr?
   if constexpr(std::is_same< InputType, __half2>::value || std::is_same< InputType,float2>::value)
@@ -1262,14 +1263,11 @@ template <class FFT_base>
 void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(KernelType kernel_type, bool do_forward_transform)
 {
 
-  // For all cases, we want to get the device arch. TODO consider other device properties here. (Or should that go in the kernel launch?)
-  int device, arch;
-  GetCudaDeviceArch( device, arch );
 
   if constexpr (detail::is_operator<fft_operator::thread, FFT_base>::value)
   {
     GetTransformSize_thread(kernel_type, size_of<FFT_base>::value);
-    switch (arch)
+    switch (device_properties.device_arch)
     {
       case 700: { using FFT = decltype(FFT_base() + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
       case 750: { using FFT = decltype(FFT_base() + SM<750>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
@@ -1283,7 +1281,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
     switch (transform_size)
     {
       case 16: {
-        switch (arch)
+        switch (device_properties.device_arch)
         {
           case 700: { using FFT = decltype(FFT_base()  + Size<16>()  + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 750: { using FFT = decltype(FFT_base()  + Size<16>()  + SM<750>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
@@ -1292,7 +1290,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
         break; }
 
       case 32: {
-        switch (arch)
+        switch (device_properties.device_arch)
         {
           case 700: { using FFT = decltype(FFT_base()  + Size<32>()  + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 750: { using FFT = decltype(FFT_base()  + Size<32>()  + SM<750>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
@@ -1301,7 +1299,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
         break; }
 
       case 64: {
-        switch (arch)
+        switch (device_properties.device_arch)
         {
           case 700: { using FFT = decltype(FFT_base()  + Size<64>()  + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 750: { using FFT = decltype(FFT_base()  + Size<64>()  + SM<750>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
@@ -1310,7 +1308,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
         break; }
   
       case 128: {
-        switch (arch)
+        switch (device_properties.device_arch)
         {
           case 700: { using FFT = decltype(FFT_base()  + Size<128>()  + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 750: { using FFT = decltype(FFT_base()  + Size<128>()  + SM<750>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
@@ -1319,7 +1317,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
         break; }
   
       case 256: {
-        switch (arch)
+        switch (device_properties.device_arch)
         {
           case 700: { using FFT = decltype(FFT_base()  + Size<256>()  + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 750: { using FFT = decltype(FFT_base()  + Size<256>()  + SM<750>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
@@ -1328,7 +1326,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
         break; } 
   
       case 512: {
-        switch (arch)
+        switch (device_properties.device_arch)
         {
           case 700: { using FFT = decltype(FFT_base()  + Size<512>()  + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 750: { using FFT = decltype(FFT_base()  + Size<512>()  + SM<750>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
@@ -1337,7 +1335,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
         break; } 
   
       // case 768: {
-      //   switch (arch)
+      //   switch (device_properties.device_arch)
       //   {
       //     case 700: { using FFT = decltype(FFT_base()  + Size<768>()  + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
       //     case 750: { using FFT = decltype(FFT_base()  + Size<768>()  + SM<750>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
@@ -1346,7 +1344,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
       // break; } 
   
       case 1024: {
-        switch (arch)
+        switch (device_properties.device_arch)
         {
           case 700: { using FFT = decltype(FFT_base()  + Size<1024>()  + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 750: { using FFT = decltype(FFT_base()  + Size<1024>()  + SM<750>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
@@ -1355,7 +1353,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
       break; } 
   
       // case 1536: {
-      //   switch (arch)
+      //   switch (device_properties.device_arch)
       //   {
       //     case 700: { using FFT = decltype(FFT_base()  + Size<1536>()  + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
       //     // case 750: { using FFT = decltype(FFT_base()  + Size<1536>()  + SM<750>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
@@ -1364,7 +1362,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
       // break; }    
   
       case 2048: {
-        switch (arch)
+        switch (device_properties.device_arch)
         {
           case 700: { using FFT = decltype(FFT_base()  + Size<2048>()  + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 750: { using FFT = decltype(FFT_base()  + Size<2048>()  + SM<750>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
@@ -1374,7 +1372,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
   
   
       case 4096: {
-        switch (arch)
+        switch (device_properties.device_arch)
         {
           case 700: { using FFT = decltype(FFT_base()  + Size<4096>()  + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           // case 750: { using FFT = decltype(FFT_base()  + Size<4096>()  + SM<750>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
@@ -1383,7 +1381,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
         break; }  
   
       case 8192: {
-        switch (arch)
+        switch (device_properties.device_arch)
         {
           case 700: { using FFT = decltype(FFT_base()  + Size<8192>()  + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 800: { using FFT = decltype(FFT_base()  + Size<8192>()  + SM<800>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
@@ -1446,6 +1444,8 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_decomposed);  
       
         int shared_mem = LP.mem_offsets.shared_output * sizeof(complex_type);
+        CheckSharedMemory(shared_mem, device_properties);
+        cudaErr(cudaFuncSetAttribute((void*)thread_fft_kernel_R2C_decomposed<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem));        
       
         precheck
         thread_fft_kernel_R2C_decomposed<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
@@ -1462,7 +1462,9 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_decomposed_transposed);
       
         int shared_mem = LP.mem_offsets.shared_output * sizeof(complex_type);
-
+        CheckSharedMemory(shared_mem, device_properties);
+        cudaErr(cudaFuncSetAttribute((void*)thread_fft_kernel_R2C_decomposed_transposed<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem));        
+  
         precheck
         thread_fft_kernel_R2C_decomposed_transposed<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
         (scalar_input, complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q);
@@ -1478,6 +1480,9 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
 
       LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2r_decomposed);
       int shared_memory = LP.mem_offsets.shared_output * sizeof(scalar_type);
+      CheckSharedMemory(shared_memory, device_properties);
+      cudaErr(cudaFuncSetAttribute((void*)thread_fft_kernel_C2R_decomposed<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+
       precheck
       thread_fft_kernel_C2R_decomposed<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
       (complex_input, complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q);
@@ -1491,7 +1496,9 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
 
       LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2r_decomposed_transposed);
       int shared_memory = LP.mem_offsets.shared_output * sizeof(scalar_type);
-  
+      CheckSharedMemory(shared_memory, device_properties);
+      cudaErr(cudaFuncSetAttribute((void*)thread_fft_kernel_C2R_decomposed_transposed<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+ 
       precheck
       thread_fft_kernel_C2R_decomposed_transposed<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
       (complex_input, complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q);
@@ -1507,24 +1514,29 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
 
       LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, xcorr_decomposed);
 
-      int shared_mem = LP.mem_offsets.shared_output * sizeof(complex_type);
-      
+      int shared_memory = LP.mem_offsets.shared_output * sizeof(complex_type);
+      CheckSharedMemory(shared_memory, device_properties);
+
       // FIXME
       bool swap_real_space_quadrants = false;
 
       if (swap_real_space_quadrants)
       {
         MyFFTRunTimeAssertTrue(false, "decomposed xcorr with swap real space quadrants is not implemented.");
+        cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_WithPadding_ConjMul_C2C_SwapRealSpaceQuadrants<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+
         // precheck
-        // block_fft_kernel_C2C_WithPadding_ConjMul_C2C_SwapRealSpaceQuadrants<FFT,invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
+        // block_fft_kernel_C2C_WithPadding_ConjMul_C2C_SwapRealSpaceQuadrants<FFT,invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
         // ( (complex_type*) image_to_search, (complex_type*)  d_ptr.momentum_space_buffer,  (complex_type*) d_ptr.momentum_space, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace_fwd, workspace_inv);
         // postcheck
       }
       else
       {
+        cudaErr(cudaFuncSetAttribute((void*)thread_fft_kernel_C2C_decomposed_ConjMul<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+
         // the image_to_search pointer is set during call to CrossCorrelate,
         precheck
-        thread_fft_kernel_C2C_decomposed_ConjMul<FFT, invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
+        thread_fft_kernel_C2C_decomposed_ConjMul<FFT, invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
         ( (complex_type *)d_ptr.image_to_search, complex_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q);
         postcheck
       }
@@ -1539,10 +1551,12 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
       if (do_forward_transform)
       {
         using FFT = decltype( FFT_nodir() + Direction<fft_direction::forward>() );
-        int shared_mem = LP.mem_offsets.shared_output * sizeof(complex_type);
-    
+        int shared_memory = LP.mem_offsets.shared_output * sizeof(complex_type);
+        CheckSharedMemory(shared_memory, device_properties);
+        cudaErr(cudaFuncSetAttribute((void*)thread_fft_kernel_C2C_decomposed<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+     
         precheck
-        thread_fft_kernel_C2C_decomposed<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
+        thread_fft_kernel_C2C_decomposed<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
         ( complex_input, complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q);
         postcheck
       }
@@ -1550,10 +1564,12 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
       {
     
         using FFT = decltype( FFT_nodir() + Direction<fft_direction::inverse>() );
-        int shared_mem = LP.mem_offsets.shared_output * sizeof(complex_type);
-    
+        int shared_memory = LP.mem_offsets.shared_output * sizeof(complex_type);
+        CheckSharedMemory(shared_memory, device_properties);
+        cudaErr(cudaFuncSetAttribute((void*)thread_fft_kernel_C2C_decomposed<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+      
         precheck
-        thread_fft_kernel_C2C_decomposed<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
+        thread_fft_kernel_C2C_decomposed<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
         ( complex_input, complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q);
         postcheck
       }
@@ -1581,23 +1597,27 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
             break;
           }
           case increase: {
-            int shared_mem = LP.mem_offsets.shared_input*sizeof(scalar_type) + FFT::shared_memory_size;
-  
+            int shared_memory = LP.mem_offsets.shared_input*sizeof(scalar_type) + FFT::shared_memory_size;
+            CheckSharedMemory(shared_memory, device_properties);
+            cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_R2C_WithPadding<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+       
             precheck
-            block_fft_kernel_R2C_WithPadding<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
+            block_fft_kernel_R2C_WithPadding<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
             ( scalar_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
             postcheck          
             break;
           }
           case none: {
-            int shared_mem = FFT::shared_memory_size;
-  
+            int shared_memory = FFT::shared_memory_size;
+            CheckSharedMemory(shared_memory, device_properties);
+            cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_R2C<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+       
             // cudaErr(cudaSetDevice(0));
             //  cudaErr(cudaFuncSetCacheConfig( (void*)block_fft_kernel_R2C<FFT,complex_type,scalar_type>,cudaFuncCachePreferShared ));
             //  cudaFuncSetSharedMemConfig ( (void*)block_fft_kernel_R2C<FFT,complex_type,scalar_type>, cudaSharedMemBankSizeEightByte );
       
             precheck
-            block_fft_kernel_R2C<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
+            block_fft_kernel_R2C<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
             (scalar_input, complex_output, LP.mem_offsets, workspace);
             postcheck          
             break;
@@ -1617,27 +1637,33 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         auto workspace = make_workspace<FFT>(error_code);
         
         // cudaErr(cudaFuncSetCacheConfig( (void*)block_fft_kernel_C2C_WithPadding<FFT,complex_type>,cudaFuncCachePreferShared ));
-          // cudaFuncSetSharedMemConfig ( (void*)block_fft_kernel_C2C_WithPadding<FFT,complex_type>, cudaSharedMemBankSizeEightByte );
-          cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_WithPadding<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, 64000));
+          // cudaFuncSetSharedMemConfig ( (void*)block_fft_kernel_C2C_WithPadding<FFT,complex_type>, cudaSharedMemBankSizeEightByte )
       
-        int shared_mem;
+        int shared_memory;
         // Aggregate the transformed frequency data in shared memory so that we can write to global coalesced.
-        shared_mem = LP.mem_offsets.shared_output*sizeof(complex_type) + LP.mem_offsets.shared_input*sizeof(complex_type) + FFT::shared_memory_size;
-        std::cout << "shared_mem " << shared_mem << std::endl;
+        shared_memory = LP.mem_offsets.shared_output*sizeof(complex_type) + LP.mem_offsets.shared_input*sizeof(complex_type) + FFT::shared_memory_size;
+        CheckSharedMemory(shared_memory, device_properties);
+  
+        // std::cout << "shared_memory " << shared_memory << std::endl;
         // When it is the output dims being smaller, may need a logical or different method
         //FIXME
+        CheckSharedMemory(shared_memory, device_properties);
         bool swap_real_space_quadrants = false;
         if (swap_real_space_quadrants)
         {
+          cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_WithPadding_SwapRealSpaceQuadrants<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));
+
           precheck
-          block_fft_kernel_C2C_WithPadding_SwapRealSpaceQuadrants<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
+          block_fft_kernel_C2C_WithPadding_SwapRealSpaceQuadrants<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
           ( complex_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
           postcheck
         }
         else
         {
+          cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_WithPadding<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));
+
           precheck
-          block_fft_kernel_C2C_WithPadding<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
+          block_fft_kernel_C2C_WithPadding<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
           ( complex_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
           postcheck
         }
@@ -1657,9 +1683,12 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
           using FFT = decltype( FFT_nodir() + Direction<fft_direction::forward>() );
           cudaError_t error_code = cudaSuccess;
           auto workspace = make_workspace<FFT>(error_code);
-          int shared_mem = FFT::shared_memory_size;
+          int shared_memory = FFT::shared_memory_size;
+          CheckSharedMemory(shared_memory, device_properties);
+          cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+    
           precheck
-          block_fft_kernel_C2C<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
+          block_fft_kernel_C2C<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
           ( (complex_type*)d_ptr.momentum_space_buffer,  (complex_type*)d_ptr.momentum_space, LP.mem_offsets, workspace);
           postcheck
       
@@ -1670,9 +1699,13 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
           using FFT = decltype( FFT_nodir() + Direction<fft_direction::inverse>() );
           cudaError_t error_code = cudaSuccess;
           auto workspace = make_workspace<FFT>(error_code);
-          int shared_mem = FFT::shared_memory_size;
+          int shared_memory = FFT::shared_memory_size;
+          CheckSharedMemory(shared_memory, device_properties);
+          cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+
+          
           precheck
-          block_fft_kernel_C2C<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
+          block_fft_kernel_C2C<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
           ( (complex_type*)d_ptr.momentum_space,  (complex_type*)d_ptr.momentum_space_buffer, LP.mem_offsets, workspace);
           postcheck
         }
@@ -1712,7 +1745,9 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         auto workspace_inv = make_workspace<invFFT>(error_code); // presumably larger of the two
         cudaErr(error_code);
   
-        int shared_mem = invFFT::shared_memory_size;
+        int shared_memory = invFFT::shared_memory_size;
+        CheckSharedMemory(shared_memory, device_properties);
+ 
         
           // cudaErr(cudaFuncSetCacheConfig( (void*)block_fft_kernel_C2C_WithPadding<FFT,complex_type>,cudaFuncCachePreferShared ));
           // cudaFuncSetSharedMemConfig ( (void*)block_fft_kernel_C2C_WithPadding<FFT,complex_type>, cudaSharedMemBankSizeEightByte );  
@@ -1720,15 +1755,19 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         bool swap_real_space_quadrants = false;   
         if (swap_real_space_quadrants)
         {
+          cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_WithPadding_ConjMul_C2C_SwapRealSpaceQuadrants<FFT,invFFT, complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+
           precheck
-          block_fft_kernel_C2C_WithPadding_ConjMul_C2C_SwapRealSpaceQuadrants<FFT,invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
+          block_fft_kernel_C2C_WithPadding_ConjMul_C2C_SwapRealSpaceQuadrants<FFT,invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
           ( (complex_type *)d_ptr.image_to_search, complex_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace_fwd, workspace_inv);
           postcheck
         }
         else
         {
+          cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_WithPadding_ConjMul_C2C<FFT, invFFT, complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+
           precheck
-          block_fft_kernel_C2C_WithPadding_ConjMul_C2C<FFT, invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
+          block_fft_kernel_C2C_WithPadding_ConjMul_C2C<FFT, invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
           ( (complex_type *)d_ptr.image_to_search, complex_input, complex_output , LP.mem_offsets, LP.twiddle_in,LP.Q, workspace_fwd, workspace_inv);
           postcheck
         }

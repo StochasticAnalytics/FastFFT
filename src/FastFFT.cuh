@@ -12,7 +12,7 @@
 // 1 - basic checks without blocking
 // 2 - full checks, including blocking
 
-#define HEAVYERRORCHECKING_FFT 
+// #define HEAVYERRORCHECKING_FFT 
 
 // #ifdef DEBUG
 #define MyFFTPrint(...)	{std::cerr << __VA_ARGS__  << std::endl;}
@@ -36,7 +36,7 @@
 #define precheck { cudaErr(cudaGetLastError()); }
 #endif
 
-//#define USEFASTSINCOS
+#define USEFASTSINCOS
 // The __sincosf doesn't appear to be the problem with accuracy, likely just the extra additions, but it probably also is less flexible with other types. I don't see a half precision equivalent.
 #ifdef USEFASTSINCOS
 __device__ __forceinline__ void SINCOS(float arg, float* s, float* c)
@@ -70,15 +70,27 @@ namespace FastFFT {
   }
 
 // GetCudaDeviceArch from https://github.com/mnicely/cufft_examples/blob/master/Common/cuda_helper.h
-void GetCudaDeviceArch( int &device, int &arch ) {
+void GetCudaDeviceProps( DeviceProps& dp ) {
   int major;
   int minor;
-  cudaErr( cudaGetDevice( &device ) );
 
-  cudaErr( cudaDeviceGetAttribute( &major, cudaDevAttrComputeCapabilityMajor, device ) );
-  cudaErr( cudaDeviceGetAttribute( &minor, cudaDevAttrComputeCapabilityMinor, device ) );
+  cudaErr( cudaGetDevice( &dp.device_id ) );
+  cudaErr( cudaDeviceGetAttribute( &major, cudaDevAttrComputeCapabilityMajor, dp.device_id ) );
+  cudaErr( cudaDeviceGetAttribute( &minor, cudaDevAttrComputeCapabilityMinor, dp.device_id ) );
 
-  arch = major * 100 + minor * 10;
+  dp.device_arch = major * 100 + minor * 10;
+
+  cudaErr( cudaDeviceGetAttribute( &dp.max_shared_memory_per_block, cudaDevAttrMaxSharedMemoryPerBlock, dp.device_id ) );
+  cudaErr( cudaDeviceGetAttribute( &dp.max_shared_memory_per_SM, cudaDevAttrMaxSharedMemoryPerMultiprocessor, dp.device_id) );
+  cudaErr( cudaDeviceGetAttribute( &dp.max_registers_per_block, cudaDevAttrMaxRegistersPerBlock, dp.device_id ) );
+  cudaErr( cudaDeviceGetAttribute( &dp.max_persisting_L2_cache_size, cudaDevAttrMaxPersistingL2CacheSize, dp.device_id) );
+}
+void CheckSharedMemory(int& memory_requested, DeviceProps& dp) {
+
+  // Depends on GetCudaDeviceProps having been called, which should be happening in the constructor.
+  // Throw an error if requesting more than allowed, otherwise, we'll set to requested and let the rest be L1 Cache.
+  MyFFTRunTimeAssertFalse(memory_requested > dp.max_shared_memory_per_SM, "The shared memory requested is greater than permitted for this arch.") 
+  if (memory_requested > dp.max_shared_memory_per_block) { memory_requested = dp.max_shared_memory_per_block; }
 }
 
 //////////////////////
@@ -86,12 +98,12 @@ void GetCudaDeviceArch( int &device, int &arch ) {
 using namespace cufftdx;
 
 // TODO this probably needs to depend on the size of the xform, at least small vs large.
-constexpr const int elements_per_thread_real = 16;
-constexpr const int elements_per_thread_complex = 16;
+constexpr const int elements_per_thread_real = 8;
+constexpr const int elements_per_thread_complex = 8;
 
 // All transforms are 
-using FFT_base   = decltype(Block() + Precision<float>() + ElementsPerThread<elements_per_thread_complex>()  + FFTsPerBlock<1>()  );
-using FFT_thread_base = decltype(Thread() + Size<4>() + Precision<float>());
+// using FFT_base   = decltype(Block() + Precision<float>() + ElementsPerThread<elements_per_thread_complex>()  + FFTsPerBlock<1>()  );
+// using FFT_thread_base = decltype(Thread() + Size<4>() + Precision<float>());
 
 //////////////////////////////
 // Kernel definitions

@@ -14,6 +14,16 @@ namespace FastFFT {
   constexpr const float PIf = 3.14159275358979323846f;
 
   typedef
+  struct _DeviceProps {
+    int device_id;
+    int device_arch;
+    int max_shared_memory_per_block;
+    int max_shared_memory_per_SM;
+    int max_registers_per_block;
+    int max_persisting_L2_cache_size;
+  } DeviceProps;
+
+  typedef
 	struct __align__(8) _Offsets{
     short shared_input;
     short shared_output;
@@ -181,7 +191,7 @@ public:
 
 private:
 
-
+  DeviceProps device_properties;
   OriginType input_origin_type;
   OriginType output_origin_type;
 
@@ -238,7 +248,7 @@ private:
       case r2c_transposed:
         input_size = dims_in.x;
         break;
-      case xcorr_decomposed:
+      case xcorr_transposed:
         input_size = dims_out.y;
         break;
       case c2c_padded:
