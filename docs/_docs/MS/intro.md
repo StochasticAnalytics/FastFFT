@@ -108,6 +108,7 @@ By design, the cufft library from Nvidia returns an FFT in the natural order [TO
 | 4096 | 1.17 | 1.14 |
 
 🍍 None of the kernels are even remotely optimized at this point, they have only been assembled and tested to pass expected behavior for FFTs of constant functions, unit impulse functions, and basic convolution ops.
+
 🍍 The relative decrease in performance on re-org seems to  be partially due to less optimization in the kernels at compile time (kernels themselves did not change) and given the trend with size, mainly due to overhead in launch? The question is whether the trade off in ease in reading the code is worth it.
 
 :plus: Add in results for using the decomposition method for non-powers of two, more computation but fewer local memory accesses vs Bluesteins.
@@ -125,6 +126,7 @@ By design, the cufft library from Nvidia returns an FFT in the natural order [TO
 | 1024 | 2.48 | 2.1 |
 
 🍍 None of the kernels are even remotely optimized at this point, they have only been assembled and tested to pass expected behavior for FFTs of constant functions, unit impulse functions, and basic convolution ops.
+
 🍍 See note on previous table. The relative perf hit is not nearly as dramatic as in the previous table; however it is still about 10% which is a tough pill to swallow.
 
 - Movie alignment expense (Pre/post process and alignment percentages.)
