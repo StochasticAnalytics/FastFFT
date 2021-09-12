@@ -20,6 +20,7 @@ FourierTransformer<ComputeType, InputType, OutputType>::FourierTransformer()
   SetDefaults();
   GetCudaDeviceProps( device_properties );
   // std::cout << "DeviceProps " << device_properties.device_id << " arch " << device_properties.device_arch << " max mem block " << device_properties.max_shared_memory_per_block << " per sm " << device_properties.max_shared_memory_per_SM << " max reg " << device_properties.max_registers_per_block << " persisting " << device_properties.max_persisting_L2_cache_size << std::endl;
+  // exit(0);
   // This assumption precludes the use of a packed _half2 that is really RRII layout for two arrays of __half.
   // TODO could is_real_valued_input be constexpr?
   if constexpr(std::is_same< InputType, __half2>::value || std::is_same< InputType,float2>::value)

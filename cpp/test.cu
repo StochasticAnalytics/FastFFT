@@ -110,7 +110,7 @@ void const_image_test(std::vector<int> size)
       if (host_output.complex_values[index].x != 0.0f && host_output.complex_values[index].y != 0.0f) {test_passed = false;} // std::cout << host_output.complex_values[index].x  << " " << host_output.complex_values[index].y << " " << std::endl;}
     }
     if (host_output.complex_values[0].x != (float)dims_out.x * (float)dims_out.y * (float)dims_out.z) test_passed = false;
-    // int n=0;
+    // int nn=0;
     // for (int x = 0; x <  host_output.size.y ; x++)
     // {
       
@@ -118,11 +118,11 @@ void const_image_test(std::vector<int> size)
     //   for (int y = 0; y < host_output.size.w; y++)
     //   {  
     //     std::cout << host_output.complex_values[x + y*host_output.size.y].x << "," << host_output.complex_values[x + y*host_output.size.y].y << " ";
-    //     n++;
-    //     if (n == 34) {n = 0; std::cout << std::endl ;} // line wrapping
+    //     nn++;
+    //     if (nn == 34) {nn = 0; std::cout << std::endl ;} // line wrapping
     //   }
     //   std::cout << "] " << std::endl;
-    //   n = 0;
+    //   nn = 0;
     // }
 
     if (test_passed == false) {all_passed = false; FastFFT_forward_passed[n] = false;}
@@ -364,6 +364,7 @@ void unit_impulse_test(std::vector<int>size)
 void compare_libraries(short4 input_size, short4 output_size)
 {
 
+  bool skip_cufft_for_profiling = false;
   bool set_padding_callback = false; // the padding callback is slower than pasting in b/c the read size of the pointers is larger than the actual data. do not use.
   bool set_conjMult_callback = true;
   if (input_size.x == output_size.x && input_size.y == output_size.y && input_size.z == output_size.z) 
@@ -594,6 +595,8 @@ void compare_libraries(short4 input_size, short4 output_size)
   }
 
 
+  if (! skip_cufft_for_profiling)
+  {
   //////////////////////////////////////////
   //////////////////////////////////////////
   // Warm up and check for accuracy
@@ -671,7 +674,7 @@ void compare_libraries(short4 input_size, short4 output_size)
   cuFFT_output.record_stop();
   cuFFT_output.synchronize();
   cuFFT_output.print_time("cuFFT");
-
+} // end of if (! skip_cufft_for_profiling)
   std::cout << "Ratio cuFFT/FastFFT : " << cuFFT_output.elapsed_gpu_ms/FastFFT_time << std::endl;
 
 }
@@ -811,7 +814,6 @@ int main(int argc, char** argv) {
   {
     run_validation_tests = true;
     run_performance_tests = false;
-    std::cout << "Running validation tests.\n";
   }
   // Input and output dimensions, with simple checks. I'm sure there are better checks on argv.
   short4 input_size;
@@ -841,19 +843,19 @@ int main(int argc, char** argv) {
     #ifdef HEAVYERRORCHECKING_FFT
       std::cout << "Running performance tests with heavy error checking.\n";
       std::cout << "This doesn't make sense as the synchronizations are invalidating.\n";
-      exit(1);
+      // exit(1);
     #endif
 
-    // for (int iSize = 0; iSize < test_size.size(); iSize++) {
+    for (int iSize = 0; iSize < test_size.size(); iSize++) {
 
-    //   std::cout << std::endl << "Testing cufft comparison " << test_size[iSize] << " x" << std::endl;
-    //   input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
-    //   output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+      std::cout << std::endl << "Testing cufft comparison " << test_size[iSize] << " x" << std::endl;
+      input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+      output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
 
-    //   compare_libraries(input_size, output_size);
+      compare_libraries(input_size, output_size);
 
-    // }
-    // exit(1);
+    }
+    exit(1);
     for (int iSize = 0; iSize < test_size.size() - 1; iSize++) {
       int oSize = iSize + 1;
       while (oSize < test_size.size())

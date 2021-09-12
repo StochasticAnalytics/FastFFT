@@ -99,12 +99,13 @@ By design, the cufft library from Nvidia returns an FFT in the natural order [TO
 ##### Table 1: FFT/iFFT pairs
 
 | 2D square size | cufft/FastFFT runtime (10k iterations) |
+|----|----|
 | 64  |  1.23 |
 | 128 | 1.36 | 
 | 256 | 1.22 |
 | 512 | 0.92 |
 | 1024| 0.69 |
-| 2048| 0.0.95 |
+| 2048| 0.95 |
 | 4096| 1.10 |
 
 🍍 None of the kernels are even remotely optimized at this point, they have only been assembled and tested to pass expected behavior for FFTs of constant functions, unit impulse functions, and basic convolution ops.
