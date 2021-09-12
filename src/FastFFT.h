@@ -106,14 +106,12 @@ public:
   enum DataType { int4_2, uint8, int8, uint16, int16, fp16, bf16, tf32, uint32, int32, fp32};
   enum OriginType { natural, centered, quadrant_swapped}; // Used to specify the origin of the data
 
-
-
   short  padding_jump_val;
   int input_memory_allocated;
   int output_memory_allocated;
   int compute_memory_allocated;
-  int input_number_non_padding_values; // not used, but set in constructor
-  int output_number_non_padding_values;// not used, but set in constructor
+  int memory_size_to_copy;
+
 
 
   ///////////////////////////////////////////////
@@ -125,18 +123,17 @@ public:
   virtual ~FourierTransformer();
 
   // This is pretty similar to an FFT plan, I should probably make it align with CufftPlan
-  void SetInputDimensionsAndType(size_t input_logical_x_dimension, 
-                                 size_t input_logical_y_dimension, 
-                                 size_t input_logical_z_dimension, 
-                                 bool is_padded_input, 
-                                 bool is_host_memory_pinned, 
-                                 OriginType input_origin_type);
-  
-  void SetOutputDimensionsAndType(size_t output_logical_x_dimension, 
-                                  size_t output_logical_y_dimension, 
-                                  size_t output_logical_z_dimension, 
-                                  bool is_padded_output, 
-                                  OriginType output_origin_type);
+  void SetForwardFFTPlan(size_t input_logical_x_dimension,  size_t input_logical_y_dimension,  size_t input_logical_z_dimension, 
+                         size_t output_logical_x_dimension, size_t output_logical_y_dimension, size_t output_logical_z_dimension,
+                         bool is_padded_output, 
+                         bool is_host_memory_pinned,
+                         OriginType output_origin_type);
+
+  void SetInverseFFTPlan(size_t input_logical_x_dimension,  size_t input_logical_y_dimension,  size_t input_logical_z_dimension, 
+                         size_t output_logical_x_dimension, size_t output_logical_y_dimension, size_t output_logical_z_dimension,
+                         bool is_padded_output, 
+                         OriginType output_origin_type);
+
 
   // For the time being, the caller is responsible for having the memory allocated for any of these input/output pointers.
   void SetInputPointer(InputType* input_pointer, bool is_input_on_device);
@@ -216,11 +213,25 @@ private:
   int  transform_dimension; // 1,2,3d.
   int  transform_size; // Size of the 1d (sub) FFT which is <= the size of the full transform determined by the larger of the input/output dimensions. 
   int  transform_divisor; // full size/ transform size = Q the number of sub-transforms.
-  enum SizeChangeType { increase, decrease, none }; // Assumed to be the same for all dimesnions. This may be relaxed later.
-  SizeChangeType size_change_type;
+  // FIXME this seems like a bad idea. Added due to conflicing labels in switch statements, even with explicitly scope. 
+  enum  SizeChangeType : uint8_t { increase = 0, decrease = 1, no_change = 2 }; // Assumed to be the same for all dimesnions. This may be relaxed later.
+  enum  DimensionCheckType : uint8_t  { CopyFromHost = 20, CopyToHost= 21, FwdTransform= 22, InvTransform = 23}; 
+  enum  TransformStageCompleted : uint8_t  { none = 50, fwd = 51, inv = 52 }; 
 
+  SizeChangeType size_change_type;
+  SizeChangeType fwd_size_change_type;
+  SizeChangeType inv_size_change_type;
+
+  TransformStageCompleted transform_stage_completed;
+
+  // dims_in may change during calculation, depending on padding, but is reset after each call.
   short4 dims_in;
   short4 dims_out;
+  
+  short4 fwd_dims_in;
+  short4 fwd_dims_out;
+  short4 inv_dims_in;
+  short4 inv_dims_out;
 
   InputType* host_pointer;
   InputType* pinnedPtr;
@@ -229,7 +240,8 @@ private:
   void UnPinHostMemory();
 
   void SetDefaults();
-  void CheckDimensions();
+  void ValidateDimensions();
+  void SetDimensions(DimensionCheckType check_op_type);
 
 
   enum KernelType { r2c_decomposed, r2c_decomposed_transposed, r2c_transposed, c2c_padded, c2c, c2c_decomposed,
@@ -586,7 +598,7 @@ private:
       wanted_memory *= wanted_dims.y * wanted_dims.z; // other dimensions
       wanted_memory *= 2; // room for complex
       wanted_dims.w = (wanted_dims.x + padding_jump_val) / 2; // number of complex elements in the X dimesnions after FFT.
-      compute_memory_allocated = 2 * wanted_memory; // scaling by 2 making room for the buffer.
+      compute_memory_allocated = std::max(compute_memory_allocated, 2 * wanted_memory); // scaling by 2 making room for the buffer.
     }
     else
     {    
@@ -594,7 +606,7 @@ private:
       wanted_dims.w = wanted_dims.x; // pitch is constant
       // We allocate using sizeof(ComputeType) which is either __half or float, so we need an extra factor of 2
       // Note: this must be considered when setting the address of the buffer memory based on the address of the regular memory.
-      compute_memory_allocated = 4 * wanted_memory; 
+      compute_memory_allocated = std::max(compute_memory_allocated, 4 * wanted_memory); 
     }
     return wanted_memory;
   }
