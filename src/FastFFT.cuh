@@ -80,6 +80,9 @@ void GetCudaDeviceProps( DeviceProps& dp ) {
 
   dp.device_arch = major * 100 + minor * 10;
 
+  MyFFTRunTimeAssertTrue(dp.device_arch == 700 || dp.device_arch == 750 || dp.device_arch == 800, "FastFFT currently only supports compute capability [7.0, 7.5, 8.0].");
+
+
   cudaErr( cudaDeviceGetAttribute( &dp.max_shared_memory_per_block, cudaDevAttrMaxSharedMemoryPerBlock, dp.device_id ) );
   cudaErr( cudaDeviceGetAttribute( &dp.max_shared_memory_per_SM, cudaDevAttrMaxSharedMemoryPerMultiprocessor, dp.device_id) );
   cudaErr( cudaDeviceGetAttribute( &dp.max_registers_per_block, cudaDevAttrMaxRegistersPerBlock, dp.device_id ) );
@@ -90,7 +93,7 @@ void CheckSharedMemory(int& memory_requested, DeviceProps& dp) {
   // Depends on GetCudaDeviceProps having been called, which should be happening in the constructor.
   // Throw an error if requesting more than allowed, otherwise, we'll set to requested and let the rest be L1 Cache.
   MyFFTRunTimeAssertFalse(memory_requested > dp.max_shared_memory_per_SM, "The shared memory requested is greater than permitted for this arch.") 
-  if (memory_requested > dp.max_shared_memory_per_block) { memory_requested = dp.max_shared_memory_per_block; }
+  // if (memory_requested > dp.max_shared_memory_per_block) { memory_requested = dp.max_shared_memory_per_block; }
 }
 
 //////////////////////
