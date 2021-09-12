@@ -1,1 +1,0 @@
-# Software skills needed

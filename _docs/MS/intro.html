@@ -73,8 +73,6 @@
         <div class="navbar-brand-box">
     <a class="navbar-brand text-wrap" href="../../index.html">
       
-      <img src="../../_static/logo1.svg" class="logo" alt="logo">
-      
       
       <h1 class="site-logo" id="site-title">FastFFT</h1>
       
@@ -468,26 +466,30 @@ algorithms.</p>
 </thead>
 <tbody>
 <tr class="row-even"><td><p>64</p></td>
-<td><p>2.34</p></td>
+<td><p>1.23</p></td>
 </tr>
 <tr class="row-odd"><td><p>128</p></td>
-<td><p>2.39</p></td>
+<td><p>1.36</p></td>
 </tr>
 <tr class="row-even"><td><p>256</p></td>
-<td><p>2.06</p></td>
+<td><p>1.22</p></td>
 </tr>
 <tr class="row-odd"><td><p>512</p></td>
-<td><p>1.20</p></td>
-</tr>
-<tr class="row-even"><td><p>1024</p></td>
 <td><p>0.92</p></td>
 </tr>
-<tr class="row-odd"><td><p>4096</p></td>
-<td><p>1.17</p></td>
+<tr class="row-even"><td><p>1024</p></td>
+<td><p>0.69</p></td>
+</tr>
+<tr class="row-odd"><td><p>2048</p></td>
+<td><p>0.95</p></td>
+</tr>
+<tr class="row-even"><td><p>4096</p></td>
+<td><p>1.10</p></td>
 </tr>
 </tbody>
 </table>
-<p>:biohazard: None of the kernels are even remotely optimized at this point, they have only been assembled and tested to pass expected behavior for FFTs of constant functions, unit impulse functions, and basic convolution ops.</p>
+<p>🍍 None of the kernels are even remotely optimized at this point, they have only been assembled and tested to pass expected behavior for FFTs of constant functions, unit impulse functions, and basic convolution ops.</p>
+<p>🍍 The relative decrease in performance on re-org seems to  be partially due to less optimization in the kernels at compile time (kernels themselves did not change) and given the trend with size, mainly due to overhead in launch? The question is whether the trade off in ease in reading the code is worth it.</p>
 <p>:plus: Add in results for using the decomposition method for non-powers of two, more computation but fewer local memory accesses vs Bluesteins.</p>
 </div>
 </div>
@@ -497,29 +499,42 @@ algorithms.</p>
 <h5>Table 2: zero padded convolution of 4096 pixel sq. image<a class="headerlink" href="#table-2-zero-padded-convolution-of-4096-pixel-sq-image" title="Permalink to this headline">¶</a></h5>
 <table class="colwidths-auto table">
 <thead>
-<tr class="row-odd"><th class="head"><p>2D square size kernel size</p></th>
+<tr class="row-odd"><th class="head"><p>2D input</p></th>
+<th class="head"><p>2x size</p></th>
+<th class="head"><p>4096</p></th>
 <th class="head"><p>cufft/FastFFT runtime (10k iterations)</p></th>
 </tr>
 </thead>
 <tbody>
 <tr class="row-even"><td><p>64</p></td>
-<td><p>2.79</p></td>
+<td><p>2.54</p></td>
+<td><p>2.59</p></td>
+<td><p></p></td>
 </tr>
 <tr class="row-odd"><td><p>128</p></td>
-<td><p>2.81</p></td>
+<td><p>1.65</p></td>
+<td><p>2.50</p></td>
+<td><p></p></td>
 </tr>
 <tr class="row-even"><td><p>256</p></td>
-<td><p>2.71</p></td>
+<td><p>1.33</p></td>
+<td><p>2.45</p></td>
+<td><p></p></td>
 </tr>
 <tr class="row-odd"><td><p>512</p></td>
-<td><p>2.66</p></td>
+<td><p>1.88</p></td>
+<td><p>2.29</p></td>
+<td><p></p></td>
 </tr>
 <tr class="row-even"><td><p>1024</p></td>
-<td><p>2.48</p></td>
+<td><p>1.94</p></td>
+<td><p>1.94</p></td>
+<td><p></p></td>
 </tr>
 </tbody>
 </table>
-<p>:biohazard: None of the kernels are even remotely optimized at this point, they have only been assembled and tested to pass expected behavior for FFTs of constant functions, unit impulse functions, and basic convolution ops.</p>
+<p>🍍 None of the kernels are even remotely optimized at this point, they have only been assembled and tested to pass expected behavior for FFTs of constant functions, unit impulse functions, and basic convolution ops.</p>
+<p>🍍 See note on previous table. The relative perf hit is not nearly as dramatic as in the previous table; however it is still about 10% which is a tough pill to swallow.</p>
 <ul>
 <li><p>Movie alignment expense (Pre/post process and alignment percentages.)</p>
 <p>:soon:</p>

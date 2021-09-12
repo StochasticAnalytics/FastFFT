@@ -99,15 +99,18 @@ By design, the cufft library from Nvidia returns an FFT in the natural order [TO
 ##### Table 1: FFT/iFFT pairs
 
 | 2D square size | cufft/FastFFT runtime (10k iterations) |
-| --- | ---- |
-| 64 | 2.34 |
-| 128 | 2.39 |
-| 256 | 2.06 |
-| 512 | 1.20 |
-| 1024 | 0.92 |
-| 4096 | 1.17 | 
+|----|----|
+| 64  |  1.23 |
+| 128 | 1.36 | 
+| 256 | 1.22 |
+| 512 | 0.92 |
+| 1024| 0.69 |
+| 2048| 0.95 |
+| 4096| 1.10 |
 
-:biohazard: None of the kernels are even remotely optimized at this point, they have only been assembled and tested to pass expected behavior for FFTs of constant functions, unit impulse functions, and basic convolution ops.
+🍍 None of the kernels are even remotely optimized at this point, they have only been assembled and tested to pass expected behavior for FFTs of constant functions, unit impulse functions, and basic convolution ops.
+
+🍍 The relative decrease in performance on re-org seems to  be partially due to less optimization in the kernels at compile time (kernels themselves did not change) and given the trend with size, mainly due to overhead in launch? The question is whether the trade off in ease in reading the code is worth it.
 
 :plus: Add in results for using the decomposition method for non-powers of two, more computation but fewer local memory accesses vs Bluesteins.
 
@@ -115,15 +118,17 @@ By design, the cufft library from Nvidia returns an FFT in the natural order [TO
 
 ##### Table 2: zero padded convolution of 4096 pixel sq. image
 
-| 2D square size kernel size | cufft/FastFFT runtime (10k iterations) |
-| --- | ---- |
-| 64 | 2.79 |
-| 128 | 2.81 |
-| 256 | 2.71 |
-| 512 | 2.66 |
-| 1024 | 2.48 |
+| 2D input | 2x size |  4096 | cufft/FastFFT runtime (10k iterations) | 
+| --- | ---- | ---- | ---- |
+| 64 | 2.54 | 2.59 | |
+| 128 | 1.65 | 2.50 | |
+| 256 | 1.33 | 2.45 | | 
+| 512 | 1.88 | 2.29 | |
+| 1024 | 1.94 | 1.94 | | 
 
-:biohazard: None of the kernels are even remotely optimized at this point, they have only been assembled and tested to pass expected behavior for FFTs of constant functions, unit impulse functions, and basic convolution ops.
+🍍 None of the kernels are even remotely optimized at this point, they have only been assembled and tested to pass expected behavior for FFTs of constant functions, unit impulse functions, and basic convolution ops.
+
+🍍 See note on previous table. The relative perf hit is not nearly as dramatic as in the previous table; however it is still about 10% which is a tough pill to swallow.
 
 - Movie alignment expense (Pre/post process and alignment percentages.)
 
