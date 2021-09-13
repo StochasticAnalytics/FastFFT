@@ -245,6 +245,9 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CopyDeviceToHost( b
   if (is_in_buffer_memory) copy_pointer = d_ptr.position_space_buffer;
   else copy_pointer = d_ptr.position_space;
 
+  std::cout<< "Is completed " << transform_stage_completed << std::endl;
+  std::cout << "Copying device to host byts: "  << memory_size_to_copy << std::endl;
+
   // FIXME this is assuming the input type matches the compute type.
   precheck
 	cudaErr(cudaMemcpyAsync(pinnedPtr, copy_pointer, memory_size_to_copy * sizeof(InputType),cudaMemcpyDeviceToHost,cudaStreamPerThread));
@@ -322,11 +325,15 @@ void FourierTransformer<ComputeType, InputType, OutputType>::FwdFFT(bool swap_re
         {
           if (is_real_valued_input) SetPrecisionAndExectutionMethod(r2c_decomposed, do_forward_transform); //FFT_R2C_decomposed(transpose_output);
           else SetPrecisionAndExectutionMethod(c2c_decomposed, do_forward_transform);
+          transform_stage_completed = TransformStageCompleted::fwd;
+
         }
         else
         {
           if (is_real_valued_input) SetPrecisionAndExectutionMethod<false>(r2c_transposed, do_forward_transform); //FFT_R2C_decomposed(transpose_output);
           else SetPrecisionAndExectutionMethod(c2c, do_forward_transform);
+          transform_stage_completed = TransformStageCompleted::fwd;
+
         }
 
         break;
@@ -340,18 +347,22 @@ void FourierTransformer<ComputeType, InputType, OutputType>::FwdFFT(bool swap_re
           if (use_thread_method)
           {
             SetPrecisionAndExectutionMethod(r2c_decomposed_transposed, do_forward_transform);
+            transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
             SetPrecisionAndExectutionMethod(c2c_decomposed, do_forward_transform);
           }
           else
           {
             SetPrecisionAndExectutionMethod(r2c_transposed, do_forward_transform);
+            transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
             SetPrecisionAndExectutionMethod(c2c,            do_forward_transform);
           }
           break;
         }
         case increase: {
           SetPrecisionAndExectutionMethod(r2c_transposed, do_forward_transform);
-          SetPrecisionAndExectutionMethod(c2c_padded,     do_forward_transform);          
+          transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
+          SetPrecisionAndExectutionMethod(c2c_padded,     do_forward_transform);   
+       
           // FFT_R2C_WithPadding(transpose_output);
           // FFT_C2C_WithPadding(swap_real_space_quadrants);
           break;
@@ -385,6 +396,8 @@ void FourierTransformer<ComputeType, InputType, OutputType>::InvFFT(bool transpo
     case 1: {
       if (is_real_valued_input) SetPrecisionAndExectutionMethod(c2r_decomposed, do_forward_transform); //FFT_R2C_decomposed(transpose_output);
       else SetPrecisionAndExectutionMethod(c2c_decomposed, do_forward_transform);
+      transform_stage_completed = TransformStageCompleted::inv;
+
 
       break;
     }
@@ -397,12 +410,16 @@ void FourierTransformer<ComputeType, InputType, OutputType>::InvFFT(bool transpo
           if (use_thread_method)
           {
             SetPrecisionAndExectutionMethod(c2c_decomposed,            do_forward_transform);
+            transform_stage_completed = TransformStageCompleted::inv; // technically not complete, needed for copy on validation of partial fft.
             SetPrecisionAndExectutionMethod(c2r_decomposed_transposed, do_forward_transform);
+
           }
           else
           {
             SetPrecisionAndExectutionMethod(c2c,            do_forward_transform);
+            transform_stage_completed = TransformStageCompleted::inv; // technically not complete, needed for copy on validation of partial fft.
             SetPrecisionAndExectutionMethod(c2r_transposed, do_forward_transform);
+
           }          
           // // FFT_C2C(false);
           // // FFT_C2R_Transposed();
@@ -412,7 +429,9 @@ void FourierTransformer<ComputeType, InputType, OutputType>::InvFFT(bool transpo
         }
         case increase: {
           SetPrecisionAndExectutionMethod(c2c,            do_forward_transform);
-          SetPrecisionAndExectutionMethod(c2r_transposed, do_forward_transform);           
+          transform_stage_completed = TransformStageCompleted::inv; // technically not complete, needed for copy on validation of partial fft.
+          SetPrecisionAndExectutionMethod(c2r_transposed, do_forward_transform); 
+          
           // FFT_C2C(false);
           // FFT_C2R_Transposed();
           break;
@@ -465,6 +484,8 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CrossCorrelate(floa
             case no_change: {
               SetPrecisionAndExectutionMethod(xcorr_transposed, true);
               SetPrecisionAndExectutionMethod(c2r_transposed,   false);
+              transform_stage_completed = TransformStageCompleted::inv;
+
               break;
             }
             case increase: {
@@ -533,6 +554,8 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CrossCorrelate(__ha
             case no_change: {
               SetPrecisionAndExectutionMethod(xcorr_transposed, true);
               SetPrecisionAndExectutionMethod(c2r_transposed,   false); 
+              transform_stage_completed = TransformStageCompleted::inv;
+
               break;
             }
             case increase: {
@@ -686,7 +709,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetDimensions(Dimen
         case fwd: {
           dims_in = inv_dims_in;
           dims_out = inv_dims_out;
-          memory_size_to_copy = compute_memory_allocated;
+          memory_size_to_copy = compute_memory_allocated/2;
           break;
         }
         case inv: {
@@ -700,7 +723,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetDimensions(Dimen
     } // case CopToHose
 
     case FwdTransform: {
-      MyFFTDebugAssertTrue(transform_stage_completed == none, "When doing a forward transform, the transform stage completed should be none, something has gone wrong.");
+      MyFFTDebugAssertTrue(transform_stage_completed == none || transform_stage_completed == inv, "When doing a forward transform, the transform stage completed should be none, something has gone wrong.");
       dims_in = fwd_dims_in;
       dims_out = fwd_dims_out;
       break;
@@ -1725,7 +1748,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         cudaError_t error_code = cudaSuccess;
         auto workspace = make_workspace<FFT>(error_code);
   
-        switch (size_change_type)
+        switch (fwd_size_change_type)
         {
           case decrease: {
             MyFFTRunTimeAssertTrue(false, "r2c_transposed with decreasing size is not yet implemented.");
@@ -1857,7 +1880,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
       
         cudaError_t error_code = cudaSuccess;
         auto workspace = make_workspace<FFT>(error_code);
-        cudaErr(error_code);
+        cudaMsg(error_code);
   
         precheck
         block_fft_kernel_C2R_Transposed<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, FFT::shared_memory_size, cudaStreamPerThread>> >
@@ -1875,10 +1898,10 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
   
         cudaError_t error_code = cudaSuccess;
         auto workspace_fwd = make_workspace<FFT>(error_code); // presumably larger of the two
-        cudaErr(error_code);
+        cudaMsg(error_code);
         error_code = cudaSuccess;
         auto workspace_inv = make_workspace<invFFT>(error_code); // presumably larger of the two
-        cudaErr(error_code);
+        cudaMsg(error_code);
   
         int shared_memory = invFFT::shared_memory_size;
         CheckSharedMemory(shared_memory, device_properties);

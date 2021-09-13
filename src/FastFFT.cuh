@@ -29,10 +29,12 @@
 #ifndef HEAVYERRORCHECKING_FFT 
 #define postcheck
 #define cudaErr
+#define cudaMsg
 #define precheck
 #else
 #define postcheck { cudaErr(cudaPeekAtLastError()); cudaError_t error = cudaStreamSynchronize(cudaStreamPerThread); cudaErr(error); };
 #define cudaErr(error) { auto status = static_cast<cudaError_t>(error); if (status != cudaSuccess) { std::cerr << cudaGetErrorString(status) << " :-> "; MyFFTPrintWithDetails("");} };
+#define cudaMsg(error_message) { if (error_message != cudaSuccess) { std::cerr << cudaGetErrorString(error_message) << " :-> "; MyFFTPrintWithDetails("");} };
 #define precheck { cudaErr(cudaGetLastError()); }
 #endif
 

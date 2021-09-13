@@ -164,9 +164,11 @@ public:
 
   int inline ReturnInputMemorySize() { return input_memory_allocated; }
   int inline ReturnOutputMemorySize() { return output_memory_allocated; }
-  short4 inline ReturnInputDimensions() { return dims_in; }
-  short4 inline ReturnOutputDimensions() { return dims_out; }
-  
+  short4 inline ReturnFwdInputDimensions() { return fwd_dims_in; }
+  short4 inline ReturnFwdOutputDimensions() { return fwd_dims_out; }
+  short4 inline ReturnInvInputDimensions() { return fwd_dims_in; }
+  short4 inline ReturnInvOutputDimensions() { return fwd_dims_out; }
+
   template<typename T, bool is_on_host = true>
   void SetToConstant(T* input_pointer, int N_values, const T& wanted_value)
   {
