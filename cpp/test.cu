@@ -38,23 +38,22 @@ void const_image_test(std::vector<int> size)
     FastFFT::FourierTransformer<float, float, float> FT;
     
     // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
-    FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-    FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+    FT.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, output_size.x,output_size.y,output_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+    FT.SetInverseFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
 
       // The padding (dims.w) is calculated based on the setup
-    short4 dims_in = FT.ReturnInputDimensions();
-    short4 dims_out = FT.ReturnOutputDimensions();
+    short4 dims_in = FT.ReturnFwdInputDimensions();
+    short4 dims_out = FT.ReturnFwdOutputDimensions();
 
     // Determine how much memory we need, working with FFTW/CUDA style in place transform padding.
     // Note: there is no reason we really need this, because the xforms will always be out of place. 
     //       For now, this is just in place because all memory in cisTEM is allocated accordingly.
     host_input.real_memory_allocated = FT.ReturnInputMemorySize();
     host_output.real_memory_allocated = FT.ReturnOutputMemorySize();
-    
+
     // On the device, we will always allocate enough memory for the larger of input/output including the buffer array.
     // Minmize the number of calls to malloc which are slow and can lead to fragmentation.
     device_output.real_memory_allocated = std::max(host_input.real_memory_allocated, host_output.real_memory_allocated);
-    
     
     // In your own programs, you will be handling this memory allocation yourself. We'll just make something here.
     // I think fftwf_malloc may potentially create a different alignment than new/delete, but kinda doubt it. For cisTEM consistency...
@@ -74,7 +73,6 @@ void const_image_test(std::vector<int> size)
     FT.SetInputPointer(host_output.real_values, false);
     sum = ReturnSumOfReal(host_output.real_values, dims_out);
     if (sum != dims_out.x*dims_out.y*dims_out.z) {all_passed = false; init_passed[n] = false;}
-
     // MyFFTDebugAssertTestTrue( sum == dims_out.x*dims_out.y*dims_out.z,"Unit impulse Init ");
     
     // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
@@ -221,12 +219,12 @@ void unit_impulse_test(std::vector<int>size)
   // For the time being input and output are also float. TODO calc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
   FastFFT::FourierTransformer<float, float, float> FT;
   // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
-  FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-  FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural); 
+  FT.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, output_size.x,output_size.y,output_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+  FT.SetInverseFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural); 
  
   // The padding (dims.w) is calculated based on the setup
-  short4 dims_in = FT.ReturnInputDimensions();
-  short4 dims_out = FT.ReturnOutputDimensions();
+  short4 dims_in = FT.ReturnFwdInputDimensions();
+  short4 dims_out = FT.ReturnFwdOutputDimensions();
   // Determine how much memory we need, working with FFTW/CUDA style in place transform padding.
   // Note: there is no reason we really need this, because the xforms will always be out of place. 
   //       For now, this is just in place because all memory in cisTEM is allocated accordingly.
@@ -396,13 +394,13 @@ void compare_libraries(short4 input_size, short4 output_size)
   FastFFT::FourierTransformer<float, float, float> targetFT;
 
   // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
-  FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-  FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-  cuFFT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-  cuFFT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+  FT.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, output_size.x,output_size.y,output_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+  FT.SetInverseFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+  cuFFT.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, output_size.x,output_size.y,output_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+  cuFFT.SetInverseFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
   
-  targetFT.SetInputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-  targetFT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+  targetFT.SetForwardFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+  targetFT.SetInverseFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
 
 
   FT_input.real_memory_allocated = FT.ReturnInputMemorySize();
@@ -707,11 +705,11 @@ void run_oned(std::vector<int> size)
     FastFFT::FourierTransformer<float, float2, float2> FT_complex;
 
     // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
-    FT.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-    FT.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+    FT.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, output_size.x,output_size.y,output_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+    FT.SetInverseFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
 
-    FT_complex.SetInputDimensionsAndType(input_size.x,input_size.y,input_size.z,true, false, FastFFT::FourierTransformer<float, float2 ,float2>::OriginType::natural);
-    FT_complex.SetOutputDimensionsAndType(output_size.x,output_size.y,output_size.z,true, FastFFT::FourierTransformer<float, float2 ,float2>::OriginType::natural);
+    FT_complex.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, output_size.x,output_size.y,output_size.z, true, false, FastFFT::FourierTransformer<float, float2 ,float2>::OriginType::natural);
+    FT_complex.SetInverseFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, FastFFT::FourierTransformer<float, float2 ,float2>::OriginType::natural);
 
     FT_input.real_memory_allocated = FT.ReturnInputMemorySize();
     FT_output.real_memory_allocated = FT.ReturnOutputMemorySize();
@@ -869,5 +867,5 @@ int main(int argc, char** argv) {
       }
     }
   }
-
+  return 0;
 }
