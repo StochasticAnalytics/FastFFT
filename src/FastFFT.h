@@ -311,6 +311,18 @@ private:
     {
       return true;
     }   
+    else return false; 
+
+  }
+
+  inline bool IsC2RType(KernelType kernel_type)
+  {
+     if (kernel_type == c2r_decomposed || kernel_type == c2r_decomposed_transposed ||
+         kernel_type == c2r_none || kernel_type == c2r_decrease || kernel_type == c2r_increase)
+    {
+      return true;
+    }  
+    else return false; 
   }
 
   inline bool IsForwardType(KernelType kernel_type)
@@ -322,6 +334,8 @@ private:
     {
       return true;
     }      
+    else return false; 
+
   }
 
   inline void AssertDivisibleAndFactorOf2( int full_size_transform, int number_non_zero_inputs_or_outputs)
