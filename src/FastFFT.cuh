@@ -106,35 +106,28 @@ using namespace cufftdx;
 constexpr const int elements_per_thread_real = 8;
 constexpr const int elements_per_thread_complex = 8;
 
-// All transforms are 
-// using FFT_base   = decltype(Block() + Precision<float>() + ElementsPerThread<elements_per_thread_complex>()  + FFTsPerBlock<1>()  );
-// using FFT_thread_base = decltype(Thread() + Size<4>() + Precision<float>());
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FFT kernels
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 
 //////////////////////////////
-// Kernel definitions
+// Block FFT based Kernel definitions
 //////////////////////////////
-
-
 
 /////////////
 // R2C
 /////////////
 
-template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
-__global__
-void thread_fft_kernel_R2C_decomposed(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q);
-
-template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
-__global__
-void thread_fft_kernel_R2C_decomposed_transposed(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q);
 
 template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_R2C(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+void block_fft_kernel_R2C_NONE(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
 
 template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_R2C_WithPadding(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
+void block_fft_kernel_R2C_INCREASE(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 
 
 /////////////
@@ -158,16 +151,50 @@ __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_C2C_WithPadding_ConjMul_C2C_SwapRealSpaceQuadrants( const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv);
 
 template<class FFT, class ComplexType = typename FFT::value_type>
+__launch_bounds__(FFT::max_threads_per_block) __global__
+void block_fft_kernel_C2C(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+
+/////////////
+// C2R 
+/////////////
+
+
+template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
+__launch_bounds__(FFT::max_threads_per_block) __global__
+void block_fft_kernel_C2R_Transposed(const ComplexType*  __restrict__ input_values, ScalarType*  __restrict__ output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+
+
+
+//////////////////////////////
+// Thread FFT based Kernel definitions
+//////////////////////////////
+
+/////////////
+// R2C
+/////////////
+
+template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
+__global__
+void thread_fft_kernel_R2C_decomposed(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q);
+
+template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
+__global__
+void thread_fft_kernel_R2C_decomposed_transposed(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q);
+
+
+
+/////////////
+// C2C
+/////////////
+
+
+template<class FFT, class ComplexType = typename FFT::value_type>
 __global__
 void thread_fft_kernel_C2C_decomposed(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q);
 
 template<class FFT, class invFFT, class ComplexType = typename FFT::value_type>
 __global__
 void thread_fft_kernel_C2C_decomposed_ConjMul(const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q);
-
-template<class FFT, class ComplexType = typename FFT::value_type>
-__launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2C(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
 
 /////////////
 // C2R 
@@ -181,9 +208,9 @@ template<class FFT, class ComplexType = typename FFT::value_type, class ScalarTy
 __global__
 void thread_fft_kernel_C2R_decomposed_transposed(const ComplexType*  __restrict__ input_values, ScalarType*  __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q);
 
-template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
-__launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2R_Transposed(const ComplexType*  __restrict__ input_values, ScalarType*  __restrict__ output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// End FFT Kernels
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 
