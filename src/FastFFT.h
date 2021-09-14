@@ -283,8 +283,9 @@ private:
 
   inline bool IsThreadType(KernelType kernel_type)
   {
-    if ( kernel_type = c2c_decomposed ||
-        kernel_type == c2r_decomposed || kernel_type == c2r_decomposed_transposed || kernel_type == xcorr_decomposed)
+    if ( kernel_type == r2c_decomposed || kernel_type == r2c_decomposed_transposed ||
+         kernel_type == c2c_decomposed ||
+         kernel_type == c2r_decomposed || kernel_type == c2r_decomposed_transposed || kernel_type == xcorr_decomposed)
     {
       return true;
     }
@@ -292,7 +293,7 @@ private:
     else if (kernel_type == r2c_none || kernel_type == r2c_decrease || kernel_type == r2c_increase ||
              kernel_type == c2c_fwd_none || kernel_type == c2c_fwd_decrease || kernel_type == c2c_fwd_increase ||
              kernel_type == c2c_inv_none || kernel_type == c2c_inv_decrease || kernel_type == c2c_inv_increase ||
-             kernel_type == c2c_none || kernel_type == c2c_decrease || kernel_type == c2c_increase ||
+             kernel_type == c2r_none || kernel_type == c2r_decrease || kernel_type == c2r_increase ||
              kernel_type == xcorr_transposed )
     { 
       return false;

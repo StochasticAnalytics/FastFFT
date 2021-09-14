@@ -12,7 +12,7 @@
 // 1 - basic checks without blocking
 // 2 - full checks, including blocking
 
-// #define HEAVYERRORCHECKING_FFT 
+#define HEAVYERRORCHECKING_FFT 
 
 // #ifdef DEBUG
 #define MyFFTPrint(...)	{std::cerr << __VA_ARGS__  << std::endl;}
@@ -29,14 +29,15 @@
 #ifndef HEAVYERRORCHECKING_FFT 
 #define postcheck
 #define cudaErr
-#define cudaMsg
 #define precheck
+#define checkCudaErr
 #else
 #define postcheck { cudaErr(cudaPeekAtLastError()); cudaError_t error = cudaStreamSynchronize(cudaStreamPerThread); cudaErr(error); };
 #define cudaErr(error) { auto status = static_cast<cudaError_t>(error); if (status != cudaSuccess) { std::cerr << cudaGetErrorString(status) << " :-> "; MyFFTPrintWithDetails("");} };
-#define cudaMsg(error_message) { if (error_message != cudaSuccess) { std::cerr << cudaGetErrorString(error_message) << " :-> "; MyFFTPrintWithDetails("");} };
 #define precheck { cudaErr(cudaGetLastError()); }
+inline void checkCudaErr(cudaError_t err) { if (err != cudaSuccess) { std::cerr << cudaGetErrorString(err) << " :-> "; MyFFTPrintWithDetails("");} };
 #endif
+
 
 #define USEFASTSINCOS
 // The __sincosf doesn't appear to be the problem with accuracy, likely just the extra additions, but it probably also is less flexible with other types. I don't see a half precision equivalent.
@@ -136,7 +137,7 @@ void block_fft_kernel_R2C_INCREASE(const ScalarType*  __restrict__ input_values,
 
 template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2C_WithPadding(const ComplexType* __restrict__  input_values, ComplexType*  __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
+void block_fft_kernel_C2C_INCREASE(const ComplexType* __restrict__  input_values, ComplexType*  __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 
 template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
@@ -152,7 +153,7 @@ void block_fft_kernel_C2C_WithPadding_ConjMul_C2C_SwapRealSpaceQuadrants( const 
 
 template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2C(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+void block_fft_kernel_C2C_NONE(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
 
 /////////////
 // C2R 
@@ -161,7 +162,7 @@ void block_fft_kernel_C2C(const ComplexType* __restrict__  input_values, Complex
 
 template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2R_Transposed(const ComplexType*  __restrict__ input_values, ScalarType*  __restrict__ output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+void block_fft_kernel_C2R_NONE(const ComplexType*  __restrict__ input_values, ScalarType*  __restrict__ output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
 
 
 

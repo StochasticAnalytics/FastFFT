@@ -86,12 +86,12 @@ void const_image_test(std::vector<int> size)
       if (host_output.complex_values[index].x != 0.0f && host_output.complex_values[index].y != 0.0f) { std::cout << host_output.complex_values[index].x  << " " << host_output.complex_values[index].y << " " << std::endl; test_passed = false;}
     }
     if (host_output.complex_values[0].x != (float)dims_out.x * (float)dims_out.y * (float)dims_out.z) test_passed = false;
-    // for (int i = 0; i < 10; i++)
-    // {
-    //   std::cout << "FFTW unit " << host_output.complex_values[i].x << " " << host_output.complex_values[i].y << std::endl;
-    // }
+    for (int i = 0; i < 10; i++)
+    {
+      std::cout << "FFTW unit " << host_output.complex_values[i].x << " " << host_output.complex_values[i].y << std::endl;
+    }
     if (test_passed == false) {all_passed = false; FFTW_passed[n] = false;}
-    // MyFFTDebugAssertTestTrue( test_passed, "FFTW unit impulse forward FFT");
+    MyFFTDebugAssertTestTrue( test_passed, "FFTW unit impulse forward FFT");
     
     // Just to make sure we don't get a false positive, set the host memory to some undesired value.
     FT.SetToConstant<float>(host_output.real_values, host_output.real_memory_allocated, 2.0f);
@@ -108,23 +108,23 @@ void const_image_test(std::vector<int> size)
       if (host_output.complex_values[index].x != 0.0f && host_output.complex_values[index].y != 0.0f) {test_passed = false;} // std::cout << host_output.complex_values[index].x  << " " << host_output.complex_values[index].y << " " << std::endl;}
     }
     if (host_output.complex_values[0].x != (float)dims_out.x * (float)dims_out.y * (float)dims_out.z) test_passed = false;
-    // int nn=0;
-    // for (int x = 0; x <  host_output.size.y ; x++)
-    // {
+    int nn=0;
+    for (int x = 0; x <  host_output.size.y ; x++)
+    {
       
-    //   std::cout << x << "[ ";
-    //   for (int y = 0; y < host_output.size.w; y++)
-    //   {  
-    //     std::cout << host_output.complex_values[x + y*host_output.size.y].x << "," << host_output.complex_values[x + y*host_output.size.y].y << " ";
-    //     nn++;
-    //     if (nn == 34) {nn = 0; std::cout << std::endl ;} // line wrapping
-    //   }
-    //   std::cout << "] " << std::endl;
-    //   nn = 0;
-    // }
+      std::cout << x << "[ ";
+      for (int y = 0; y < host_output.size.w; y++)
+      {  
+        std::cout << host_output.complex_values[x + y*host_output.size.y].x << "," << host_output.complex_values[x + y*host_output.size.y].y << " ";
+        nn++;
+        if (nn == 34) {nn = 0; std::cout << std::endl ;} // line wrapping
+      }
+      std::cout << "] " << std::endl;
+      nn = 0;
+    }
 
     if (test_passed == false) {all_passed = false; FastFFT_forward_passed[n] = false;}
-    // MyFFTDebugAssertTestTrue( test_passed, "FastFFT unit impulse forward FFT");
+    MyFFTDebugAssertTestTrue( test_passed, "FastFFT unit impulse forward FFT");
     FT.SetToConstant<float>(host_input.real_values, host_input.real_memory_allocated, 2.0f);
     
 
