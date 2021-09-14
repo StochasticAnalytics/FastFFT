@@ -30,14 +30,20 @@
 #define postcheck
 #define cudaErr
 #define precheck
-#define checkCudaErr
 #else
 #define postcheck { cudaErr(cudaPeekAtLastError()); cudaError_t error = cudaStreamSynchronize(cudaStreamPerThread); cudaErr(error); };
 #define cudaErr(error) { auto status = static_cast<cudaError_t>(error); if (status != cudaSuccess) { std::cerr << cudaGetErrorString(status) << " :-> "; MyFFTPrintWithDetails("");} };
 #define precheck { cudaErr(cudaGetLastError()); }
-inline void checkCudaErr(cudaError_t err) { if (err != cudaSuccess) { std::cerr << cudaGetErrorString(err) << " :-> "; MyFFTPrintWithDetails("");} };
 #endif
 
+inline void checkCudaErr(cudaError_t err) 
+{ 
+  if (err != cudaSuccess) 
+  { 
+    std::cerr << cudaGetErrorString(err) << " :-> " << std::endl;
+    MyFFTPrintWithDetails(" ");
+  } 
+};
 
 #define USEFASTSINCOS
 // The __sincosf doesn't appear to be the problem with accuracy, likely just the extra additions, but it probably also is less flexible with other types. I don't see a half precision equivalent.

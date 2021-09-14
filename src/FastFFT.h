@@ -403,12 +403,87 @@ private:
   template <class FFT_base_arch, bool use_thread_method = false>
   void SetAndLaunchKernel(KernelType kernel_type, bool do_forward_transform);
 
+  // For debugging
+
+  inline void PrintVectorType(int3 input) 
+  {
+    std::cout << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
+  }
+  inline void PrintVectorType(int4 input) 
+  {
+    std::cout << "(x,y,z,w) " << input.x << " " << input.y << " " << input.z << " " << input.w << std::endl;
+  }
+    inline void PrintVectorType(dim3 input) 
+  {
+    std::cout << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
+  }
+  inline void PrintVectorType(short3 input) 
+  {
+    std::cout << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
+  }
+  inline void PrintVectorType(short4 input) 
+  {
+    std::cout << "(x,y,z,w) " << input.x << " " << input.y << " " << input.z << " " << input.w << std::endl;
+  }
+
+  void PrintLaunchParameters(LaunchParams LP)
+  {
+    std::cout << "Launch parameters: " << std::endl;
+    std::cout << "  Threads per block: ";
+    PrintVectorType(LP.threadsPerBlock);
+    std::cout << "  Grid dimensions: ";
+    PrintVectorType(LP.gridDims);
+    std::cout << "  Q: " << LP.Q << std::endl;
+    std::cout << "  Twiddle in: " << LP.twiddle_in << std::endl;
+    std::cout << "  shared input: " << LP.mem_offsets.shared_input << std::endl;
+    std::cout << "  shared output: " << LP.mem_offsets.shared_output << std::endl;
+    std::cout << "  pixel pitch input: " << LP.mem_offsets.pixel_pitch_input << std::endl;
+    std::cout << "  pixel pitch output: " << LP.mem_offsets.pixel_pitch_output << std::endl;
+
+  };
+  void PrintState()
+  {
+    std::cout << "Device Properties:\n" << std::endl;
+    std::cout << "Device idx: " << device_properties.device_id << std::endl;
+    std::cout << "max_shared_memory_per_block: " << device_properties.max_shared_memory_per_block << std::endl;
+    std::cout << "max_shared_memory_per_SM: " << device_properties.max_shared_memory_per_SM << std::endl;
+    std::cout << "max_registers_per_block: " << device_properties.max_registers_per_block << std::endl;
+    std::cout << "max_persisting_L2_cache_size: " << device_properties.max_persisting_L2_cache_size << std::endl;
+
+    std::cout << "State Variables:\n" << std::endl;
+    std::cout << "is_in_memory_host_pointer " << is_in_memory_host_pointer << std::endl;
+    std::cout << "is_in_memory_device_pointer " << is_in_memory_device_pointer << std::endl;
+    std::cout << "is_in_buffer_memory " << is_in_buffer_memory << std::endl;
+    std::cout << "is_host_memory_pinned " << is_host_memory_pinned << std::endl;
+    std::cout << "is_fftw_padded_input " << is_fftw_padded_input << std::endl;
+    std::cout << "is_fftw_padded_output " << is_fftw_padded_output << std::endl;
+    std::cout << "is_real_valued_input " << is_real_valued_input << std::endl;
+    std::cout << "is_set_input_params " << is_set_input_params << std::endl;
+    std::cout << "is_set_output_params " << is_set_output_params << std::endl;
+    std::cout << "is_size_validated " << is_size_validated << std::endl;
+    std::cout << "is_set_input_pointer " << is_set_input_pointer << std::endl;
+
+    std::cout << "Size variables:\n" << std::endl;
+    std::cout << "transform_size.N " << transform_size.N << std::endl;
+    std::cout << "transform_size.L " << transform_size.L << std::endl;
+    std::cout << "transform_size.P " << transform_size.P << std::endl;
+    std::cout << "transform_size.Q " << transform_size.Q << std::endl;
+    std::cout << "fwd_dims_in.x,y,z " << fwd_dims_in.x << "," << fwd_dims_in.y << "," << fwd_dims_in.z << std::endl;
+    std::cout << "fwd_dims_out.x,y,z " << fwd_dims_out.x << "," << fwd_dims_out.y << "," << fwd_dims_out.z << std::endl;
+    std::cout << "inv_dims_in.x,y,z " << inv_dims_in.x << "," << inv_dims_in.y << "," << inv_dims_in.z << std::endl;
+    std::cout << "inv_dims_out.x,y,z " << inv_dims_out.x << "," << inv_dims_out.y << "," << inv_dims_out.z << std::endl;
+
+    std::cout << "Misc:\n" << std::endl;
+    std::cout << "compute_memory_allocated " << compute_memory_allocated << std::endl;
+    std::cout << "fwd_size_change_type " << fwd_size_change_type << std::endl;
+    std::cout << "inv_size_change_type " << inv_size_change_type << std::endl;
+    std::cout << "transform stage complete " << transform_stage_completed << std::endl;
+    std::cout << "input_origin_type " << input_origin_type << std::endl;
+    std::cout << "output_origin_type " << output_origin_type << std::endl;
+  }; // PrintState()
 
 
-};
-
-
-
+}; // class Fourier Transformer
 
 } // namespace fast_FFT
 

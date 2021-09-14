@@ -46,20 +46,25 @@ template <class ComputeType, class InputType, class OutputType>
 void FourierTransformer<ComputeType, InputType, OutputType>::SetDefaults()
 {
 
+
   // booleans to track state, could be bit fields but that seem opaque to me.
-  is_in_memory_host_pointer = false;
-  is_in_memory_device_pointer = false;
-  transform_stage_completed = none; // TOOD make sure this makes sense as a default.
-
-  is_fftw_padded_input = false;
-  is_fftw_padded_output = false;
-
-  is_set_input_params = false;
+  is_in_memory_host_pointer = false; // To track allocation of host side memory
+  is_in_memory_device_pointer = false; // To track allocation of device side memory.
+  is_in_buffer_memory = false; // To track whether the current result is in dev_ptr.position_space or dev_ptr.position_space_buffer (momemtum space/ momentum space buffer respectively.)
+  transform_stage_completed = none;
+  
+  is_host_memory_pinned = false; // Specified in the constructor. Assuming host memory won't be pinned for many applications.
+  
+  is_fftw_padded_input = false; // Padding for in place r2c transforms
+  is_fftw_padded_output = false; // Currently the output state will match the input state, otherwise it is an error.
+  
+  is_real_valued_input = true; // This is determined by the input type. If it is a float2 or __half2, then it is assumed to be a complex valued input function.
+  
+  is_set_input_params = false; // Yes, yes, "are" set.
   is_set_output_params = false;
-  is_size_validated = false;
-  is_set_input_pointer = false;
+  is_size_validated = false; // Defaults to false, set after both input/output dimensions are set and checked.
+  is_set_input_pointer = false; // May be on the host of the device.
 
-  is_host_memory_pinned = false;
 
   compute_memory_allocated = 0;
 
@@ -1766,11 +1771,15 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
     switch (kernel_type)
     {
       case r2c_none: {
+
         using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() );  
         cudaError_t error_code = cudaSuccess;
         auto workspace = make_workspace<FFT>(error_code);
 
         LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_none);
+        PrintState();
+        PrintLaunchParameters(LP);
+        exit(1);
         int shared_memory = FFT::shared_memory_size;
         CheckSharedMemory(shared_memory, device_properties);
         cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_R2C_NONE<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
