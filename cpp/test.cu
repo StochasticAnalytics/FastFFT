@@ -556,7 +556,7 @@ void compare_libraries(short4 input_size, short4 output_size)
   // }
 
 
-  const int n_loops = 10000;
+  const int n_loops = 3000;
   cuFFT_output.record_start();
   for (int i = 0; i < n_loops; ++i)
   {
@@ -819,14 +819,12 @@ int main(int argc, char** argv) {
 
   std::vector<int> test_size = { 64, 128, 256, 512, 1024, 2048, 4096};
 
-  std::vector<int> test_sizes =  {32};//,64,128,256,320,480,512,544,608,768,1024,1056,1536,2048,2560,3072,3584,4096,5120,6144};
 
   if (run_validation_tests)  {
 
     // change onde these to just report the pass/fail.
-    // run_oned(test_sizes);
+    // run_oned(test_size);
     // exit(0);
-
 
 
     const_image_test(test_size);
@@ -844,15 +842,15 @@ int main(int argc, char** argv) {
       // exit(1);
     #endif
 
-    // for (int iSize = 0; iSize < test_size.size(); iSize++) {
+    for (int iSize = 0; iSize < test_size.size(); iSize++) {
 
-    //   std::cout << std::endl << "Testing cufft comparison " << test_size[iSize] << " x" << std::endl;
-    //   input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
-    //   output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+      std::cout << std::endl << "Testing cufft comparison " << test_size[iSize] << " x" << std::endl;
+      input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+      output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
 
-    //   compare_libraries(input_size, output_size);
+      compare_libraries(input_size, output_size);
 
-    // }
+    }
    
     for (int iSize = 0; iSize < test_size.size() - 1; iSize++) {
       int oSize = iSize + 1;
