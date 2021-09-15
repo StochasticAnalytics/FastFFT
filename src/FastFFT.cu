@@ -193,14 +193,14 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CopyHostToDevice()
   SetDimensions(CopyFromHost);
 	MyFFTDebugAssertTrue(is_in_memory_host_pointer, "Host memory not allocated");
 
-  // MyFFTPrintWithDetails("Copying host to device");
+  // MyFFTDebugPrintWithDetails("Copying host to device");
   // MyFFTPrint(std::to_string(output_memory_allocated) + " bytes of host memory to device");
   // FIXME switch to stream ordered malloc
 	if ( ! is_in_memory_device_pointer )
 	{
 
     // Allocate enough for the out of place buffer as well.
-    // MyFFTPrintWithDetails("Allocating device memory for input pointer");
+    // MyFFTDebugPrintWithDetails("Allocating device memory for input pointer");
     precheck
 		cudaErr(cudaMalloc(&d_ptr.position_space, compute_memory_allocated * sizeof(ComputeType)));
     postcheck
@@ -380,7 +380,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::FwdFFT(bool swap_re
         case increase: {
           SetPrecisionAndExectutionMethod(r2c_increase);
           transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
-          SetPrecisionAndExectutionMethod(c2c_fwd_increase);   
+          // SetPrecisionAndExectutionMethod(c2c_fwd_increase);   
        
           // FFT_R2C_WithPadding(transpose_output);
           // FFT_C2C_WithPadding(swap_real_space_quadrants);
@@ -1812,13 +1812,18 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_increase);
 
         int shared_memory = LP.mem_offsets.shared_input*sizeof(scalar_type) + FFT::shared_memory_size;
+        std::cout << "in r2c_increase" << std::endl;
+        MyFFTDebugPrintWithDetails("Shared memory requested " + std::to_string(shared_memory));
+        MyFFTPrintWithDetails("");
+        PrintLaunchParameters(LP);
         CheckSharedMemory(shared_memory, device_properties);
         cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_R2C_INCREASE<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
     
         precheck
         block_fft_kernel_R2C_INCREASE<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
         ( scalar_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
-        postcheck          
+        postcheck 
+        MyFFTPrintWithDetails  ("");      
         break;
       }
 
@@ -1863,6 +1868,8 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         int shared_memory;
         // Aggregate the transformed frequency data in shared memory so that we can write to global coalesced.
         shared_memory = LP.mem_offsets.shared_output*sizeof(complex_type) + LP.mem_offsets.shared_input*sizeof(complex_type) + FFT::shared_memory_size;
+        MyFFTDebugPrintWithDetails("Shared memory requested " + std::to_string(shared_memory));
+        PrintLaunchParameters(LP);
         CheckSharedMemory(shared_memory, device_properties);
   
         // std::cout << "shared_memory " << shared_memory << std::endl;
@@ -2170,9 +2177,17 @@ LaunchParams FourierTransformer<ComputeType, InputType, OutputType>::SetLaunchPa
   L.Q = transform_size.Q;
 
   // Set the twiddle factor, only differ in sign between fwd/inv transforms.
-  if ( IsForwardType(kernel_type) ) L.twiddle_in = L.twiddle_in = -2*PIf/transform_size.N ;
-  else L.twiddle_in = L.twiddle_in = 2*PIf/transform_size.N ;
-
+  SizeChangeType size_change_type;
+  if ( IsForwardType(kernel_type) ) 
+  {
+    size_change_type = fwd_size_change_type;
+    L.twiddle_in = L.twiddle_in = -2*PIf/transform_size.N ;
+  }
+  else 
+  {
+    size_change_type = inv_size_change_type;
+    L.twiddle_in = L.twiddle_in = 2*PIf/transform_size.N ;
+  }
 
   // Set the thread block dimensions
   if ( IsThreadType(kernel_type) ) {
@@ -2187,16 +2202,20 @@ LaunchParams FourierTransformer<ComputeType, InputType, OutputType>::SetLaunchPa
     }
   }
 
-
+  
   // Set the shared mem sizes, which depend on the size_change_type
   switch (size_change_type)
   {
-    case none: {
+    case no_change: {
+      
+
       L.mem_offsets.shared_input  = 0;
       L.mem_offsets.shared_output = 0;
       break;
     }
     case decrease: {
+      
+
       L.mem_offsets.shared_input  = transform_size.N;
       L.mem_offsets.shared_output = 0;
       break;
@@ -2208,9 +2227,13 @@ LaunchParams FourierTransformer<ComputeType, InputType, OutputType>::SetLaunchPa
       // This is overwritten in the c2c methods as it depends on 1d vs 2d and fwd vs inv.
       break;
     }
+    default: {
+      MyFFTDebugAssertTrue(false, "Unknown size_change_type ( " + std::to_string(size_change_type) + " )");
+    }
   } // switch on size change
 
   
+
   // This leaves the grid dims and pixel pitch which are set by kernel type.
 
   // Set the grid dimensions and pixel pitch
@@ -2352,11 +2375,11 @@ LaunchParams FourierTransformer<ComputeType, InputType, OutputType>::SetLaunchPa
 
               break;
             }
+            default: {
+              MyFFTDebugAssertTrue( false, "Unknown transform dimension");
+            }
           } // end switch on transform dimension
           break; // case c2c_inv_increase
-        break;
-      
-
   
       case c2c_decomposed: 
 
@@ -2414,12 +2437,10 @@ LaunchParams FourierTransformer<ComputeType, InputType, OutputType>::SetLaunchPa
         break;
        
       default:
-        std::cerr << "ERROR: Unrecognized kernel type" << std::endl;
-        exit(-1);
+        MyFFTDebugAssertTrue(false, "ERROR: Unrecognized kernel type");
     } // End switch on transfkernelorm type  
   } 
-
-  
+ 
   return L;
 }
 

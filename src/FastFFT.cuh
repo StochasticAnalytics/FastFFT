@@ -7,21 +7,52 @@
 // “This software contains source code provided by NVIDIA Corporation.” Much of it is modfied as noted at relevant function definitions.
 
 
-//
-// 0 - no checks
-// 1 - basic checks without blocking
-// 2 - full checks, including blocking
-
+// When defined Turns on synchronization based checking for all FFT kernels as well as cudaErr macros
 #define HEAVYERRORCHECKING_FFT 
+// Various levels of debuging conditions and prints
+#define FFT_DEBUG_LEVEL 4
 
-// #ifdef DEBUG
-#define MyFFTPrint(...)	{std::cerr << __VA_ARGS__  << std::endl;}
-#define MyFFTPrintWithDetails(...)	{std::cerr << __VA_ARGS__  << " From: " << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl;}
+#if FFT_DEBUG_LEVEL < 1
+
+#define MyFFTPrint(...)	
+#define MyFFTPrintWithDetails(...)	
+#define MyFFTDebugAssertTrue(cond, msg, ...) 
+#define MyFFTDebugAssertFalse(cond, msg, ...) 
+#define MyFFTDebugAssertTestTrue(cond, msg, ...) 
+#define MyFFTDebugAssertTestFalse(cond, msg, ...) 
+
+#else 
+// Minimally define asserts that check state variables and setup.
 #define MyFFTDebugAssertTrue(cond, msg, ...) {if ((cond) != true) { std::cerr << msg   << std::endl << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}}
 #define MyFFTDebugAssertFalse(cond, msg, ...) {if ((cond) == true) { std::cerr << msg  << std::endl << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}}
+
+#endif
+
+#if FFT_DEBUG_LEVEL > 1
+// Turn on checkpoints in the testing functions.
 #define MyFFTDebugAssertTestTrue(cond, msg, ...) {if ((cond) != true) { std::cerr <<  "    Test " << msg << " FAILED!"  << std::endl << "  at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);} else { std::cerr << "    Test " << msg << " passed!" << std::endl;}}
 #define MyFFTDebugAssertTestFalse(cond, msg, ...) {if ((cond) == true) { std::cerr<<  "    Test " << msg << " FAILED!"  << std::endl  << " at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);} else { std::cerr << "    Test " << msg << " passed!" << std::endl;}}
 
+#endif
+
+#if FFT_DEBUG_LEVEL  == 3
+// More verbose debug info 
+#define MyFFTDebugPrint(...)	{std::cerr << __VA_ARGS__  << std::endl;}
+#define MyFFTDebugPrintWithDetails(...)	{std::cerr << __VA_ARGS__  << " From: " << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl;}
+
+#endif
+
+#if FFT_DEBUG_LEVEL == 4
+// More verbose debug info + state info
+#define MyFFTDebugPrint(...)	{ PrintState(); std::cerr << __VA_ARGS__  << std::endl;}
+#define MyFFTDebugPrintWithDetails(...)	{ PrintState(); std::cerr << __VA_ARGS__  << " From: " << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl;}
+
+#endif
+
+
+// Always in use
+#define MyFFTPrint(...)	{std::cerr << __VA_ARGS__  << std::endl;}
+#define MyFFTPrintWithDetails(...)	{std::cerr << __VA_ARGS__  << " From: " << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl;}
 #define MyFFTRunTimeAssertTrue(cond, msg, ...) {if ((cond) != true) { std::cerr << msg   << std::endl << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}}
 #define MyFFTRunTimeAssertFalse(cond, msg, ...) {if ((cond) == true) { std::cerr << msg  << std::endl << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}}
 
@@ -101,7 +132,7 @@ void CheckSharedMemory(int& memory_requested, DeviceProps& dp) {
 
   // Depends on GetCudaDeviceProps having been called, which should be happening in the constructor.
   // Throw an error if requesting more than allowed, otherwise, we'll set to requested and let the rest be L1 Cache.
-  MyFFTRunTimeAssertFalse(memory_requested > dp.max_shared_memory_per_SM, "The shared memory requested is greater than permitted for this arch.") 
+  MyFFTRunTimeAssertFalse(memory_requested > dp.max_shared_memory_per_SM, "The shared memory requested is greater than permitted for this arch.") ;
   // if (memory_requested > dp.max_shared_memory_per_block) { memory_requested = dp.max_shared_memory_per_block; }
 }
 

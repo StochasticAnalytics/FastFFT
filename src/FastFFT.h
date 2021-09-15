@@ -113,7 +113,9 @@ public:
 
   // Used to specify input/calc/output data types
   enum DataType { int4_2, uint8, int8, uint16, int16, fp16, bf16, tf32, uint32, int32, fp32};
+  std::vector<std::string> DataTypeName { "int4_2", "uint8", "int8", "uint16", "int16", "fp16", "bf16", "tf32", "uint32", "int32", "fp32" };
   enum OriginType { natural, centered, quadrant_swapped}; // Used to specify the origin of the data
+  std::vector<std::string> OriginTypeName { "natural", "centered", "quadrant_swapped" };
 
   short padding_jump_val;
   int   input_memory_allocated;
@@ -226,11 +228,17 @@ private:
   int  transform_dimension; // 1,2,3d.
   FFT_Size transform_size; 
   // FIXME this seems like a bad idea. Added due to conflicing labels in switch statements, even with explicitly scope. 
-  enum  SizeChangeType : uint8_t { increase = 0, decrease = 1, no_change = 2 }; // Assumed to be the same for all dimesnions. This may be relaxed later.
-  enum  DimensionCheckType : uint8_t  { CopyFromHost = 20, CopyToHost= 21, FwdTransform= 22, InvTransform = 23}; 
-  enum  TransformStageCompleted : uint8_t  { none = 50, fwd = 51, inv = 52 }; 
+  enum  SizeChangeType : uint8_t { increase , decrease , no_change  }; // Assumed to be the same for all dimesnions. This may be relaxed later.
+  std::vector<std::string> SizeChangeName { "increase", "decrease", "no_change" };
+  enum  TransformStageCompleted : uint8_t  { none = 10 , fwd = 11, inv = 12 };  // none must be greater than number of sizeChangeTypes, padding must match in TransformStageCompletedName vector
+  std::vector<std::string> TransformStageCompletedName { "","","","","", // padding of 5
+                                                         "","","","","", // padding of 5
+                                                         "none", "fwd", "inv" };
 
-  SizeChangeType size_change_type;
+  enum  DimensionCheckType : uint8_t  { CopyFromHost, CopyToHost, FwdTransform, InvTransform }; 
+  std::vector<std::string> DimensionCheckName { "CopyFromHost", "CopyToHost", "FwdTransform", "InvTransform" };
+
+
   SizeChangeType fwd_size_change_type;
   SizeChangeType inv_size_change_type;
 
@@ -443,12 +451,16 @@ private:
   };
   void PrintState()
   {
-    std::cout << "Device Properties:\n" << std::endl;
+    std::cout << "================================================================" << std::endl; 
+    std::cout << "Device Properties: " << std::endl;
+    std::cout << "================================================================" << std::endl; 
+
     std::cout << "Device idx: " << device_properties.device_id << std::endl;
     std::cout << "max_shared_memory_per_block: " << device_properties.max_shared_memory_per_block << std::endl;
     std::cout << "max_shared_memory_per_SM: " << device_properties.max_shared_memory_per_SM << std::endl;
     std::cout << "max_registers_per_block: " << device_properties.max_registers_per_block << std::endl;
     std::cout << "max_persisting_L2_cache_size: " << device_properties.max_persisting_L2_cache_size << std::endl;
+    std::cout << std::endl;
 
     std::cout << "State Variables:\n" << std::endl;
     std::cout << "is_in_memory_host_pointer " << is_in_memory_host_pointer << std::endl;
@@ -462,6 +474,7 @@ private:
     std::cout << "is_set_output_params " << is_set_output_params << std::endl;
     std::cout << "is_size_validated " << is_size_validated << std::endl;
     std::cout << "is_set_input_pointer " << is_set_input_pointer << std::endl;
+    std::cout << std::endl;
 
     std::cout << "Size variables:\n" << std::endl;
     std::cout << "transform_size.N " << transform_size.N << std::endl;
@@ -472,14 +485,17 @@ private:
     std::cout << "fwd_dims_out.x,y,z " << fwd_dims_out.x << "," << fwd_dims_out.y << "," << fwd_dims_out.z << std::endl;
     std::cout << "inv_dims_in.x,y,z " << inv_dims_in.x << "," << inv_dims_in.y << "," << inv_dims_in.z << std::endl;
     std::cout << "inv_dims_out.x,y,z " << inv_dims_out.x << "," << inv_dims_out.y << "," << inv_dims_out.z << std::endl;
+    std::cout << std::endl;
 
     std::cout << "Misc:\n" << std::endl;
     std::cout << "compute_memory_allocated " << compute_memory_allocated << std::endl;
-    std::cout << "fwd_size_change_type " << fwd_size_change_type << std::endl;
-    std::cout << "inv_size_change_type " << inv_size_change_type << std::endl;
-    std::cout << "transform stage complete " << transform_stage_completed << std::endl;
-    std::cout << "input_origin_type " << input_origin_type << std::endl;
-    std::cout << "output_origin_type " << output_origin_type << std::endl;
+    std::cout << "memory size to copy " << memory_size_to_copy << std::endl;
+    std::cout << "fwd_size_change_type " << SizeChangeName[fwd_size_change_type] << std::endl;
+    std::cout << "inv_size_change_type " << SizeChangeName[inv_size_change_type] << std::endl;
+    std::cout << "transform stage complete " << TransformStageCompletedName[transform_stage_completed] << std::endl;
+    std::cout << "input_origin_type " << OriginTypeName[input_origin_type] << std::endl;
+    std::cout << "output_origin_type " << OriginTypeName[output_origin_type] << std::endl;
+    
   }; // PrintState()
 
 
