@@ -408,28 +408,48 @@ template <class ComputeType, class InputType, class OutputType>
 void FourierTransformer<ComputeType, InputType, OutputType>::InvFFT(bool transpose_output)
 {
   SetDimensions(InvTransform);
-  bool use_thread_method = false;
+  constexpr const bool use_thread_method = false;
   bool do_forward_transform = false;
 
   switch (transform_dimension)
   {
     case 1: {
-      if (is_real_valued_input) 
-      {
-        switch (inv_size_change_type)
+
+              // FIXME there is some redundancy in specifying _decomposed and use_thread_method
+        // Note: the only time the non-transposed method should be used is for 1d data.
+        if constexpr (use_thread_method)
         {
-          case SizeChangeType::no_change: { SetPrecisionAndExectutionMethod(c2r_decomposed, do_forward_transform); break; }
-          default: { MyFFTDebugAssertTrue(false, "Invalid size change type"); }
+          if (is_real_valued_input) SetPrecisionAndExectutionMethod(c2r_decomposed, do_forward_transform); //FFT_R2C_decomposed(transpose_output);
+          else SetPrecisionAndExectutionMethod(c2c_decomposed, do_forward_transform);
+          transform_stage_completed = TransformStageCompleted::inv;
+
         }
-      }
-      else 
-      {
-        SetPrecisionAndExectutionMethod(c2c_decomposed, do_forward_transform);
-      }
-      transform_stage_completed = TransformStageCompleted::inv;
+        else
+        {
+          if (is_real_valued_input) 
+          {
+            switch (inv_size_change_type)
+            {
+              case SizeChangeType::no_change:{ SetPrecisionAndExectutionMethod<false>(c2r_none); break; }
+              case SizeChangeType::decrease: { SetPrecisionAndExectutionMethod<false>(c2r_decrease); break; }
+              case SizeChangeType::increase: { SetPrecisionAndExectutionMethod<false>(c2r_increase); break; }
+              default: { MyFFTDebugAssertTrue(false, "Invalid size change type"); }
+            }
+          }
+          else
+          {
+            switch (inv_size_change_type)
+            {
+              case SizeChangeType::no_change:{ SetPrecisionAndExectutionMethod<false>(c2c_inv_none); break; }
+              case SizeChangeType::decrease: { SetPrecisionAndExectutionMethod<false>(c2c_inv_decrease); break; }
+              case SizeChangeType::increase: { SetPrecisionAndExectutionMethod<false>(c2c_inv_increase); break; }
+              default: { MyFFTDebugAssertTrue(false, "Invalid size change type"); }
+            }
+          }
+          transform_stage_completed = TransformStageCompleted::inv;
+        }
 
-
-      break;
+        break;
     }
     case 2: {
       switch (inv_size_change_type)
