@@ -105,8 +105,7 @@ void CheckSharedMemory(int& memory_requested, DeviceProps& dp) {
   // if (memory_requested > dp.max_shared_memory_per_block) { memory_requested = dp.max_shared_memory_per_block; }
 }
 
-//////////////////////
-// Base FFT kerenel types, direction (r2c, c2r, c2c) and direction are ommited, to be applied in the method calling afull kernel
+
 using namespace cufftdx;
 
 // TODO this probably needs to depend on the size of the xform, at least small vs large.
@@ -120,7 +119,7 @@ constexpr const int elements_per_thread_complex = 8;
 
 
 //////////////////////////////
-// Block FFT based Kernel definitions
+// BLOCK FFT based Kernel definitions
 //////////////////////////////
 
 /////////////
