@@ -380,7 +380,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::FwdFFT(bool swap_re
         case increase: {
           SetPrecisionAndExectutionMethod(r2c_increase);
           transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
-          // SetPrecisionAndExectutionMethod(c2c_fwd_increase);   
+          SetPrecisionAndExectutionMethod(c2c_fwd_increase);   
        
           // FFT_R2C_WithPadding(transpose_output);
           // FFT_C2C_WithPadding(swap_real_space_quadrants);
@@ -926,7 +926,7 @@ void block_fft_kernel_R2C_INCREASE(const ScalarType* __restrict__  input_values,
   }
 
   FFT().execute(thread_data, shared_mem, workspace);
-  io<FFT>::store_r2c_transposed(thread_data, output_values, output_MAP, mem_offsets.pixel_pitch_output, mem_offsets.pixel_pitch_input/2);
+  io<FFT>::store_r2c_transposed(thread_data, output_values, output_MAP, mem_offsets.pixel_pitch_output, mem_offsets.shared_output);
 	
 
 
@@ -1777,9 +1777,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         auto workspace = make_workspace<FFT>(error_code);
 
         LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_none);
-        // PrintState();
-        // PrintLaunchParameters(LP);
-        // exit(1);
+
         int shared_memory = FFT::shared_memory_size;
         CheckSharedMemory(shared_memory, device_properties);
         cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_R2C_NONE<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
@@ -1791,7 +1789,10 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         precheck
         block_fft_kernel_R2C_NONE<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
         (scalar_input, complex_output, LP.mem_offsets, workspace);
-        postcheck          
+        postcheck   
+        // PrintState();
+        // PrintLaunchParameters(LP);
+        // exit(1);       
         break;
       }
       
@@ -1812,10 +1813,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_increase);
 
         int shared_memory = LP.mem_offsets.shared_input*sizeof(scalar_type) + FFT::shared_memory_size;
-        std::cout << "in r2c_increase" << std::endl;
-        MyFFTDebugPrintWithDetails("Shared memory requested " + std::to_string(shared_memory));
-        MyFFTPrintWithDetails("");
-        PrintLaunchParameters(LP);
+
         CheckSharedMemory(shared_memory, device_properties);
         cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_R2C_INCREASE<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
     
@@ -1823,7 +1821,6 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         block_fft_kernel_R2C_INCREASE<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
         ( scalar_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
         postcheck 
-        MyFFTPrintWithDetails  ("");      
         break;
       }
 
@@ -1868,8 +1865,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         int shared_memory;
         // Aggregate the transformed frequency data in shared memory so that we can write to global coalesced.
         shared_memory = LP.mem_offsets.shared_output*sizeof(complex_type) + LP.mem_offsets.shared_input*sizeof(complex_type) + FFT::shared_memory_size;
-        MyFFTDebugPrintWithDetails("Shared memory requested " + std::to_string(shared_memory));
-        PrintLaunchParameters(LP);
+
         CheckSharedMemory(shared_memory, device_properties);
   
         // std::cout << "shared_memory " << shared_memory << std::endl;
@@ -1943,7 +1939,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
       
         cudaError_t error_code = cudaSuccess;
         auto workspace = make_workspace<FFT>(error_code);
-        checkCudaErr(error_code);
+        cudaErr(error_code);
   
         precheck
         block_fft_kernel_C2R_NONE<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, FFT::shared_memory_size, cudaStreamPerThread>> >
@@ -1972,10 +1968,10 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
   
         cudaError_t error_code = cudaSuccess;
         auto workspace_fwd = make_workspace<FFT>(error_code); // presumably larger of the two
-        checkCudaErr(error_code);
+        cudaErr(error_code);
         error_code = cudaSuccess;
         auto workspace_inv = make_workspace<invFFT>(error_code); // presumably larger of the two
-        checkCudaErr(error_code);
+        cudaErr(error_code);
   
         int shared_memory = invFFT::shared_memory_size;
         CheckSharedMemory(shared_memory, device_properties);
@@ -2222,7 +2218,7 @@ LaunchParams FourierTransformer<ComputeType, InputType, OutputType>::SetLaunchPa
     }
     case increase: {
       L.mem_offsets.shared_input  = transform_size.P;
-      if (IsR2CType(kernel_type)) { L.mem_offsets.shared_output = 0; } // Non-coalesced so no bother.
+      if (IsR2CType(kernel_type)) { L.mem_offsets.shared_output = dims_out.w; } // used for memory limit.
       else { L.mem_offsets.shared_output = transform_size.N; }
       // This is overwritten in the c2c methods as it depends on 1d vs 2d and fwd vs inv.
       break;
@@ -2264,7 +2260,7 @@ LaunchParams FourierTransformer<ComputeType, InputType, OutputType>::SetLaunchPa
             break;
           }
           case 2: {             
-            L.gridDims = dim3(transform_size.P, fwd_dims_out.w, 1);
+            L.gridDims = dim3(1, fwd_dims_out.w, 1);
             L.mem_offsets.pixel_pitch_input =  fwd_dims_in.y;
             L.mem_offsets.pixel_pitch_output = fwd_dims_out.y;
 
@@ -2327,7 +2323,7 @@ LaunchParams FourierTransformer<ComputeType, InputType, OutputType>::SetLaunchPa
             break;
           }
           case 2: {             
-            L.gridDims = dim3(transform_size.P, inv_dims_out.w, 1);
+            L.gridDims = dim3(1, inv_dims_out.w, 1);
             L.mem_offsets.pixel_pitch_input =  inv_dims_in.y;
             L.mem_offsets.pixel_pitch_output = inv_dims_out.y;
 

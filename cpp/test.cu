@@ -290,20 +290,20 @@ void unit_impulse_test(std::vector<int>size)
 
   FT.CopyDeviceToHost(host_output.real_values, false, false);
 
-  int n=0;
-  for (int x = 0; x <  host_output.size.y ; x++)
-  {
+  // int n=0;
+  // for (int x = 0; x <  host_output.size.y ; x++)
+  // {
     
-    std::cout << x << "[ ";
-    for (int y = 0; y < host_output.size.w; y++)
-    {  
-      std::cout << host_output.complex_values[x + y*host_output.size.y].x << "," << host_output.complex_values[x + y*host_output.size.y].y << " ";
-      n++;
-      if (n == 32) {n = 0; std::cout << std::endl ;} // line wrapping
-    }
-    std::cout << "] " << std::endl;
-    n = 0;
-  }
+  //   std::cout << x << "[ ";
+  //   for (int y = 0; y < host_output.size.w; y++)
+  //   {  
+  //     std::cout << host_output.complex_values[x + y*host_output.size.y].x << "," << host_output.complex_values[x + y*host_output.size.y].y << " ";
+  //     n++;
+  //     if (n == 32) {n = 0; std::cout << std::endl ;} // line wrapping
+  //   }
+  //   std::cout << "] " << std::endl;
+  //   n = 0;
+  // }
 
   sum = ReturnSumOfComplexAmplitudes(host_output.complex_values, host_output.real_memory_allocated/2); 
   // std::cout << sum << " " << host_output.real_memory_allocated<< std::endl;
@@ -844,16 +844,16 @@ int main(int argc, char** argv) {
       // exit(1);
     #endif
 
-    for (int iSize = 0; iSize < test_size.size(); iSize++) {
+    // for (int iSize = 0; iSize < test_size.size(); iSize++) {
 
-      std::cout << std::endl << "Testing cufft comparison " << test_size[iSize] << " x" << std::endl;
-      input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
-      output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+    //   std::cout << std::endl << "Testing cufft comparison " << test_size[iSize] << " x" << std::endl;
+    //   input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+    //   output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
 
-      compare_libraries(input_size, output_size);
+    //   compare_libraries(input_size, output_size);
 
-    }
-    exit(1);
+    // }
+   
     for (int iSize = 0; iSize < test_size.size() - 1; iSize++) {
       int oSize = iSize + 1;
       while (oSize < test_size.size())

@@ -444,7 +444,7 @@ private:
     std::cout << "  Q: " << LP.Q << std::endl;
     std::cout << "  Twiddle in: " << LP.twiddle_in << std::endl;
     std::cout << "  shared input: " << LP.mem_offsets.shared_input << std::endl;
-    std::cout << "  shared output: " << LP.mem_offsets.shared_output << std::endl;
+    std::cout << "  shared output (memlimit in r2c): " << LP.mem_offsets.shared_output << std::endl;
     std::cout << "  pixel pitch input: " << LP.mem_offsets.pixel_pitch_input << std::endl;
     std::cout << "  pixel pitch output: " << LP.mem_offsets.pixel_pitch_output << std::endl;
 
@@ -481,10 +481,10 @@ private:
     std::cout << "transform_size.L " << transform_size.L << std::endl;
     std::cout << "transform_size.P " << transform_size.P << std::endl;
     std::cout << "transform_size.Q " << transform_size.Q << std::endl;
-    std::cout << "fwd_dims_in.x,y,z " << fwd_dims_in.x << "," << fwd_dims_in.y << "," << fwd_dims_in.z << std::endl;
-    std::cout << "fwd_dims_out.x,y,z " << fwd_dims_out.x << "," << fwd_dims_out.y << "," << fwd_dims_out.z << std::endl;
-    std::cout << "inv_dims_in.x,y,z " << inv_dims_in.x << "," << inv_dims_in.y << "," << inv_dims_in.z << std::endl;
-    std::cout << "inv_dims_out.x,y,z " << inv_dims_out.x << "," << inv_dims_out.y << "," << inv_dims_out.z << std::endl;
+    std::cout << "fwd_dims_in.x,y,z "; PrintVectorType(fwd_dims_in); std::cout << std::endl;
+    std::cout << "fwd_dims_out.x,y,z " ; PrintVectorType(fwd_dims_out); std::cout<< std::endl;
+    std::cout << "inv_dims_in.x,y,z " ; PrintVectorType(inv_dims_in); std::cout<< std::endl;
+    std::cout << "inv_dims_out.x,y,z " ; PrintVectorType(inv_dims_out); std::cout<< std::endl;
     std::cout << std::endl;
 
     std::cout << "Misc:\n" << std::endl;

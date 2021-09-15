@@ -8,14 +8,13 @@
 
 
 // When defined Turns on synchronization based checking for all FFT kernels as well as cudaErr macros
-#define HEAVYERRORCHECKING_FFT 
+// #define HEAVYERRORCHECKING_FFT 
 // Various levels of debuging conditions and prints
-#define FFT_DEBUG_LEVEL 4
+#define FFT_DEBUG_LEVEL 0
 
 #if FFT_DEBUG_LEVEL < 1
 
-#define MyFFTPrint(...)	
-#define MyFFTPrintWithDetails(...)	
+#define MyFFTDebugPrintWithDetails(...)	
 #define MyFFTDebugAssertTrue(cond, msg, ...) 
 #define MyFFTDebugAssertFalse(cond, msg, ...) 
 #define MyFFTDebugAssertTestTrue(cond, msg, ...) 
@@ -35,6 +34,10 @@
 
 #endif
 
+#if FFT_DEBUG_LEVEL == 2
+#define MyFFTDebugPrintWithDetails(...)	
+#endif
+
 #if FFT_DEBUG_LEVEL  == 3
 // More verbose debug info 
 #define MyFFTDebugPrint(...)	{std::cerr << __VA_ARGS__  << std::endl;}
@@ -51,10 +54,10 @@
 
 
 // Always in use
-#define MyFFTPrint(...)	{std::cerr << __VA_ARGS__  << std::endl;}
-#define MyFFTPrintWithDetails(...)	{std::cerr << __VA_ARGS__  << " From: " << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl;}
-#define MyFFTRunTimeAssertTrue(cond, msg, ...) {if ((cond) != true) { std::cerr << msg   << std::endl << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}}
-#define MyFFTRunTimeAssertFalse(cond, msg, ...) {if ((cond) == true) { std::cerr << msg  << std::endl << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}}
+#define MyFFTPrint(...)	//{std::cerr << __VA_ARGS__  << std::endl;}
+#define MyFFTPrintWithDetails(...)	//{std::cerr << __VA_ARGS__  << " From: " << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl;}
+#define MyFFTRunTimeAssertTrue(cond, msg, ...) //{if ((cond) != true) { std::cerr << msg   << std::endl << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}}
+#define MyFFTRunTimeAssertFalse(cond, msg, ...) //{if ((cond) == true) { std::cerr << msg  << std::endl << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}}
 
 // Note we are using std::cerr b/c the wxWidgets apps running in cisTEM are capturing std::cout
 #ifndef HEAVYERRORCHECKING_FFT 
@@ -97,6 +100,19 @@ namespace FastFFT {
   d_ReturnReal1DAddressFromPhysicalCoord(int3 coords, short4 img_dims)
   {
     return ( (((int)coords.z*(int)img_dims.y + coords.y) * (int)img_dims.w * 2)  + (int)coords.x) ;
+  }
+
+  static constexpr const int bank_size = 32;
+  static constexpr const int bank_padded = bank_size + 1;
+  static constexpr const int ubank_size = 32;
+  static constexpr const int ubank_padded = ubank_size + 1;
+  __device__ __forceinline__ int GetShmemPaddedIndex(const int index)
+  {
+    return ( index % bank_size ) + ( index / bank_size * bank_padded );
+  }
+  __device__ __forceinline__ int GetShmemPaddedIndex(const unsigned int index)
+  {
+    return ( index % ubank_size ) + ( index / ubank_size * ubank_padded );
   }
 
   // Complex a * conj b multiplication
