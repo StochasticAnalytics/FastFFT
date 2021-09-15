@@ -264,7 +264,7 @@ void unit_impulse_test(std::vector<int>size)
   sum = ReturnSumOfReal(host_output.real_values, dims_out);
   if (sum != 1) {all_passed = false; init_passed[iSize] = false;}
 
-  // MyFFTDebugAssertTestTrue( sum == 1,"Unit impulse Init ");
+  MyFFTDebugAssertTestTrue( sum == 1,"Unit impulse Init ");
   
   // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
   FT.CopyHostToDevice();
@@ -277,7 +277,7 @@ void unit_impulse_test(std::vector<int>size)
   host_output.fftw_epsilon -= (host_output.real_memory_allocated/2 );
   if (std::abs(host_output.fftw_epsilon) > 1e-8 ) {all_passed = false; FFTW_passed[iSize] = false;}
 
-  // MyFFTDebugAssertTestTrue( std::abs(host_output.fftw_epsilon) < 1e-8 , "FFTW unit impulse forward FFT");
+  MyFFTDebugAssertTestTrue( std::abs(host_output.fftw_epsilon) < 1e-8 , "FFTW unit impulse forward FFT");
   
   // Just to make sure we don't get a false positive, set the host memory to some undesired value.
   FT.SetToConstant<float>(host_output.real_values, host_output.real_memory_allocated, 2.0f);
@@ -311,11 +311,11 @@ void unit_impulse_test(std::vector<int>size)
   sum -= (host_output.real_memory_allocated/2 );
 
 
-  // std::cout << "FFT Unit Impulse Forward FFT: " << sum <<  " epsilon " << host_output.fftw_epsilon << std::endl;
-  // std::cout << "epsilon " << abs(sum - host_output.fftw_epsilon) << std::endl;
+  std::cout << "FFT Unit Impulse Forward FFT: " << sum <<  " epsilon " << host_output.fftw_epsilon << std::endl;
+  std::cout << "epsilon " << abs(sum - host_output.fftw_epsilon) << std::endl;
   if (abs(sum - host_output.fftw_epsilon) > 1e-8) {all_passed = false; FastFFT_forward_passed[iSize] = false;}
 
-  // MyFFTDebugAssertTestTrue( abs(sum - host_output.fftw_epsilon) < 1e-8, "FastFFT unit impulse forward FFT");
+  MyFFTDebugAssertTestTrue( abs(sum - host_output.fftw_epsilon) < 1e-8, "FastFFT unit impulse forward FFT");
   FT.SetToConstant<float>(host_output.real_values, host_output.real_memory_allocated, 2.0f);
   
 
@@ -335,7 +335,7 @@ void unit_impulse_test(std::vector<int>size)
   sum = ReturnSumOfReal(host_output.real_values, dims_out);
   if (sum != dims_out.x*dims_out.y*dims_out.z) {all_passed = false; FastFFT_roundTrip_passed[iSize] = false;}
 
-  // MyFFTDebugAssertTestTrue( sum == dims_out.x*dims_out.y*dims_out.z,"FastFFT unit impulse round trip FFT");
+  MyFFTDebugAssertTestTrue( sum == dims_out.x*dims_out.y*dims_out.z,"FastFFT unit impulse round trip FFT");
     oSize++;
     } // while loop over pad to size
   } // for loop over pad from size
@@ -844,16 +844,16 @@ int main(int argc, char** argv) {
       // exit(1);
     #endif
 
-    for (int iSize = 0; iSize < test_size.size(); iSize++) {
+    // for (int iSize = 0; iSize < test_size.size(); iSize++) {
 
-      std::cout << std::endl << "Testing cufft comparison " << test_size[iSize] << " x" << std::endl;
-      input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
-      output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+    //   std::cout << std::endl << "Testing cufft comparison " << test_size[iSize] << " x" << std::endl;
+    //   input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+    //   output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
 
-      compare_libraries(input_size, output_size);
+    //   compare_libraries(input_size, output_size);
 
-    }
-    exit(1);
+    // }
+   
     for (int iSize = 0; iSize < test_size.size() - 1; iSize++) {
       int oSize = iSize + 1;
       while (oSize < test_size.size())

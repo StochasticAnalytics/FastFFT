@@ -7,36 +7,77 @@
 // “This software contains source code provided by NVIDIA Corporation.” Much of it is modfied as noted at relevant function definitions.
 
 
-//
-// 0 - no checks
-// 1 - basic checks without blocking
-// 2 - full checks, including blocking
-
+// When defined Turns on synchronization based checking for all FFT kernels as well as cudaErr macros
 // #define HEAVYERRORCHECKING_FFT 
+// Various levels of debuging conditions and prints
+#define FFT_DEBUG_LEVEL 0
 
-// #ifdef DEBUG
-#define MyFFTPrint(...)	{std::cerr << __VA_ARGS__  << std::endl;}
-#define MyFFTPrintWithDetails(...)	{std::cerr << __VA_ARGS__  << " From: " << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl;}
+#if FFT_DEBUG_LEVEL < 1
+
+#define MyFFTDebugPrintWithDetails(...)	
+#define MyFFTDebugAssertTrue(cond, msg, ...) 
+#define MyFFTDebugAssertFalse(cond, msg, ...) 
+#define MyFFTDebugAssertTestTrue(cond, msg, ...) 
+#define MyFFTDebugAssertTestFalse(cond, msg, ...) 
+
+#else 
+// Minimally define asserts that check state variables and setup.
 #define MyFFTDebugAssertTrue(cond, msg, ...) {if ((cond) != true) { std::cerr << msg   << std::endl << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}}
 #define MyFFTDebugAssertFalse(cond, msg, ...) {if ((cond) == true) { std::cerr << msg  << std::endl << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}}
+
+#endif
+
+#if FFT_DEBUG_LEVEL > 1
+// Turn on checkpoints in the testing functions.
 #define MyFFTDebugAssertTestTrue(cond, msg, ...) {if ((cond) != true) { std::cerr <<  "    Test " << msg << " FAILED!"  << std::endl << "  at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);} else { std::cerr << "    Test " << msg << " passed!" << std::endl;}}
 #define MyFFTDebugAssertTestFalse(cond, msg, ...) {if ((cond) == true) { std::cerr<<  "    Test " << msg << " FAILED!"  << std::endl  << " at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);} else { std::cerr << "    Test " << msg << " passed!" << std::endl;}}
 
-#define MyFFTRunTimeAssertTrue(cond, msg, ...) {if ((cond) != true) { std::cerr << msg   << std::endl << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}}
-#define MyFFTRunTimeAssertFalse(cond, msg, ...) {if ((cond) == true) { std::cerr << msg  << std::endl << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}}
+#endif
+
+#if FFT_DEBUG_LEVEL == 2
+#define MyFFTDebugPrintWithDetails(...)	
+#endif
+
+#if FFT_DEBUG_LEVEL  == 3
+// More verbose debug info 
+#define MyFFTDebugPrint(...)	{std::cerr << __VA_ARGS__  << std::endl;}
+#define MyFFTDebugPrintWithDetails(...)	{std::cerr << __VA_ARGS__  << " From: " << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl;}
+
+#endif
+
+#if FFT_DEBUG_LEVEL == 4
+// More verbose debug info + state info
+#define MyFFTDebugPrint(...)	{ PrintState(); std::cerr << __VA_ARGS__  << std::endl;}
+#define MyFFTDebugPrintWithDetails(...)	{ PrintState(); std::cerr << __VA_ARGS__  << " From: " << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl;}
+
+#endif
+
+
+// Always in use
+#define MyFFTPrint(...)	//{std::cerr << __VA_ARGS__  << std::endl;}
+#define MyFFTPrintWithDetails(...)	//{std::cerr << __VA_ARGS__  << " From: " << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl;}
+#define MyFFTRunTimeAssertTrue(cond, msg, ...) //{if ((cond) != true) { std::cerr << msg   << std::endl << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}}
+#define MyFFTRunTimeAssertFalse(cond, msg, ...) //{if ((cond) == true) { std::cerr << msg  << std::endl << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}}
 
 // Note we are using std::cerr b/c the wxWidgets apps running in cisTEM are capturing std::cout
 #ifndef HEAVYERRORCHECKING_FFT 
 #define postcheck
 #define cudaErr
-#define cudaMsg
 #define precheck
 #else
 #define postcheck { cudaErr(cudaPeekAtLastError()); cudaError_t error = cudaStreamSynchronize(cudaStreamPerThread); cudaErr(error); };
 #define cudaErr(error) { auto status = static_cast<cudaError_t>(error); if (status != cudaSuccess) { std::cerr << cudaGetErrorString(status) << " :-> "; MyFFTPrintWithDetails("");} };
-#define cudaMsg(error_message) { if (error_message != cudaSuccess) { std::cerr << cudaGetErrorString(error_message) << " :-> "; MyFFTPrintWithDetails("");} };
 #define precheck { cudaErr(cudaGetLastError()); }
 #endif
+
+inline void checkCudaErr(cudaError_t err) 
+{ 
+  if (err != cudaSuccess) 
+  { 
+    std::cerr << cudaGetErrorString(err) << " :-> " << std::endl;
+    MyFFTPrintWithDetails(" ");
+  } 
+};
 
 #define USEFASTSINCOS
 // The __sincosf doesn't appear to be the problem with accuracy, likely just the extra additions, but it probably also is less flexible with other types. I don't see a half precision equivalent.
@@ -59,6 +100,19 @@ namespace FastFFT {
   d_ReturnReal1DAddressFromPhysicalCoord(int3 coords, short4 img_dims)
   {
     return ( (((int)coords.z*(int)img_dims.y + coords.y) * (int)img_dims.w * 2)  + (int)coords.x) ;
+  }
+
+  static constexpr const int bank_size = 32;
+  static constexpr const int bank_padded = bank_size + 1;
+  static constexpr const int ubank_size = 32;
+  static constexpr const int ubank_padded = ubank_size + 1;
+  __device__ __forceinline__ int GetShmemPaddedIndex(const int index)
+  {
+    return ( index % bank_size ) + ( index / bank_size * bank_padded );
+  }
+  __device__ __forceinline__ int GetShmemPaddedIndex(const unsigned int index)
+  {
+    return ( index % ubank_size ) + ( index / ubank_size * ubank_padded );
   }
 
   // Complex a * conj b multiplication
@@ -94,47 +148,39 @@ void CheckSharedMemory(int& memory_requested, DeviceProps& dp) {
 
   // Depends on GetCudaDeviceProps having been called, which should be happening in the constructor.
   // Throw an error if requesting more than allowed, otherwise, we'll set to requested and let the rest be L1 Cache.
-  MyFFTRunTimeAssertFalse(memory_requested > dp.max_shared_memory_per_SM, "The shared memory requested is greater than permitted for this arch.") 
+  MyFFTRunTimeAssertFalse(memory_requested > dp.max_shared_memory_per_SM, "The shared memory requested is greater than permitted for this arch.") ;
   // if (memory_requested > dp.max_shared_memory_per_block) { memory_requested = dp.max_shared_memory_per_block; }
 }
 
-//////////////////////
-// Base FFT kerenel types, direction (r2c, c2r, c2c) and direction are ommited, to be applied in the method calling afull kernel
+
 using namespace cufftdx;
 
 // TODO this probably needs to depend on the size of the xform, at least small vs large.
 constexpr const int elements_per_thread_real = 8;
 constexpr const int elements_per_thread_complex = 8;
 
-// All transforms are 
-// using FFT_base   = decltype(Block() + Precision<float>() + ElementsPerThread<elements_per_thread_complex>()  + FFTsPerBlock<1>()  );
-// using FFT_thread_base = decltype(Thread() + Size<4>() + Precision<float>());
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FFT kernels
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 
 //////////////////////////////
-// Kernel definitions
+// BLOCK FFT based Kernel definitions
 //////////////////////////////
-
-
 
 /////////////
 // R2C
 /////////////
 
-template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
-__global__
-void thread_fft_kernel_R2C_decomposed(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q);
-
-template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
-__global__
-void thread_fft_kernel_R2C_decomposed_transposed(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q);
 
 template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_R2C(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+void block_fft_kernel_R2C_NONE(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
 
 template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_R2C_WithPadding(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
+void block_fft_kernel_R2C_INCREASE(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 
 
 /////////////
@@ -143,7 +189,7 @@ void block_fft_kernel_R2C_WithPadding(const ScalarType*  __restrict__ input_valu
 
 template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2C_WithPadding(const ComplexType* __restrict__  input_values, ComplexType*  __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
+void block_fft_kernel_C2C_INCREASE(const ComplexType* __restrict__  input_values, ComplexType*  __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 
 template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
@@ -158,16 +204,50 @@ __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_C2C_WithPadding_ConjMul_C2C_SwapRealSpaceQuadrants( const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv);
 
 template<class FFT, class ComplexType = typename FFT::value_type>
+__launch_bounds__(FFT::max_threads_per_block) __global__
+void block_fft_kernel_C2C_NONE(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+
+/////////////
+// C2R 
+/////////////
+
+
+template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
+__launch_bounds__(FFT::max_threads_per_block) __global__
+void block_fft_kernel_C2R_NONE(const ComplexType*  __restrict__ input_values, ScalarType*  __restrict__ output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+
+
+
+//////////////////////////////
+// Thread FFT based Kernel definitions
+//////////////////////////////
+
+/////////////
+// R2C
+/////////////
+
+template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
+__global__
+void thread_fft_kernel_R2C_decomposed(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q);
+
+template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
+__global__
+void thread_fft_kernel_R2C_decomposed_transposed(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q);
+
+
+
+/////////////
+// C2C
+/////////////
+
+
+template<class FFT, class ComplexType = typename FFT::value_type>
 __global__
 void thread_fft_kernel_C2C_decomposed(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q);
 
 template<class FFT, class invFFT, class ComplexType = typename FFT::value_type>
 __global__
 void thread_fft_kernel_C2C_decomposed_ConjMul(const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q);
-
-template<class FFT, class ComplexType = typename FFT::value_type>
-__launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2C(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
 
 /////////////
 // C2R 
@@ -181,9 +261,9 @@ template<class FFT, class ComplexType = typename FFT::value_type, class ScalarTy
 __global__
 void thread_fft_kernel_C2R_decomposed_transposed(const ComplexType*  __restrict__ input_values, ScalarType*  __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q);
 
-template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
-__launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2R_Transposed(const ComplexType*  __restrict__ input_values, ScalarType*  __restrict__ output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// End FFT Kernels
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 

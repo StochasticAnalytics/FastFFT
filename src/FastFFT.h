@@ -14,7 +14,7 @@ namespace FastFFT {
   constexpr const float PIf = 3.14159275358979323846f;
 
   typedef
-  struct _DeviceProps {
+  struct __align__(32) _DeviceProps {
     int device_id;
     int device_arch;
     int max_shared_memory_per_block;
@@ -22,6 +22,15 @@ namespace FastFFT {
     int max_registers_per_block;
     int max_persisting_L2_cache_size;
   } DeviceProps;
+
+  typedef 
+  struct __align__(8) _FFT_Size {
+    // Following Sorensen & Burrus 1993 for clarity
+    short N; // N : 1d FFT size
+    short L; // L : number of non-zero output/input points 
+    short P; // P >= L && N % P == 0 : The size of the sub-FFT used to compute the full transform. Currently also must be a power of 2.
+    short Q; // Q = N/P : The number of sub-FFTs used to compute the full transform
+  } FFT_Size;
 
   typedef
 	struct __align__(8) _Offsets{
@@ -32,7 +41,7 @@ namespace FastFFT {
   } Offsets;
 
   typedef 
-  struct __align__(32) _LaunchParams{
+  struct __align__(64) _LaunchParams{
     int Q;
     float twiddle_in;
     dim3 gridDims;
@@ -104,13 +113,15 @@ public:
 
   // Used to specify input/calc/output data types
   enum DataType { int4_2, uint8, int8, uint16, int16, fp16, bf16, tf32, uint32, int32, fp32};
+  std::vector<std::string> DataTypeName { "int4_2", "uint8", "int8", "uint16", "int16", "fp16", "bf16", "tf32", "uint32", "int32", "fp32" };
   enum OriginType { natural, centered, quadrant_swapped}; // Used to specify the origin of the data
+  std::vector<std::string> OriginTypeName { "natural", "centered", "quadrant_swapped" };
 
-  short  padding_jump_val;
-  int input_memory_allocated;
-  int output_memory_allocated;
-  int compute_memory_allocated;
-  int memory_size_to_copy;
+  short padding_jump_val;
+  int   input_memory_allocated;
+  int   output_memory_allocated;
+  int   compute_memory_allocated;
+  int   memory_size_to_copy;
 
 
 
@@ -212,15 +223,22 @@ private:
   bool is_size_validated; // Defaults to false, set after both input/output dimensions are set and checked.
   bool is_set_input_pointer; // May be on the host of the device.
 
-  int  transform_dimension; // 1,2,3d.
-  int  transform_size; // Size of the 1d (sub) FFT which is <= the size of the full transform determined by the larger of the input/output dimensions. 
-  int  transform_divisor; // full size/ transform size = Q the number of sub-transforms.
-  // FIXME this seems like a bad idea. Added due to conflicing labels in switch statements, even with explicitly scope. 
-  enum  SizeChangeType : uint8_t { increase = 0, decrease = 1, no_change = 2 }; // Assumed to be the same for all dimesnions. This may be relaxed later.
-  enum  DimensionCheckType : uint8_t  { CopyFromHost = 20, CopyToHost= 21, FwdTransform= 22, InvTransform = 23}; 
-  enum  TransformStageCompleted : uint8_t  { none = 50, fwd = 51, inv = 52 }; 
 
-  SizeChangeType size_change_type;
+
+  int  transform_dimension; // 1,2,3d.
+  FFT_Size transform_size; 
+  // FIXME this seems like a bad idea. Added due to conflicing labels in switch statements, even with explicitly scope. 
+  enum  SizeChangeType : uint8_t { increase , decrease , no_change  }; // Assumed to be the same for all dimesnions. This may be relaxed later.
+  std::vector<std::string> SizeChangeName { "increase", "decrease", "no_change" };
+  enum  TransformStageCompleted : uint8_t  { none = 10 , fwd = 11, inv = 12 };  // none must be greater than number of sizeChangeTypes, padding must match in TransformStageCompletedName vector
+  std::vector<std::string> TransformStageCompletedName { "","","","","", // padding of 5
+                                                         "","","","","", // padding of 5
+                                                         "none", "fwd", "inv" };
+
+  enum  DimensionCheckType : uint8_t  { CopyFromHost, CopyToHost, FwdTransform, InvTransform }; 
+  std::vector<std::string> DimensionCheckName { "CopyFromHost", "CopyToHost", "FwdTransform", "InvTransform" };
+
+
   SizeChangeType fwd_size_change_type;
   SizeChangeType inv_size_change_type;
 
@@ -246,346 +264,106 @@ private:
   void SetDimensions(DimensionCheckType check_op_type);
 
 
-  enum KernelType { r2c_decomposed, r2c_decomposed_transposed, r2c_transposed, c2c_padded, c2c, c2c_decomposed,
-                    c2r_decomposed, c2r_decomposed_transposed, c2r_transposed, xcorr_transposed, xcorr_decomposed}; // Used to specify the origin of the data
-    
+  enum KernelType { r2c_decomposed, // Thread based, full length.
+                    r2c_decomposed_transposed, // Thread based, full length, transposed.
+                    r2c_none, r2c_decrease, r2c_increase,
+                    c2c_fwd_none, c2c_fwd_decrease, c2c_fwd_increase,     
+                    c2c_inv_none, c2c_inv_decrease, c2c_inv_increase,                       
+                    c2c_decomposed,
+                    c2r_decomposed, 
+                    c2r_decomposed_transposed, 
+                    c2r_none, c2r_decrease, c2r_increase,
+                    xcorr_transposed, 
+                    xcorr_decomposed }; // Used to specify the origin of the data
+  // WARNING this is flimsy and prone to breaking, you must ensure the order matches the KernelType enum.
   std::vector<std::string> 
-        KernelName{ "r2c_decomposed", "r2c_decomposed_transposed", "r2c_transposed", "c2c_padded", "c2c", "c2c_decomposed", 
-                    "c2r_decomposed", "c2r_decomposed_transposed", "c2r_transposed",  "xcorr_transposed", "xcorr_decomposed"};
+        KernelName{ "r2c_decomposed", 
+                    "r2c_decomposed_transposed", 
+                    "r2c_none", "r2c_decrease", "r2c_increase",
+                    "c2c_fwd_none", "c2c_fwd_increase", "c2c_fwd_increase",
+                    "c2c_inv_none", "c2c_inv_increase", "c2c_inv_increase",
+                    "c2c_decomposed", 
+                    "c2r_decomposed", 
+                    "c2r_decomposed_transposed", 
+                    "c2r_none", "c2r_decrease", "c2r_increase",
+                    "xcorr_transposed", 
+                    "xcorr_decomposed" };
 
-  void GetTransformSize(KernelType kernel_type)
+  inline bool IsThreadType(KernelType kernel_type)
   {
-    int input_size;
-
-    switch (kernel_type)
+    if ( kernel_type == r2c_decomposed || kernel_type == r2c_decomposed_transposed ||
+         kernel_type == c2c_decomposed ||
+         kernel_type == c2r_decomposed || kernel_type == c2r_decomposed_transposed || kernel_type == xcorr_decomposed)
     {
-      case r2c_transposed:
-        input_size = dims_in.x;
-        break;
-      case xcorr_transposed:
-        input_size = dims_out.y;
-        break;
-      case c2c_padded:
-        input_size = dims_in.y;
-        break;
-      case c2c:
-        input_size = dims_out.y;
-        break;
-      case c2r_transposed:
-        input_size = dims_out.x;
-        break;
-      default:
-        std::cerr << "Function GetTransformSize does not recognize the kernel type ( " << KernelName[kernel_type] << " )" << std::endl;
-        exit(-1);
+      return true;
     }
 
-
-    if ( abs(fmod(log2(float(input_size)), 1)) < 1e-6 ) 
-    {
-      // For the time being, this also implies a block transform rather than a thread transform.
-      transform_divisor = 1;
-      transform_size = input_size;
-      // TODO for larger sizes, below
-      // transform_size = input_size / transform_divisor;
+    else if (kernel_type == r2c_none || kernel_type == r2c_decrease || kernel_type == r2c_increase ||
+             kernel_type == c2c_fwd_none || kernel_type == c2c_fwd_decrease || kernel_type == c2c_fwd_increase ||
+             kernel_type == c2c_inv_none || kernel_type == c2c_inv_decrease || kernel_type == c2c_inv_increase ||
+             kernel_type == c2r_none || kernel_type == c2r_decrease || kernel_type == c2r_increase ||
+             kernel_type == xcorr_transposed )
+    { 
+      return false;
     }
-    else 
+    else
     {
-      if ( abs(fmod(log2(float(input_size)/3), 1)) < 1e-6) 
-      {
-        transform_divisor = 3;
-        transform_size = input_size / transform_divisor;
-      }
-      else
-      {
-        std::cerr << "The input dimension must factor into powers of two, with at most one factor of three." << std::endl;
-        exit(-1);
-      }
+      std::cerr << "Function IsThreadType does not recognize the kernel type ( " << KernelName[kernel_type] << " )" << std::endl;
+      exit(-1);
     }
   };
 
-  inline void GetTransformSize_thread(KernelType kernel_type, int thread_fft_size)
+  inline bool IsR2CType(KernelType kernel_type)
   {
-        int input_size;
-
-    switch (kernel_type)
+     if (kernel_type == r2c_decomposed || kernel_type == r2c_decomposed_transposed ||
+         kernel_type == r2c_none || kernel_type == r2c_decrease || kernel_type == r2c_increase)
     {
-      case r2c_decomposed:
-        input_size = dims_in.x;
-        break;
-      case r2c_decomposed_transposed:
-        input_size = dims_in.x;
-        break;
-      case c2c_decomposed:
-        if (dims_in.y == 1) input_size = dims_in.x;
-        else input_size = dims_in.y;
-        break;
-      case c2r_decomposed:
-        input_size = dims_out.x;
-        break;
-      case c2r_decomposed_transposed:
-        input_size = dims_out.x;
-        break;
-      case xcorr_decomposed:
-        if (dims_in.y == 1) input_size = dims_out.x; // FIXME should probably throw an error for now.
-        else input_size = dims_out.y; // does dims_in make sense?
+      return true;
+    }   
+    else return false; 
 
-        break;
-      default:
-        std::cerr << "Function GetTransformSize_thread does not recognize the kernel type ( " << KernelName[kernel_type] << " )" << std::endl;
-        exit(-1);
-    }
-
-    if (input_size % thread_fft_size != 0) { std::cerr << "Thread based decompositions must factor by thread_fft_size (" << thread_fft_size << ") in the current implmentations." << std::endl; exit(-1); }
-    transform_divisor = input_size / thread_fft_size;
-    transform_size = thread_fft_size;
-  };
-
-
-
-  // TODO: not sure this should be inlined. (Probably ignored by the compiler anyway.)
-  inline LaunchParams SetLaunchParameters(const int& ept, KernelType kernel_type, bool do_forward_transform = true)
-  {
-    /*
-      Assuming:
-      1) r2c/c2r imply forward/inverse transform. 
-         c2c_padded implies forward transform.
-      2) for 2d or 3d transforms the x/y dimensions are transposed in momentum space during store on the 1st set of 1ds transforms.
-      3) if 1d then z = y = 1.
-
-      threadsPerBlock = size/threads_per_fft (for thread based transforms)
-                      = size of fft ( for block based transforms ) NOTE: Something in cufftdx seems to be very picky about this. Launching > threads seem to cause problems.
-      gridDims = number of 1d FFTs, placed on blockDim perpendicular
-      shared_input/output = number of elements reserved in dynamic shared memory. TODO add a check on minimal (48k) and whether this should be increased (depends on Arch)
-      pixel_pitch_input/output = number of elements along the fast (x) dimension, depends on fftw padding && whether the memory is currently transposed in x/y
-      twiddle_in = +/- 2*PI/Largest dimension : + for the inverse transform
-      Q = number of sub-transforms
-    */
-    LaunchParams L;
-    switch (kernel_type)
-    {
-      case r2c_decomposed: 
-        // This is also fine for a 1d transform
-        L.threadsPerBlock = dim3(transform_divisor, 1, 1);
-        L.gridDims = dim3(1, dims_in.y, 1); 
-        L.mem_offsets.shared_input = 0;
-        L.mem_offsets.shared_output = dims_out.w; 
-        L.mem_offsets.pixel_pitch_input = dims_in.w*2; // scalar type, natural 
-        L.mem_offsets.pixel_pitch_output = dims_out.w; // complex type
-        L.twiddle_in = -2*PIf/dims_in.x ;
-        L.Q =  transform_divisor; //  (dims_in / transform size)
-        break;
-
-      case r2c_decomposed_transposed: 
-        // The logic in this kernel would cause a segfault if the output is transposed in 1d
-        if (transform_dimension == 1) { std::cerr << "r2c_decomposed_transposed is not supported for 1d transforms." << std::endl; exit(-1); }
-      
-        L.threadsPerBlock = dim3(transform_divisor, 1, 1);
-        L.gridDims = dim3(1, dims_in.y, 1); 
-        L.mem_offsets.shared_input = 0;  
-        L.mem_offsets.shared_output = dims_out.w;
-        L.mem_offsets.pixel_pitch_input = dims_in.w*2; // scalar type, natural 
-        L.mem_offsets.pixel_pitch_output = dims_out.y; // complex type
-        L.twiddle_in = -2*PIf/dims_in.x ;
-        L.Q =  transform_divisor; //  (dims_in / transform size)
-        break;        
-
-      case r2c_transposed:
-        // The logic in this kernel would cause a segfault if the output is transposed in 1d
-        if (transform_dimension == 1) { std::cerr << "r2c_decomposed_transposed is not supported for 1d transforms." << std::endl; exit(-1); }
-
-        L.threadsPerBlock = dim3(transform_size/ept, 1, 1);
-        L.gridDims = dim3(transform_divisor, dims_in.y, 1); 
-        L.mem_offsets.shared_input = dims_in.x;
-        L.mem_offsets.shared_output = dims_out.w; // used in bounds check.
-        L.mem_offsets.pixel_pitch_input = dims_in.w*2; // scalar type, natural 
-        L.mem_offsets.pixel_pitch_output = dims_out.y; // complex type, transposed
-        L.twiddle_in = -2*PIf/dims_out.x;
-        L.Q = dims_out.x / dims_in.x; 
-        break;
-
-      case c2c_padded:
-        // This is implicitly a forward transform
-        switch (transform_dimension)
-        {
-          case 1: {         
-            // If 1d, this is implicitly a complex valued input, s.t. dims_in.x = dims_in.w.) But if fftw_padding is allowed false this may not be true.
-            L.threadsPerBlock = dim3(transform_size/ept, 1, 1);
-            L.gridDims = dim3(transform_divisor, 1, 1);
-            L.mem_offsets.shared_input = dims_in.x;
-            L.mem_offsets.shared_output = dims_out.w;
-            L.mem_offsets.pixel_pitch_input = dims_in.w; // complex ype, natural
-            L.mem_offsets.pixel_pitch_output = dims_out.w; // complex type, natural
-            L.twiddle_in = -2*PIf/dims_out.x;
-            L.Q = dims_out.x / dims_in.x;
-            break;
-          }
-          case 2: {
-            L.threadsPerBlock = dim3(transform_size/ept, 1, 1); 
-            L.gridDims = dim3(transform_divisor, dims_out.w, 1);
-            L.mem_offsets.shared_input = dims_in.y;
-            L.mem_offsets.shared_output = dims_out.y;
-            L.mem_offsets.pixel_pitch_input = dims_out.y;
-            L.mem_offsets.pixel_pitch_output = dims_out.y;
-            L.twiddle_in = -2*PIf/dims_in.y;
-            L.Q = dims_out.y / dims_in.y; // FIXME assuming for now this is already divisible
-            break;
-          }
-          case 3: {
-            // Not implemented
-            std::cerr << "3d c2c_padded not implemented" << std::endl;
-            exit(-1);
-            break;
-          }
-        } // end switch on transform dimension
-        // If inverse we need to negate the twidddle factor.
-        if ( ! do_forward_transform)  L.twiddle_in  = -L.twiddle_in ;
-        break; // case c2c_padded
-
-      case c2c:
-        switch (transform_dimension)
-        {
-          case 1: {  
-            // If 1d, this is implicitly a complex valued input, s.t. dims_in.x = dims_in.w.) But if fftw_padding is allowed false this may not be true.
-            L.threadsPerBlock = dim3(transform_size/ept, 1, 1);
-            L.gridDims = dim3(transform_divisor, 1, 1);
-            L.mem_offsets.pixel_pitch_input = dims_in.w;
-            L.mem_offsets.pixel_pitch_output = dims_out.w;
-            L.twiddle_in = -2*PIf/dims_out.x;
-            L.Q = dims_out.x / dims_in.x; // should be 1
-            break;
-          }
-          case 2: {             
-            L.threadsPerBlock = dim3(transform_size/ept, 1, 1); 
-            L.gridDims = dim3(transform_divisor, dims_out.w, 1);
-            L.mem_offsets.pixel_pitch_input = dims_out.y;
-            L.mem_offsets.pixel_pitch_output = dims_out.y;
-            L.twiddle_in = -2*PIf/dims_out.y;
-            L.Q = dims_out.y / dims_in.y; // should be 1
-            break;
-          }
-          case 3: {
-            // Not implemented
-            std::cerr << "3d c2c not implemented" << std::endl;
-            exit(-1);
-            break;
-          }
-        } // end switch on transform dimension
-        L.mem_offsets.shared_input = 0;
-        L.mem_offsets.shared_output = 0;  
-        // If inverse we need to negate the twidddle factor.
-        if ( ! do_forward_transform)  L.twiddle_in  = -L.twiddle_in ; 
-        break; // case c2c
-
-      case c2c_decomposed: 
-        L.threadsPerBlock = dim3(transform_divisor, 1, 1);
-        L.Q =  transform_divisor; //  (dims_in / transform size)
-        switch (transform_dimension)
-        {
-          case 1: {
-            L.gridDims = dim3(1, 1, 1); 
-            L.mem_offsets.shared_input = 0;
-            L.mem_offsets.shared_output = dims_out.x; 
-            L.mem_offsets.pixel_pitch_input = dims_out.x; // scalar type, natural 
-            L.mem_offsets.pixel_pitch_output = dims_out.x; // complex type
-            L.twiddle_in = 2*PIf/dims_out.x;            
-            break;
-          }
-          case 2: {
-            L.gridDims = dim3(1, dims_out.w, 1); 
-            L.mem_offsets.shared_input = 0;
-            L.mem_offsets.shared_output = dims_out.y; 
-            L.mem_offsets.pixel_pitch_input = dims_out.y; // scalar type, natural 
-            L.mem_offsets.pixel_pitch_output = dims_out.y; // complex type
-            L.twiddle_in = 2*PIf/dims_out.y;
-            break;
-          }
-          case 3: {
-            // Not implemented
-            std::cerr << "3d c2c_decomposed not implemented" << std::endl;
-            exit(-1);
-            break;
-          }
-
-        } // end switch on transform dimension
-        if ( ! do_forward_transform) L.twiddle_in = - L.twiddle_in ;
-      break;
-      
-      case c2r_transposed:
-        if (transform_dimension == 1) { std::cerr << "c2r_transposed is not supported for 1d transforms." << std::endl; exit(-1); }
-
-        L.twiddle_in = 2*PIf/dims_out.y;
-        L.Q = 1; // Already full size - FIXME when working out limited number of output pixels  
-        L.threadsPerBlock = dim3(transform_size/ept, 1, 1); 
-        L.gridDims = dim3(transform_divisor, dims_out.y, 1);
-        L.mem_offsets.shared_input = 0;
-        L.mem_offsets.shared_output = 0;
-        L.mem_offsets.pixel_pitch_input = dims_out.y;
-        L.mem_offsets.pixel_pitch_output = dims_out.w*2;      
-        break;
-
-      case c2r_decomposed:
-        if (transform_dimension == 2 || transform_dimension == 3) { std::cerr << "c2r_decomposed is not supported for transposed xforms, implied by 2d/3d." << std::endl; exit(-1); }
-
-        L.twiddle_in = 2*PIf/dims_out.x;
-        L.Q = transform_divisor; //  (dims_in / transform size)
-        L.threadsPerBlock = dim3(transform_divisor, 1, 1); 
-        L.gridDims = dim3(1, dims_out.y, 1);
-        L.mem_offsets.shared_input = 0;
-        L.mem_offsets.shared_output = dims_out.x;
-        L.mem_offsets.pixel_pitch_input = dims_out.w;
-        L.mem_offsets.pixel_pitch_output = dims_out.w*2;      
-      break; 
-      
-      case c2r_decomposed_transposed:
-        if (transform_dimension == 1) { std::cerr << "c2r_decomposed_transposed is not supported for 1d transforms." << std::endl; exit(-1); }
-        L.twiddle_in = 2*PIf/dims_out.x;
-        L.Q = transform_divisor; //  (dims_in / transform size)
-        L.threadsPerBlock = dim3(transform_divisor, 1, 1); 
-        L.gridDims = dim3(1, dims_out.y, 1);
-        L.mem_offsets.shared_input = 0;
-        L.mem_offsets.shared_output = dims_out.x;
-        L.mem_offsets.pixel_pitch_input = dims_out.y;
-        L.mem_offsets.pixel_pitch_output = dims_out.w*2;      
-      break; 
-
-      case xcorr_transposed:
-        if (transform_dimension == 1 || transform_dimension == 3) { std::cerr << "xcorr_transposed is not supported for 1d/3d yet." << std::endl; exit(-1); } // FIXME
-
-      // Cross correlation case
-      // The added complexity, in instructions and shared memory usage outweigh the cost of just running the full length C2C on the forward.
-        L.threadsPerBlock = dim3(transform_size/ept, 1, 1); 
-        L.gridDims = dim3(transform_divisor, dims_out.w, 1);
-        L.mem_offsets.shared_input = dims_in.y;
-        L.mem_offsets.shared_output = dims_out.y;
-        L.mem_offsets.pixel_pitch_input = dims_out.y;
-        L.mem_offsets.pixel_pitch_output = dims_out.y;
-
-        L.twiddle_in = -2*PIf/dims_out.y;
-        L.Q = dims_out.y / dims_in.y; // FIXME assuming for now this is already divisible
-
-        break;
-
-      case xcorr_decomposed:
-        if (transform_dimension == 1 || transform_dimension == 3) { std::cerr << "xcorr_decomposed is not supported for 1d/3d yet." << std::endl; exit(-1); } // FIXME
-
-        L.threadsPerBlock = dim3(transform_divisor, 1, 1);
-        L.Q =  transform_divisor; //  (dims_in / transform size)
-
-        L.gridDims = dim3(1, dims_out.w, 1); 
-        L.mem_offsets.shared_input = 0;
-        L.mem_offsets.shared_output = dims_out.y; 
-        L.mem_offsets.pixel_pitch_input = dims_out.y; // scalar type, natural 
-        L.mem_offsets.pixel_pitch_output = dims_out.y; // complex type
-        L.twiddle_in = -2*PIf/dims_out.y; // this is negated on the inverse xform in the kernel
-        break;
-       
-      default:
-        std::cerr << "ERROR: Unrecognized fft_status" << std::endl;
-        exit(-1);
-        
-    }
-    return L;
   }
+
+  inline bool IsC2RType(KernelType kernel_type)
+  {
+     if (kernel_type == c2r_decomposed || kernel_type == c2r_decomposed_transposed ||
+         kernel_type == c2r_none || kernel_type == c2r_decrease || kernel_type == c2r_increase)
+    {
+      return true;
+    }  
+    else return false; 
+  }
+
+  inline bool IsForwardType(KernelType kernel_type)
+  {
+      if (kernel_type == r2c_decomposed || kernel_type == r2c_decomposed_transposed ||
+          kernel_type == r2c_none || kernel_type == r2c_decrease || kernel_type == r2c_increase ||
+          kernel_type == c2c_fwd_none || kernel_type == c2c_fwd_decrease || kernel_type == c2c_fwd_increase)
+
+    {
+      return true;
+    }      
+    else return false; 
+
+  }
+
+  inline void AssertDivisibleAndFactorOf2( int full_size_transform, int number_non_zero_inputs_or_outputs)
+  {
+    // FIXME: This function could be named more appropriately.
+    transform_size.N = full_size_transform;
+    transform_size.L = number_non_zero_inputs_or_outputs;
+    // FIXME: in principle, transform_size.L should equal number_non_zero_inputs_or_outputs and transform_size.P only needs to be >= and satisfy other requirements, e.g. power of two (currently.)
+    transform_size.P = number_non_zero_inputs_or_outputs;
+
+    if (transform_size.N % transform_size.P == 0) { transform_size.Q = transform_size.N / transform_size.P; }
+    else { std::cerr << "Array size " << transform_size.N << " is not divisible by wanted output size " << transform_size.P << std::endl; exit(1); }
+
+    if ( abs(fmod(log2(float(transform_size.P)), 1)) > 1e-6 ) { std::cerr << "Wanted output size " << transform_size.P << " is not a power of 2." << std::endl; exit(1); }
+  }
+
+  void GetTransformSize(KernelType kernel_type);
+  void GetTransformSize_thread(KernelType kernel_type, int thread_fft_size);
+  LaunchParams SetLaunchParameters(const int& ept, KernelType kernel_type, bool do_forward_transform = true);  
 
   inline int ReturnPaddedMemorySize(short4 & wanted_dims)
   {
@@ -621,7 +399,7 @@ private:
   // 1. 
   // First call passed from a public transform function, selects block or thread and the transform precision.
   template <bool use_thread_method = false>
-  void SetPrecisionAndExectutionMethod(KernelType kernel_type, bool do_forward_transform);
+  void SetPrecisionAndExectutionMethod(KernelType kernel_type, bool do_forward_transform = true);
 
   // 2.
   // Second call, sets size of the transform kernel, selects the appropriate GPU arch
@@ -633,12 +411,95 @@ private:
   template <class FFT_base_arch, bool use_thread_method = false>
   void SetAndLaunchKernel(KernelType kernel_type, bool do_forward_transform);
 
+  // For debugging
+
+  inline void PrintVectorType(int3 input) 
+  {
+    std::cout << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
+  }
+  inline void PrintVectorType(int4 input) 
+  {
+    std::cout << "(x,y,z,w) " << input.x << " " << input.y << " " << input.z << " " << input.w << std::endl;
+  }
+    inline void PrintVectorType(dim3 input) 
+  {
+    std::cout << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
+  }
+  inline void PrintVectorType(short3 input) 
+  {
+    std::cout << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
+  }
+  inline void PrintVectorType(short4 input) 
+  {
+    std::cout << "(x,y,z,w) " << input.x << " " << input.y << " " << input.z << " " << input.w << std::endl;
+  }
+
+  void PrintLaunchParameters(LaunchParams LP)
+  {
+    std::cout << "Launch parameters: " << std::endl;
+    std::cout << "  Threads per block: ";
+    PrintVectorType(LP.threadsPerBlock);
+    std::cout << "  Grid dimensions: ";
+    PrintVectorType(LP.gridDims);
+    std::cout << "  Q: " << LP.Q << std::endl;
+    std::cout << "  Twiddle in: " << LP.twiddle_in << std::endl;
+    std::cout << "  shared input: " << LP.mem_offsets.shared_input << std::endl;
+    std::cout << "  shared output (memlimit in r2c): " << LP.mem_offsets.shared_output << std::endl;
+    std::cout << "  pixel pitch input: " << LP.mem_offsets.pixel_pitch_input << std::endl;
+    std::cout << "  pixel pitch output: " << LP.mem_offsets.pixel_pitch_output << std::endl;
+
+  };
+  void PrintState()
+  {
+    std::cout << "================================================================" << std::endl; 
+    std::cout << "Device Properties: " << std::endl;
+    std::cout << "================================================================" << std::endl; 
+
+    std::cout << "Device idx: " << device_properties.device_id << std::endl;
+    std::cout << "max_shared_memory_per_block: " << device_properties.max_shared_memory_per_block << std::endl;
+    std::cout << "max_shared_memory_per_SM: " << device_properties.max_shared_memory_per_SM << std::endl;
+    std::cout << "max_registers_per_block: " << device_properties.max_registers_per_block << std::endl;
+    std::cout << "max_persisting_L2_cache_size: " << device_properties.max_persisting_L2_cache_size << std::endl;
+    std::cout << std::endl;
+
+    std::cout << "State Variables:\n" << std::endl;
+    std::cout << "is_in_memory_host_pointer " << is_in_memory_host_pointer << std::endl;
+    std::cout << "is_in_memory_device_pointer " << is_in_memory_device_pointer << std::endl;
+    std::cout << "is_in_buffer_memory " << is_in_buffer_memory << std::endl;
+    std::cout << "is_host_memory_pinned " << is_host_memory_pinned << std::endl;
+    std::cout << "is_fftw_padded_input " << is_fftw_padded_input << std::endl;
+    std::cout << "is_fftw_padded_output " << is_fftw_padded_output << std::endl;
+    std::cout << "is_real_valued_input " << is_real_valued_input << std::endl;
+    std::cout << "is_set_input_params " << is_set_input_params << std::endl;
+    std::cout << "is_set_output_params " << is_set_output_params << std::endl;
+    std::cout << "is_size_validated " << is_size_validated << std::endl;
+    std::cout << "is_set_input_pointer " << is_set_input_pointer << std::endl;
+    std::cout << std::endl;
+
+    std::cout << "Size variables:\n" << std::endl;
+    std::cout << "transform_size.N " << transform_size.N << std::endl;
+    std::cout << "transform_size.L " << transform_size.L << std::endl;
+    std::cout << "transform_size.P " << transform_size.P << std::endl;
+    std::cout << "transform_size.Q " << transform_size.Q << std::endl;
+    std::cout << "fwd_dims_in.x,y,z "; PrintVectorType(fwd_dims_in); std::cout << std::endl;
+    std::cout << "fwd_dims_out.x,y,z " ; PrintVectorType(fwd_dims_out); std::cout<< std::endl;
+    std::cout << "inv_dims_in.x,y,z " ; PrintVectorType(inv_dims_in); std::cout<< std::endl;
+    std::cout << "inv_dims_out.x,y,z " ; PrintVectorType(inv_dims_out); std::cout<< std::endl;
+    std::cout << std::endl;
+
+    std::cout << "Misc:\n" << std::endl;
+    std::cout << "compute_memory_allocated " << compute_memory_allocated << std::endl;
+    std::cout << "memory size to copy " << memory_size_to_copy << std::endl;
+    std::cout << "fwd_size_change_type " << SizeChangeName[fwd_size_change_type] << std::endl;
+    std::cout << "inv_size_change_type " << SizeChangeName[inv_size_change_type] << std::endl;
+    std::cout << "transform stage complete " << TransformStageCompletedName[transform_stage_completed] << std::endl;
+    std::cout << "input_origin_type " << OriginTypeName[input_origin_type] << std::endl;
+    std::cout << "output_origin_type " << OriginTypeName[output_origin_type] << std::endl;
+    
+  }; // PrintState()
 
 
-};
-
-
-
+}; // class Fourier Transformer
 
 } // namespace fast_FFT
 
