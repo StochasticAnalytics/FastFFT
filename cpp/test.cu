@@ -3,6 +3,7 @@
 #include <cufft.h>
 #include <cufftXt.h>
 
+
 // The Fourier transform of a constant should be a unit impulse, and on back fft, without normalization, it should be a constant * N.
 // It is assumed the input/output have the same dimension (i.e. no padding)
 void const_image_test(std::vector<int> size)
@@ -185,7 +186,7 @@ void const_image_test(std::vector<int> size)
   }
 }
 
-void unit_impulse_test(std::vector<int>size)
+void unit_impulse_test(std::vector<int>size, bool do_increase_size)
 {
 
   bool all_passed = true;
@@ -194,16 +195,29 @@ void unit_impulse_test(std::vector<int>size)
   std::vector<bool> FastFFT_forward_passed(size.size(), true);
   std::vector<bool> FastFFT_roundTrip_passed(size.size(), true);
 
+  short4 input_size;
+  short4 output_size;
   for (int iSize = 0; iSize < size.size() - 1 ; iSize++)
   {
     int oSize = iSize + 1;
     while (oSize < size.size())
     {
-      std::cout << std::endl << "Testing padding from  " << size[iSize] << " to " << size[oSize] << std::endl;
-      short4 input_size = make_short4(size[iSize],size[iSize],1,0);
-      short4 output_size = make_short4(size[oSize],size[oSize],1,0);   
+      MyFFTDebugPrintWithDetails("at the begining, input isze  " + std::to_string(size[iSize]) + " output size " + std::to_string(size[oSize]));
 
+      // std::cout << std::endl << "Testing padding from  " << size[iSize] << " to " << size[oSize] << std::endl;
+      if (do_increase_size)
+      {
+        input_size  = make_short4(size[iSize],size[iSize],1,0);
+        output_size = make_short4(size[oSize],size[oSize],1,0);  
+      }
+      else
+      {
+        output_size = make_short4(size[iSize],size[iSize],1,0);
+        input_size  = make_short4(size[oSize],size[oSize],1,0);  
+      }
 
+  FastFFT::PrintVectorType(input_size);
+  FastFFT::PrintVectorType(output_size);
   bool test_passed = true;
   long address = 0;
 
@@ -264,7 +278,7 @@ void unit_impulse_test(std::vector<int>size)
   sum = ReturnSumOfReal(host_output.real_values, dims_out);
   if (sum != 1) {all_passed = false; init_passed[iSize] = false;}
 
-  MyFFTDebugAssertTestTrue( sum == 1,"Unit impulse Init ");
+  // MyFFTDebugAssertTestTrue( sum == 1,"Unit impulse Init ");
   
   // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
   FT.CopyHostToDevice();
@@ -277,18 +291,20 @@ void unit_impulse_test(std::vector<int>size)
   host_output.fftw_epsilon -= (host_output.real_memory_allocated/2 );
   if (std::abs(host_output.fftw_epsilon) > 1e-8 ) {all_passed = false; FFTW_passed[iSize] = false;}
 
-  MyFFTDebugAssertTestTrue( std::abs(host_output.fftw_epsilon) < 1e-8 , "FFTW unit impulse forward FFT");
+  // MyFFTDebugAssertTestTrue( std::abs(host_output.fftw_epsilon) < 1e-8 , "FFTW unit impulse forward FFT");
   
   // Just to make sure we don't get a false positive, set the host memory to some undesired value.
   FT.SetToConstant<float>(host_output.real_values, host_output.real_memory_allocated, 2.0f);
   
   // This method will call the regular FFT kernels given the input/output dimensions are equal when the class is instantiated.
   bool swap_real_space_quadrants = true;
-  FT.FwdFFT(swap_real_space_quadrants);
-  
-  // do not deallocate, do not unpin memory
 
+  FT.FwdFFT(swap_real_space_quadrants);
+  MyFFTDebugPrintWithDetails(" ");
+
+  // do not deallocate, do not unpin memory
   FT.CopyDeviceToHost(host_output.real_values, false, false);
+  MyFFTDebugPrintWithDetails(" ");
 
   // int n=0;
   // for (int x = 0; x <  host_output.size.y ; x++)
@@ -310,17 +326,23 @@ void unit_impulse_test(std::vector<int>size)
 
   sum -= (host_output.real_memory_allocated/2 );
 
+  MyFFTDebugPrintWithDetails(" ");
 
-  std::cout << "FFT Unit Impulse Forward FFT: " << sum <<  " epsilon " << host_output.fftw_epsilon << std::endl;
-  std::cout << "epsilon " << abs(sum - host_output.fftw_epsilon) << std::endl;
+  // std::cout << "FFT Unit Impulse Forward FFT: " << sum <<  " epsilon " << host_output.fftw_epsilon << std::endl;
+  // std::cout << "epsilon " << abs(sum - host_output.fftw_epsilon) << std::endl;
   if (abs(sum - host_output.fftw_epsilon) > 1e-8) {all_passed = false; FastFFT_forward_passed[iSize] = false;}
 
-  MyFFTDebugAssertTestTrue( abs(sum - host_output.fftw_epsilon) < 1e-8, "FastFFT unit impulse forward FFT");
+  // MyFFTDebugAssertTestTrue( abs(sum - host_output.fftw_epsilon) < 1e-8, "FastFFT unit impulse forward FFT");
   FT.SetToConstant<float>(host_output.real_values, host_output.real_memory_allocated, 2.0f);
   
+  MyFFTDebugPrintWithDetails(" ");
 
   FT.InvFFT();
+  MyFFTDebugPrintWithDetails(" ");
+
   FT.CopyDeviceToHost(host_output.real_values, true, true);
+  MyFFTDebugPrintWithDetails(" ");
+
   // for (int x = 0; x < 128; x++)
   // {
   //   int n=0;
@@ -332,10 +354,16 @@ void unit_impulse_test(std::vector<int>size)
   //   std::cout << "] " << n << std::endl;
   // }
   // Assuming the outputs are always even dimensions, padding_jump_val is always 2.
-  sum = ReturnSumOfReal(host_output.real_values, dims_out);
-  if (sum != dims_out.x*dims_out.y*dims_out.z) {all_passed = false; FastFFT_roundTrip_passed[iSize] = false;}
+  MyFFTDebugPrintWithDetails(" ");
 
-  MyFFTDebugAssertTestTrue( sum == dims_out.x*dims_out.y*dims_out.z,"FastFFT unit impulse round trip FFT");
+  sum = ReturnSumOfReal(host_output.real_values, dims_out);
+  MyFFTDebugPrintWithDetails("at the end  " + std::to_string(sum));
+  
+  if (sum != dims_out.x*dims_out.y*dims_out.z) {all_passed = false; FastFFT_roundTrip_passed[iSize] = false;}
+  MyFFTDebugPrintWithDetails("at the end  " + std::to_string(size[iSize]));
+  MyFFTDebugPrintWithDetails("at the end  " + std::to_string(size[oSize]));
+
+  // MyFFTDebugAssertTestTrue( sum == dims_out.x*dims_out.y*dims_out.z,"FastFFT unit impulse round trip FFT");
     oSize++;
     } // while loop over pad to size
   } // for loop over pad from size
@@ -828,7 +856,8 @@ int main(int argc, char** argv) {
 
 
     const_image_test(test_size);
-    unit_impulse_test(test_size);
+    unit_impulse_test(test_size, true);
+    unit_impulse_test(test_size, false);
 
 
   } // end of validation tests
@@ -844,7 +873,7 @@ int main(int argc, char** argv) {
 
     for (int iSize = 0; iSize < test_size.size(); iSize++) {
 
-      std::cout << std::endl << "Testing cufft comparison " << test_size[iSize] << " x" << std::endl;
+      // std::cout << std::endl << "Testing cufft comparison " << test_size[iSize] << " x" << std::endl;
       input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
       output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
 
@@ -856,7 +885,7 @@ int main(int argc, char** argv) {
       int oSize = iSize + 1;
       while (oSize < test_size.size())
       {
-        std::cout << std::endl << "Testing padding from  " << test_size[iSize] << " to " << test_size[oSize] << std::endl;
+        // std::cout << std::endl << "Testing padding from  " << test_size[iSize] << " to " << test_size[oSize] << std::endl;
         input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
         output_size = make_short4(test_size[oSize],test_size[oSize],1,0);
     

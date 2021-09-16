@@ -37,9 +37,16 @@ FourierTransformer<ComputeType, InputType, OutputType>::FourierTransformer()
 template <class ComputeType, class InputType, class OutputType>
 FourierTransformer<ComputeType, InputType, OutputType>::~FourierTransformer() 
 {
+  MyFFTDebugPrintWithDetails("FourierTransformer destructor");
   Deallocate();
-  UnPinHostMemory();
+  MyFFTDebugPrintWithDetails("FourierTransformer destructor");
+
+  // UnPinHostMemory();
+  MyFFTDebugPrintWithDetails("FourierTransformer destructor");
+
   SetDefaults();
+  MyFFTDebugPrintWithDetails("FourierTransformer destructor");
+
 }
 
 template <class ComputeType, class InputType, class OutputType>
@@ -86,13 +93,21 @@ void FourierTransformer<ComputeType, InputType, OutputType>::Deallocate()
 template <class ComputeType, class InputType, class OutputType>
 void FourierTransformer<ComputeType, InputType, OutputType>::UnPinHostMemory()
 {
+  
+  MyFFTDebugPrintWithDetails("Unpin");
   if (is_host_memory_pinned)
 	{
+    MyFFTDebugPrintWithDetails("Unpin");
+
     precheck
 		cudaErr(cudaHostUnregister(host_pointer));
     postcheck
+    MyFFTDebugPrintWithDetails("Unpin");
+
 		is_host_memory_pinned = false;
 	} 
+  MyFFTDebugPrintWithDetails("Unpin");
+
 }
 
 
@@ -245,6 +260,9 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CopyDeviceToHost( b
   SetDimensions(CopyToHost);  
 	MyFFTDebugAssertTrue(is_in_memory_device_pointer, "GPU memory not allocated");
 
+  MyFFTDebugPrintWithDetails("");
+  PrintState();
+
   ComputeType* copy_pointer;
   if (is_in_buffer_memory) copy_pointer = d_ptr.position_space_buffer;
   else copy_pointer = d_ptr.position_space;
@@ -267,44 +285,66 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CopyDeviceToHost( b
 template <class ComputeType, class InputType, class OutputType>
 void FourierTransformer<ComputeType, InputType, OutputType>::CopyDeviceToHost(OutputType* output_pointer, bool free_gpu_memory, bool unpin_host_memory)
 {
- 
+       MyFFTDebugPrintWithDetails(" ");
+
   SetDimensions(CopyToHost);
+  MyFFTDebugPrintWithDetails(" ");
 
 	MyFFTDebugAssertTrue(is_in_memory_device_pointer, "GPU memory not allocated");
+  MyFFTDebugPrintWithDetails("");
+  PrintState();
   // Assuming the output is not pinned, TODO change to optionally maintain as host_input as well.
   OutputType* tmpPinnedPtr;
   precheck
   // FIXME this is assuming output type is the same as compute type.
   cudaErr(cudaHostRegister(output_pointer, sizeof(OutputType)*memory_size_to_copy, cudaHostRegisterDefault));
   postcheck
-  
+  MyFFTDebugPrintWithDetails("");
+
   precheck
   cudaErr(cudaHostGetDevicePointer( &tmpPinnedPtr, output_pointer, 0));
   postcheck
+  MyFFTDebugPrintWithDetails("");
+
   if (is_in_buffer_memory)
   {
+    MyFFTDebugPrintWithDetails("");
+
     precheck
     cudaErr(cudaMemcpyAsync(tmpPinnedPtr, d_ptr.position_space_buffer, memory_size_to_copy*sizeof(OutputType),cudaMemcpyDeviceToHost,cudaStreamPerThread));
     postcheck
+    MyFFTDebugPrintWithDetails("");
+
   }
   else
   {
+    MyFFTDebugPrintWithDetails("");
+
     precheck
     cudaErr(cudaMemcpyAsync(tmpPinnedPtr, d_ptr.position_space, memory_size_to_copy*sizeof(OutputType),cudaMemcpyDeviceToHost,cudaStreamPerThread));
     postcheck
+    MyFFTDebugPrintWithDetails("");
+
   }
+  MyFFTDebugPrintWithDetails("");
 
 
   // Just set true her for now
   bool should_block_until_complete = true;
   if (should_block_until_complete) cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
+  MyFFTDebugPrintWithDetails("");
 
   precheck
   cudaErr(cudaHostUnregister(tmpPinnedPtr));
   postcheck
+  MyFFTDebugPrintWithDetails("");
 
 	if (free_gpu_memory) { Deallocate();}
+  MyFFTDebugPrintWithDetails("");
+
   if (unpin_host_memory) { UnPinHostMemory();}
+  MyFFTDebugPrintWithDetails("");
+
 
 }
 
@@ -387,8 +427,15 @@ void FourierTransformer<ComputeType, InputType, OutputType>::FwdFFT(bool swap_re
           break;
         }
         case decrease: {
-          // r2c_increase
-          MyFFTRunTimeAssertTrue(false, "Size reduction not yet supported");
+          MyFFTDebugPrintWithDetails("");
+          PrintState();
+          SetPrecisionAndExectutionMethod(r2c_decrease);
+          MyFFTDebugPrintWithDetails("");
+          PrintState();
+          transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
+          SetPrecisionAndExectutionMethod(c2c_fwd_decrease); 
+          MyFFTDebugPrintWithDetails("");
+          PrintState();
           break;
         }
       }
@@ -466,9 +513,15 @@ void FourierTransformer<ComputeType, InputType, OutputType>::InvFFT(bool transpo
           }
           else
           {
+            MyFFTDebugPrintWithDetails("");
+            PrintState();
             SetPrecisionAndExectutionMethod(c2c_inv_none);
+            MyFFTDebugPrintWithDetails("");
+            PrintState();
             transform_stage_completed = TransformStageCompleted::inv; // technically not complete, needed for copy on validation of partial fft.
             SetPrecisionAndExectutionMethod(c2r_none);
+            MyFFTDebugPrintWithDetails("");
+            PrintState();
 
           }          
           // // FFT_C2C(false);
@@ -945,8 +998,9 @@ void block_fft_kernel_R2C_INCREASE(const ScalarType* __restrict__  input_values,
 
 } // end of block_fft_kernel_R2C_INCREASE
 
+// __launch_bounds__(FFT::max_threads_per_block)  we don't know this because it is threadDim.x * threadDim.z - this could be templated if it affects performance significantly
 template<class FFT, class ComplexType, class ScalarType>
-__launch_bounds__(FFT::max_threads_per_block) __global__
+__global__
 void block_fft_kernel_R2C_DECREASE(const ScalarType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace)
 {
   // Initialize the shared memory, assuming everyting matches the input data X size in
@@ -1112,8 +1166,9 @@ void block_fft_kernel_C2C_NONE(const ComplexType*  __restrict__  input_values, C
 
 // C2C decomposed
 
+// __launch_bounds__(FFT::max_threads_per_block)  we don't know this because it is threadDim.x * threadDim.z - this could be templated if it affects performance significantly
 template<class FFT, class ComplexType>
-__launch_bounds__(FFT::max_threads_per_block) __global__
+__global__
 void block_fft_kernel_C2C_DECREASE(const ComplexType* __restrict__  input_values, ComplexType*  __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace)
 {
   //	// Initialize the shared memory, assuming everyting matches the input data X size in
@@ -1140,9 +1195,9 @@ void block_fft_kernel_C2C_DECREASE(const ComplexType* __restrict__  input_values
 
 }
 
-
+// __launch_bounds__(FFT::max_threads_per_block)  we don't know this because it is threadDim.x * threadDim.z - this could be templated if it affects performance significantly
 template<class FFT, class ComplexType>
-__launch_bounds__(FFT::max_threads_per_block) __global__
+__global__
 void block_fft_kernel_C2C_INCREASE(const ComplexType*  __restrict__ input_values, ComplexType*  __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace)
 {
 //	// Initialize the shared memory, assuming everyting matches the input data X size in
@@ -1904,6 +1959,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         auto workspace = make_workspace<FFT>(error_code);
 
         LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_decrease);
+
         // the shared mem is mixed between storage, shuffling and FFT. For this kernel we need to add padding to avoid bank conlicts (N/32)
         int shared_memory = std::max( FFT::shared_memory_size, (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input/32) * (unsigned int)sizeof(complex_type));
 
@@ -2196,7 +2252,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::GetTransformSize(Ke
       AssertDivisibleAndFactorOf2( fwd_dims_in.x, fwd_dims_out.x );
       break;
     case r2c_decrease:
-      AssertDivisibleAndFactorOf2( fwd_dims_in.x, fwd_dims_out.x );
+      AssertDivisibleAndFactorOf2( fwd_dims_in.x, fwd_dims_out.x ); 
       break;
     case r2c_increase:
       AssertDivisibleAndFactorOf2( fwd_dims_out.x, fwd_dims_in.x );
