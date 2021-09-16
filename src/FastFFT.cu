@@ -952,6 +952,36 @@ void block_fft_kernel_R2C_INCREASE(const ScalarType* __restrict__  input_values,
 
 } // end of block_fft_kernel_R2C_INCREASE
 
+template<class FFT, class ComplexType, class ScalarType>
+__launch_bounds__(FFT::max_threads_per_block) __global__
+void block_fft_kernel_R2C_DECREASE(const ScalarType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace)
+{
+  // Initialize the shared memory, assuming everyting matches the input data X size in
+  using complex_type = ComplexType;
+  using scalar_type  = ScalarType;
+
+  // The shared memory is used for storage, shuffling and fft ops at different stages and includes room for bank padding.
+	extern __shared__  complex_type shared_mem[];
+
+  complex_type thread_data[FFT::storage_size];
+
+  // Load in natural order
+  io<FFT>::load_r2c_shared_and_pad(&input_values[blockIdx.y*mem_offsets.pixel_pitch_input], shared_mem);
+
+  // DIT shuffle, bank conflict free
+  io<FFT>::copy_from_shared(shared_mem, thread_data, Q);
+
+  FFT().execute(thread_data, shared_mem, workspace);
+
+  // Full twiddle multiply and store in natural order in shared memory
+  io<FFT>::reduce_block_fft(thread_data, shared_mem, twiddle_in, Q);
+
+  // Reduce from shared memory into registers, ending up with only P valid outputs.
+  io<FFT>::store_r2c_reduced(thread_data, output_values, mem_offsets.pixel_pitch_output, mem_offsets.shared_output);
+	
+
+} // end of block_fft_kernel_R2C_DECREASE
+
 // decomposed with conj multiplication
 
 template<class FFT, class invFFT, class ComplexType>
@@ -1821,7 +1851,17 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         cudaError_t error_code = cudaSuccess;
         auto workspace = make_workspace<FFT>(error_code);
 
-        MyFFTRunTimeAssertTrue(false, "r2c_transposed with decreasing size is not yet implemented.");
+        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_increase);
+        // the shared mem is mixed between storage, shuffling and FFT. For this kernel we need to add padding to avoid bank conlicts (N/32)
+        int shared_memory = std::max( FFT::shared_memory_size, (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input/32) * (unsigned int)sizeof(complex_type));
+
+        CheckSharedMemory(shared_memory, device_properties);
+        cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_R2C_DECREASE<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+    
+        precheck
+        block_fft_kernel_R2C_DECREASE<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+        ( scalar_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
+        postcheck 
         break;
       }
 
@@ -2223,17 +2263,16 @@ LaunchParams FourierTransformer<ComputeType, InputType, OutputType>::SetLaunchPa
   switch (size_change_type)
   {
     case no_change: {
-      
-
+    
       L.mem_offsets.shared_input  = 0;
       L.mem_offsets.shared_output = 0;
       break;
     }
     case decrease: {
       
-
       L.mem_offsets.shared_input  = transform_size.N;
-      L.mem_offsets.shared_output = 0;
+      if (IsR2CType(kernel_type)) { L.mem_offsets.shared_output = dims_out.w; } // used for memory limit.
+      else { L.mem_offsets.shared_output = transform_size.N; } // TODO this line is just from case increase, haven't thought about it.
       break;
     }
     case increase: {
