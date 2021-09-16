@@ -2027,7 +2027,23 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
       }
 
       case c2c_inv_decrease: {
-        MyFFTRunTimeAssertTrue(false, "c2c_inv_decrease is not yet implemented.");
+
+        using FFT = decltype( FFT_base_arch() + Direction<fft_direction::inverse>()+ Type<fft_type::c2c>() );  
+        cudaError_t error_code = cudaSuccess;
+        auto workspace = make_workspace<FFT>(error_code);
+
+        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_inv_decrease);
+        // the shared mem is mixed between storage, shuffling and FFT. For this kernel we need to add padding to avoid bank conlicts (N/32)
+        // For decrease methods, the shared_input > shared_output
+        int shared_memory = std::max( FFT::shared_memory_size, (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input/32) * (unsigned int)sizeof(complex_type));
+
+        CheckSharedMemory(shared_memory, device_properties);
+        cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_DECREASE<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+    
+        precheck
+        block_fft_kernel_C2C_DECREASE<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+        ( complex_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
+        postcheck 
         break;
       }
 
@@ -2467,9 +2483,47 @@ LaunchParams FourierTransformer<ComputeType, InputType, OutputType>::SetLaunchPa
         break; // case c2c_inv_none 
 
       case c2c_inv_decrease:
-        MyFFTRunTimeAssertTrue( false, "c2c_inv_decrease is not supported atm.");
-        break;
+
+        switch (transform_dimension)
+        {
+          case 1: {   
+
+            MyFFTRunTimeAssertTrue(false, "1d c2c_inv_decrease not implemented");
+            // MyFFTRunTimeAssertFalse( is_real_valued_input, "1d c2c_fwd_increase is only supported from complex valued input atm.");      
+            
+            // L.gridDims = dim3(1, 1, 1);
+
+            // L.mem_offsets.shared_output = inv_dims_out.w; // If 1d, this is implicitly a complex valued input, s.t. dims_in.x = dims_in.w.) But if fftw_padding is allowed false this may not be true.
+            // L.mem_offsets.pixel_pitch_input = inv_dims_in.w; 
+            // L.mem_offsets.pixel_pitch_output = inv_dims_out.w; 
+
+            break;
+          }
+          case 2: {
+            
+            MyFFTRunTimeAssertTrue( is_real_valued_input, "2d c2c_inv_increase is only supported from real valued input atm.");
+
+            L.gridDims = dim3(1, inv_dims_out.w, 1);
+
+            L.mem_offsets.shared_output = inv_dims_out.y;
+            L.mem_offsets.pixel_pitch_input = inv_dims_out.y;
+            L.mem_offsets.pixel_pitch_output = inv_dims_out.y;
+
+            break;
+          }
+          case 3: {
+            MyFFTRunTimeAssertTrue( false, "3d c2c_inv_decrease is not supported for 3d input atm.");
+
+            break;
+          }
+          default: {
+            MyFFTDebugAssertTrue( false, "Unknown transform dimension");
+          }
+        } // end switch on transform dimension
+        break; // case c2c_inv_increase
+
       case c2c_inv_increase:
+
         switch (transform_dimension)
           {
             case 1: {   
