@@ -764,6 +764,38 @@ struct io
       index += stride;
     }
   } // store_coalesced
+
+
+  static inline __device__ void load_c2c_shared_and_pad(const complex_type*  input,
+                                                        complex_type*       shared_mem) 
+  {
+    const unsigned int stride = stride_size();
+    unsigned int       index  = threadIdx.x + (threadIdx.z*size_of<FFT>::value);
+    for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+    {
+      shared_mem[GetSharedMemPaddedIndex(index)] = input[index];
+      index += stride;
+    }
+    __syncthreads();
+  } // load_r2c_shared_and_pad
+
+  static inline __device__ void store_c2c_reduced(const complex_type* thread_data,
+                                                  complex_type*       output)
+  {
+    // Finally we write out the first size_of<FFT>::values to global
+    const unsigned int stride = stride_size();
+    unsigned int       index  = threadIdx.x + (threadIdx.z*size_of<FFT>::value);
+    for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+    {
+      if (index < size_of<FFT>::value)
+      {
+        // transposed index.
+        output[index] = thread_data[i];
+      }
+    index += stride;
+  }
+
+} // store_r2c_reduced
 //
   static inline __device__ void store_transposed(const complex_type* thread_data,
                                               complex_type*       output,

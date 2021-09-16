@@ -1088,7 +1088,65 @@ void block_fft_kernel_C2C_WithPadding_ConjMul_C2C_SwapRealSpaceQuadrants(const C
 
 } // 
 
-// C2C with Padding
+
+// C2C
+
+template<class FFT, class ComplexType>
+__launch_bounds__(FFT::max_threads_per_block) __global__
+void block_fft_kernel_C2C_NONE(const ComplexType*  __restrict__  input_values, ComplexType*  __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace)
+{
+
+//	// Initialize the shared memory, assuming everyting matches the input data X size in
+  using complex_type = ComplexType;
+
+	extern __shared__  complex_type shared_mem[]; // Storage for the input data that is re-used each blcok
+
+
+	// Memory used by FFT
+  complex_type thread_data[FFT::storage_size];
+
+  // No need to __syncthreads as each thread only accesses its own shared mem anyway
+  io<FFT>::load(&input_values[blockIdx.y*mem_offsets.pixel_pitch_input],  thread_data);
+
+
+	// In the first FFT the modifying twiddle factor is 1 so the data are reeal
+	FFT().execute(thread_data, shared_mem, workspace);
+
+	io<FFT>::store(thread_data ,&output_values[blockIdx.y*mem_offsets.pixel_pitch_output]);
+
+
+} // end of block_fft_kernel_C2C_NONE
+
+// C2C decomposed
+
+template<class FFT, class ComplexType>
+__launch_bounds__(FFT::max_threads_per_block) __global__
+void block_fft_kernel_C2C_DECREASE(const ComplexType* __restrict__  input_values, ComplexType*  __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace)
+{
+  //	// Initialize the shared memory, assuming everyting matches the input data X size in
+  using complex_type = ComplexType;
+
+  extern __shared__  complex_type shared_mem[]; 
+
+  complex_type thread_data[FFT::storage_size];
+
+  // Load in natural order
+  io<FFT>::load_c2c_shared_and_pad(&input_values[blockIdx.y*mem_offsets.pixel_pitch_input], shared_mem);
+
+  // DIT shuffle, bank conflict free
+  io<FFT>::copy_from_shared(shared_mem, thread_data, Q);
+
+  FFT().execute(thread_data, shared_mem, workspace);
+
+  // Full twiddle multiply and store in natural order in shared memory
+  io<FFT>::reduce_block_fft(thread_data, shared_mem, twiddle_in, Q);
+
+  // Reduce from shared memory into registers, ending up with only P valid outputs.
+  io<FFT>::store_c2c_reduced(thread_data, &output_values[blockIdx.y * mem_offsets.pixel_pitch_output]);
+
+
+}
+
 
 template<class FFT, class ComplexType>
 __launch_bounds__(FFT::max_threads_per_block) __global__
@@ -1226,36 +1284,6 @@ void block_fft_kernel_C2C_INCREASE_SwapRealSpaceQuadrants(const ComplexType*  __
 
 
 } // end of block_fft_kernel_C2C_INCREASE_SwapRealSpaceQuadrants
-
-// C2C
-
-template<class FFT, class ComplexType>
-__launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2C_NONE(const ComplexType*  __restrict__  input_values, ComplexType*  __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace)
-{
-
-//	// Initialize the shared memory, assuming everyting matches the input data X size in
-  using complex_type = ComplexType;
-
-	extern __shared__  complex_type shared_mem[]; // Storage for the input data that is re-used each blcok
-
-
-	// Memory used by FFT
-  complex_type thread_data[FFT::storage_size];
-
-  // No need to __syncthreads as each thread only accesses its own shared mem anyway
-  io<FFT>::load(&input_values[blockIdx.y*mem_offsets.pixel_pitch_input],  thread_data);
-
-
-	// In the first FFT the modifying twiddle factor is 1 so the data are reeal
-	FFT().execute(thread_data, shared_mem, workspace);
-
-	io<FFT>::store(thread_data ,&output_values[blockIdx.y*mem_offsets.pixel_pitch_output]);
-
-
-} // end of block_fft_kernel_C2C_NONE
-
-// C2C decomposed
 
 template<class FFT, class ComplexType>
 __global__
@@ -1847,11 +1875,12 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
       }
       
       case r2c_decrease: {
+
         using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() );  
         cudaError_t error_code = cudaSuccess;
         auto workspace = make_workspace<FFT>(error_code);
 
-        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_increase);
+        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_decrease);
         // the shared mem is mixed between storage, shuffling and FFT. For this kernel we need to add padding to avoid bank conlicts (N/32)
         int shared_memory = std::max( FFT::shared_memory_size, (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input/32) * (unsigned int)sizeof(complex_type));
 
@@ -1907,7 +1936,23 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
       }
 
       case c2c_fwd_decrease: {
-        MyFFTRunTimeAssertTrue(false, "c2c_fwd_decrease is not yet implemented.");
+
+        using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() );  
+        cudaError_t error_code = cudaSuccess;
+        auto workspace = make_workspace<FFT>(error_code);
+
+        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_fwd_decrease);
+        // the shared mem is mixed between storage, shuffling and FFT. For this kernel we need to add padding to avoid bank conlicts (N/32)
+        // For decrease methods, the shared_input > shared_output
+        int shared_memory = std::max( FFT::shared_memory_size, (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input/32) * (unsigned int)sizeof(complex_type));
+
+        CheckSharedMemory(shared_memory, device_properties);
+        cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_DECREASE<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+    
+        precheck
+        block_fft_kernel_C2C_DECREASE<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+        ( complex_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
+        postcheck 
         break;
       }
       case c2c_fwd_increase: {
@@ -2335,8 +2380,32 @@ LaunchParams FourierTransformer<ComputeType, InputType, OutputType>::SetLaunchPa
         break; // case c2c_fwd_none 
 
       case c2c_fwd_decrease:
-        MyFFTRunTimeAssertTrue( false, "c2c_fwd_decrease is not supported atm.");
-        break;
+        switch (transform_dimension)
+        {
+          case 1: {  
+            MyFFTRunTimeAssertTrue(false, "1d c2c_fwd_decrease not implemented");
+
+            // // If 1d, this is implicitly a complex valued input, s.t. dims_in.x = dims_in.w.) But if fftw_padding is allowed false this may not be true.
+            // L.gridDims = dim3(transform_size.P, 1, 1);
+            // L.mem_offsets.pixel_pitch_input =  fwd_dims_in.w;
+            // L.mem_offsets.pixel_pitch_output = fwd_dims_out.w;
+
+            break;
+          }
+          case 2: {             
+            L.gridDims = dim3(1, fwd_dims_out.w, 1);
+            L.mem_offsets.pixel_pitch_input =  fwd_dims_in.y;
+            L.mem_offsets.pixel_pitch_output = fwd_dims_out.y;
+
+            break;
+          }
+          case 3: {
+            // Not implemented
+            MyFFTRunTimeAssertTrue(false, "3d c2c_fwd_decrease not implemented");
+            break;
+          }
+        } // end switch on transform dimension
+        break; // case c2c_fwd_none 
 
       case c2c_fwd_increase:
         switch (transform_dimension)
