@@ -142,7 +142,8 @@ public:
 
   short padding_jump_val;
   int   input_memory_allocated;
-  int   output_memory_allocated;
+  int   fwd_output_memory_allocated;
+  int   inv_output_memory_allocated;
   int   compute_memory_allocated;
   int   memory_size_to_copy;
 
@@ -181,9 +182,11 @@ public:
 
   void CopyHostToDevice();
   // By default we are blocking with a stream sync until complete for simplicity. This is overkill and should FIXME.
-  void CopyDeviceToHost(bool free_gpu_memory, bool unpin_host_memory);
+  // If int n_elements_to_copy = 0 the appropriate size will be determined by the state of the transform completed (none, fwd, inv.) 
+  // For partial increase/decrease transforms, needed for testing, this will be invalid, so specify the int n_elements_to_copy.
+  void CopyDeviceToHost(bool free_gpu_memory, bool unpin_host_memory, int n_elements_to_copy = 0);
   // When the size changes, we need a new host pointer
-  void CopyDeviceToHost(OutputType* output_pointer, bool free_gpu_memory = true, bool unpin_host_memory = true);
+  void CopyDeviceToHost(OutputType* output_pointer, bool free_gpu_memory = true, bool unpin_host_memory = true, int n_elements_to_copy = 0);
   // FFT calls
 
   void FwdFFT(bool swap_real_space_quadrants = false, bool transpose_output = true);
@@ -197,7 +200,9 @@ public:
   // For all real valued inputs, assumed for any InputType that is not float2 or __half2
 
   int inline ReturnInputMemorySize() { return input_memory_allocated; }
-  int inline ReturnOutputMemorySize() { return output_memory_allocated; }
+  int inline ReturnFwdOutputMemorySize() { return fwd_output_memory_allocated; }
+  int inline ReturnInvOutputMemorySize() { return inv_output_memory_allocated; }
+
   short4 inline ReturnFwdInputDimensions() { return fwd_dims_in; }
   short4 inline ReturnFwdOutputDimensions() { return fwd_dims_out; }
   short4 inline ReturnInvInputDimensions() { return fwd_dims_in; }

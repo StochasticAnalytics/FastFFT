@@ -50,7 +50,7 @@ void const_image_test(std::vector<int> size)
     // Note: there is no reason we really need this, because the xforms will always be out of place. 
     //       For now, this is just in place because all memory in cisTEM is allocated accordingly.
     host_input.real_memory_allocated = FT.ReturnInputMemorySize();
-    host_output.real_memory_allocated = FT.ReturnOutputMemorySize();
+    host_output.real_memory_allocated = FT.ReturnInvOutputMemorySize();
 
     // On the device, we will always allocate enough memory for the larger of input/output including the buffer array.
     // Minmize the number of calls to malloc which are slow and can lead to fragmentation.
@@ -243,7 +243,7 @@ void unit_impulse_test(std::vector<int>size, bool do_increase_size)
   // Note: there is no reason we really need this, because the xforms will always be out of place. 
   //       For now, this is just in place because all memory in cisTEM is allocated accordingly.
   host_input.real_memory_allocated = FT.ReturnInputMemorySize();
-  host_output.real_memory_allocated = FT.ReturnOutputMemorySize();
+  host_output.real_memory_allocated = FT.ReturnInvOutputMemorySize();
 
 
 
@@ -298,51 +298,70 @@ void unit_impulse_test(std::vector<int>size, bool do_increase_size)
   
   // This method will call the regular FFT kernels given the input/output dimensions are equal when the class is instantiated.
   bool swap_real_space_quadrants = true;
-
   FT.FwdFFT(swap_real_space_quadrants);
-  MyFFTDebugPrintWithDetails(" ");
 
-  // do not deallocate, do not unpin memory
-  FT.CopyDeviceToHost(host_output.real_values, false, false);
-  MyFFTDebugPrintWithDetails(" ");
 
-  // int n=0;
-  // for (int x = 0; x <  host_output.size.y ; x++)
-  // {
-    
-  //   std::cout << x << "[ ";
-  //   for (int y = 0; y < host_output.size.w; y++)
-  //   {  
-  //     std::cout << host_output.complex_values[x + y*host_output.size.y].x << "," << host_output.complex_values[x + y*host_output.size.y].y << " ";
-  //     n++;
-  //     if (n == 32) {n = 0; std::cout << std::endl ;} // line wrapping
-  //   }
-  //   std::cout << "] " << std::endl;
-  //   n = 0;
-  // }
+  int n=0;
+  if (do_increase_size)
+  {
+        // do not deallocate, do not unpin memory
+    FT.CopyDeviceToHost(host_output.real_values, false, false);
+    // FastFFT::PrintVectorType(host_output.size);
+    // for (int x = 0; x <  host_output.size.y ; x++)
+    // {
+      
+    //   std::cout << x << " [ ";
+    //   for (int y = 0; y < host_output.size.w; y++)
+    //   {  
+    //     std::cout << host_output.complex_values[x + y*host_output.size.y].x << "," << host_output.complex_values[x + y*host_output.size.y].y << " ";
+    //     n++;
+    //     if (n == 33) {n = 0; std::cout <<  " ] " <<std::endl ;} // line wrapping
+    //   }
+    //   // std::cout << "] " << std::endl;
+    //   n = 0;
+    // }
 
-  sum = ReturnSumOfComplexAmplitudes(host_output.complex_values, host_output.real_memory_allocated/2); 
-  // std::cout << sum << " " << host_output.real_memory_allocated<< std::endl;
+    sum = ReturnSumOfComplexAmplitudes(host_output.complex_values, host_output.real_memory_allocated/2); 
+    // std::cout << sum << " " << host_output.real_memory_allocated<< std::endl;
+    sum -= (host_output.real_memory_allocated/2 );
+    sum -= host_output.size.y; // for even dimension there is an extra row
+  }
+  else
+  {
+        // do not deallocate, do not unpin memory
+    FT.CopyDeviceToHost(false, false, FT.ReturnInputMemorySize());
+    FastFFT::PrintVectorType(host_input.size);
+    // for (int x = 0; x <  host_input.size.y ; x++)
+    // {
+      
+    //   std::cout << x << " [ ";
+    //   for (int y = 0; y < host_output.size.w; y++)
+    //   {  
+    //     std::cout << host_input.complex_values[x + y*host_input.size.y].x << "," << host_input.complex_values[x + y*host_input.size.y].y << " ";
+    //     n++;
+    //     if (n == 33) {n = 0; std::cout <<  " ] " <<std::endl ;} // line wrapping
+    //   }
+    //   // std::cout << "] " << std::endl;
+    //   n = 0;
+    // } 
+    sum = ReturnSumOfComplexAmplitudes(host_input.complex_values, host_input.real_memory_allocated/2); 
+    std::cout << sum << " " << host_input.real_memory_allocated << std::endl;
+    sum -= (host_input.real_memory_allocated/2 );
+    sum -= host_input.size.y;
+  }
 
-  sum -= (host_output.real_memory_allocated/2 );
-
-  MyFFTDebugPrintWithDetails(" ");
+  std::cout << "sum " << sum << std::endl;
 
   // std::cout << "FFT Unit Impulse Forward FFT: " << sum <<  " epsilon " << host_output.fftw_epsilon << std::endl;
   // std::cout << "epsilon " << abs(sum - host_output.fftw_epsilon) << std::endl;
-  if (abs(sum - host_output.fftw_epsilon) > 1e-8) {all_passed = false; FastFFT_forward_passed[iSize] = false;}
+  if (abs(sum) > 1e-8) {all_passed = false; FastFFT_forward_passed[iSize] = false;}
 
   // MyFFTDebugAssertTestTrue( abs(sum - host_output.fftw_epsilon) < 1e-8, "FastFFT unit impulse forward FFT");
   FT.SetToConstant<float>(host_output.real_values, host_output.real_memory_allocated, 2.0f);
   
-  MyFFTDebugPrintWithDetails(" ");
 
   FT.InvFFT();
-  MyFFTDebugPrintWithDetails(" ");
-
   FT.CopyDeviceToHost(host_output.real_values, true, true);
-  MyFFTDebugPrintWithDetails(" ");
-
   // for (int x = 0; x < 128; x++)
   // {
   //   int n=0;
@@ -354,14 +373,8 @@ void unit_impulse_test(std::vector<int>size, bool do_increase_size)
   //   std::cout << "] " << n << std::endl;
   // }
   // Assuming the outputs are always even dimensions, padding_jump_val is always 2.
-  MyFFTDebugPrintWithDetails(" ");
-
   sum = ReturnSumOfReal(host_output.real_values, dims_out);
-  MyFFTDebugPrintWithDetails("at the end  " + std::to_string(sum));
-  
   if (sum != dims_out.x*dims_out.y*dims_out.z) {all_passed = false; FastFFT_roundTrip_passed[iSize] = false;}
-  MyFFTDebugPrintWithDetails("at the end  " + std::to_string(size[iSize]));
-  MyFFTDebugPrintWithDetails("at the end  " + std::to_string(size[oSize]));
 
   // MyFFTDebugAssertTestTrue( sum == dims_out.x*dims_out.y*dims_out.z,"FastFFT unit impulse round trip FFT");
     oSize++;
@@ -432,13 +445,13 @@ void compare_libraries(short4 input_size, short4 output_size)
 
 
   FT_input.real_memory_allocated = FT.ReturnInputMemorySize();
-  FT_output.real_memory_allocated = FT.ReturnOutputMemorySize();
+  FT_output.real_memory_allocated = FT.ReturnInvOutputMemorySize();
   
   cuFFT_input.real_memory_allocated = cuFFT.ReturnInputMemorySize();
-  cuFFT_output.real_memory_allocated = cuFFT.ReturnOutputMemorySize();
+  cuFFT_output.real_memory_allocated = cuFFT.ReturnInvOutputMemorySize();
 
   target_search_image.real_memory_allocated = targetFT.ReturnInputMemorySize();
-  positive_control.real_memory_allocated = targetFT.ReturnOutputMemorySize();
+  positive_control.real_memory_allocated = targetFT.ReturnInvOutputMemorySize();
 
 
   bool set_fftw_plan = false;
@@ -740,10 +753,10 @@ void run_oned(std::vector<int> size)
     FT_complex.SetInverseFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, FastFFT::FourierTransformer<float, float2 ,float2>::OriginType::natural);
 
     FT_input.real_memory_allocated = FT.ReturnInputMemorySize();
-    FT_output.real_memory_allocated = FT.ReturnOutputMemorySize();
+    FT_output.real_memory_allocated = FT.ReturnInvOutputMemorySize();
 
     FT_input_complex.real_memory_allocated = FT_complex.ReturnInputMemorySize();
-    FT_output_complex.real_memory_allocated = FT_complex.ReturnOutputMemorySize();
+    FT_output_complex.real_memory_allocated = FT_complex.ReturnInvOutputMemorySize();
     std::cout << "Allocated " << FT_input_complex.real_memory_allocated << " bytes for input.\n";
     std::cout << "Allocated complex " << FT_output_complex.real_memory_allocated << " bytes for input.\n";
 
@@ -855,8 +868,8 @@ int main(int argc, char** argv) {
     // exit(0);
 
 
-    const_image_test(test_size);
-    unit_impulse_test(test_size, true);
+    // const_image_test(test_size);
+    // unit_impulse_test(test_size, true);
     unit_impulse_test(test_size, false);
 
 

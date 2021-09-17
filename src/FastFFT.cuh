@@ -108,11 +108,11 @@ namespace FastFFT {
   static constexpr const int ubank_padded = ubank_size + 1;
   __device__ __forceinline__ int GetSharedMemPaddedIndex(const int index)
   {
-    return ( index % bank_size ) + ( index / bank_size * bank_padded );
+    return ( index % bank_size ) + ( (index / bank_size) * bank_padded );
   }
   __device__ __forceinline__ int GetSharedMemPaddedIndex(const unsigned int index)
   {
-    return ( index % ubank_size ) + ( index / ubank_size * ubank_padded );
+    return ( index % ubank_size ) + ( (index / ubank_size) * ubank_padded );
   }
 
   // Complex a * conj b multiplication
@@ -435,7 +435,7 @@ struct io
     for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
     {
       shared_mem[GetSharedMemPaddedIndex(index)] = complex_type(input[index], 0.f);
-      index += stride;
+      index += stride; 
     }
     __syncthreads();
   } // load_r2c_shared_and_pad
@@ -451,7 +451,7 @@ struct io
       thread_data[i] = shared_mem[GetSharedMemPaddedIndex(index)];
       index += stride;
     }
-    __syncthreads();
+    __syncthreads(); // FFT().execute is setup to reuse the shared mem, so we need to sync here. Optionally, we could allocate more shared mem and remove this sync
   } // copy_from_shared
 
   // Note that unlike most functions in this file, this one does not have a
@@ -469,9 +469,9 @@ struct io
     // while also updating with the full size twiddle factor.
     for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
     {
-      // (threadIdx.x * threadIdx.z) == ( k * n2 )
-      SINCOS( twiddle_in * (threadIdx.x * threadIdx.z) ,&twiddle.y,&twiddle.x);
-      thread_data[i] *= twiddle;
+      // ( index * threadIdx.z) == ( k % P * n2 )
+      SINCOS( twiddle_in * (index * threadIdx.z) ,&twiddle.y,&twiddle.x);
+      // thread_data[i] *= twiddle;
       shared_mem[GetSharedMemPaddedIndex(index)] = thread_data[i];
       index += stride;
     }
@@ -486,7 +486,7 @@ struct io
       {
         for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
         {
-          thread_data[i] += shared_mem[threadIdx.x + (i*stride) + (index/2 * size_of<FFT>::value)];
+          thread_data[i] += shared_mem[GetSharedMemPaddedIndex(threadIdx.x + (i*stride) + (index/2 * size_of<FFT>::value))];
         }
       } // end if condition
       // All threads can reach this point
@@ -496,22 +496,25 @@ struct io
 
   static inline __device__ void store_r2c_reduced(const complex_type* thread_data,
                                                   complex_type*       output,
-                                                  const int           pixel_pitch,
-                                                  const int           memory_limit)
+                                                  const unsigned int           pixel_pitch,
+                                                  const unsigned int           memory_limit)
   {
-    // Finally we write out the first size_of<FFT>::values to global
-    const unsigned int stride = stride_size();
-    unsigned int       index  = threadIdx.x + (threadIdx.z*size_of<FFT>::value);
-    for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+    if (threadIdx.z == 0)
     {
-      if (index < memory_limit)
+      // Finally we write out the first size_of<FFT>::values to global
+      const unsigned int stride = stride_size();
+      unsigned int       index  = threadIdx.x;
+      for (unsigned int i = 0; i <= FFT::elements_per_thread / 2  ; i++) 
       {
-        // transposed index.
-        output[index*pixel_pitch + blockIdx.y] = thread_data[i];
-      }
-      index += stride;
-    }
-    
+        if (index < memory_limit)
+        {
+          // transposed index.
+          output[index*pixel_pitch + blockIdx.y] = thread_data[i];  
+        }
+        index += stride;
+      }    
+
+    } // if on first sub fft (threadIdx.z == 0)
   } // store_r2c_reduced
 
   // when using load_shared || load_r2c_shared, we need then copy from shared mem into the registers.
@@ -804,7 +807,7 @@ struct io
       index += stride;
     }
     __syncthreads();
-  } // load_r2c_shared_and_pad
+  } // load_c2c_shared_and_pad
 
   static inline __device__ void store_c2c_reduced(const complex_type* thread_data,
                                                   complex_type*       output)

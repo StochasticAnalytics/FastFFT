@@ -37,16 +37,9 @@ FourierTransformer<ComputeType, InputType, OutputType>::FourierTransformer()
 template <class ComputeType, class InputType, class OutputType>
 FourierTransformer<ComputeType, InputType, OutputType>::~FourierTransformer() 
 {
-  MyFFTDebugPrintWithDetails("FourierTransformer destructor");
   Deallocate();
-  MyFFTDebugPrintWithDetails("FourierTransformer destructor");
-
-  // UnPinHostMemory();
-  MyFFTDebugPrintWithDetails("FourierTransformer destructor");
-
+  UnPinHostMemory();
   SetDefaults();
-  MyFFTDebugPrintWithDetails("FourierTransformer destructor");
-
 }
 
 template <class ComputeType, class InputType, class OutputType>
@@ -93,21 +86,13 @@ void FourierTransformer<ComputeType, InputType, OutputType>::Deallocate()
 template <class ComputeType, class InputType, class OutputType>
 void FourierTransformer<ComputeType, InputType, OutputType>::UnPinHostMemory()
 {
-  
-  MyFFTDebugPrintWithDetails("Unpin");
   if (is_host_memory_pinned)
 	{
-    MyFFTDebugPrintWithDetails("Unpin");
-
     precheck
 		cudaErr(cudaHostUnregister(host_pointer));
     postcheck
-    MyFFTDebugPrintWithDetails("Unpin");
-
 		is_host_memory_pinned = false;
 	} 
-  MyFFTDebugPrintWithDetails("Unpin");
-
 }
 
 
@@ -134,7 +119,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetForwardFFTPlan(s
 
   // ReturnPaddedMemorySize also sets FFTW padding etc.
   input_memory_allocated = ReturnPaddedMemorySize(fwd_dims_in);
-  ReturnPaddedMemorySize(fwd_dims_out); // sets .w and also increases compute_memory_allocated if needed. 
+  fwd_output_memory_allocated = ReturnPaddedMemorySize(fwd_dims_out); // sets .w and also increases compute_memory_allocated if needed. 
 
   // The compute memory allocated is the max of all possible sizes.
 
@@ -158,7 +143,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetInverseFFTPlan(s
   inv_dims_out = make_short4(output_logical_x_dimension, output_logical_y_dimension, output_logical_z_dimension,0);
 
   ReturnPaddedMemorySize(inv_dims_in); // sets .w and also increases compute_memory_allocated if needed. 
-  output_memory_allocated = ReturnPaddedMemorySize(inv_dims_out);
+  inv_output_memory_allocated = ReturnPaddedMemorySize(inv_dims_out);
   // The compute memory allocated is the max of all possible sizes.
 
   this->output_origin_type = output_origin_type;
@@ -254,14 +239,13 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CopyHostToDevice()
 }
 
 template <class ComputeType, class InputType, class OutputType>
-void FourierTransformer<ComputeType, InputType, OutputType>::CopyDeviceToHost( bool free_gpu_memory, bool unpin_host_memory)
+void FourierTransformer<ComputeType, InputType, OutputType>::CopyDeviceToHost( bool free_gpu_memory, bool unpin_host_memory, int n_elements_to_copy)
 {
  
   SetDimensions(CopyToHost);  
-	MyFFTDebugAssertTrue(is_in_memory_device_pointer, "GPU memory not allocated");
+  if (n_elements_to_copy != 0) memory_size_to_copy = n_elements_to_copy;
 
-  MyFFTDebugPrintWithDetails("");
-  PrintState();
+	MyFFTDebugAssertTrue(is_in_memory_device_pointer, "GPU memory not allocated");
 
   ComputeType* copy_pointer;
   if (is_in_buffer_memory) copy_pointer = d_ptr.position_space_buffer;
@@ -283,68 +267,47 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CopyDeviceToHost( b
 }
 
 template <class ComputeType, class InputType, class OutputType>
-void FourierTransformer<ComputeType, InputType, OutputType>::CopyDeviceToHost(OutputType* output_pointer, bool free_gpu_memory, bool unpin_host_memory)
+void FourierTransformer<ComputeType, InputType, OutputType>::CopyDeviceToHost(OutputType* output_pointer, bool free_gpu_memory, bool unpin_host_memory, int n_elements_to_copy)
 {
-       MyFFTDebugPrintWithDetails(" ");
-
+ 
   SetDimensions(CopyToHost);
-  MyFFTDebugPrintWithDetails(" ");
+  if (n_elements_to_copy != 0) memory_size_to_copy = n_elements_to_copy;
 
 	MyFFTDebugAssertTrue(is_in_memory_device_pointer, "GPU memory not allocated");
-  MyFFTDebugPrintWithDetails("");
-  PrintState();
   // Assuming the output is not pinned, TODO change to optionally maintain as host_input as well.
   OutputType* tmpPinnedPtr;
   precheck
   // FIXME this is assuming output type is the same as compute type.
   cudaErr(cudaHostRegister(output_pointer, sizeof(OutputType)*memory_size_to_copy, cudaHostRegisterDefault));
   postcheck
-  MyFFTDebugPrintWithDetails("");
-
+  
   precheck
   cudaErr(cudaHostGetDevicePointer( &tmpPinnedPtr, output_pointer, 0));
   postcheck
-  MyFFTDebugPrintWithDetails("");
-
   if (is_in_buffer_memory)
   {
-    MyFFTDebugPrintWithDetails("");
-
     precheck
     cudaErr(cudaMemcpyAsync(tmpPinnedPtr, d_ptr.position_space_buffer, memory_size_to_copy*sizeof(OutputType),cudaMemcpyDeviceToHost,cudaStreamPerThread));
     postcheck
-    MyFFTDebugPrintWithDetails("");
-
   }
   else
   {
-    MyFFTDebugPrintWithDetails("");
-
     precheck
     cudaErr(cudaMemcpyAsync(tmpPinnedPtr, d_ptr.position_space, memory_size_to_copy*sizeof(OutputType),cudaMemcpyDeviceToHost,cudaStreamPerThread));
     postcheck
-    MyFFTDebugPrintWithDetails("");
-
   }
-  MyFFTDebugPrintWithDetails("");
 
 
   // Just set true her for now
   bool should_block_until_complete = true;
   if (should_block_until_complete) cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
-  MyFFTDebugPrintWithDetails("");
 
   precheck
   cudaErr(cudaHostUnregister(tmpPinnedPtr));
   postcheck
-  MyFFTDebugPrintWithDetails("");
 
 	if (free_gpu_memory) { Deallocate();}
-  MyFFTDebugPrintWithDetails("");
-
   if (unpin_host_memory) { UnPinHostMemory();}
-  MyFFTDebugPrintWithDetails("");
-
 
 }
 
@@ -427,15 +390,12 @@ void FourierTransformer<ComputeType, InputType, OutputType>::FwdFFT(bool swap_re
           break;
         }
         case decrease: {
-          MyFFTDebugPrintWithDetails("");
-          PrintState();
+\
           SetPrecisionAndExectutionMethod(r2c_decrease);
-          MyFFTDebugPrintWithDetails("");
-          PrintState();
+
           transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
           SetPrecisionAndExectutionMethod(c2c_fwd_decrease); 
-          MyFFTDebugPrintWithDetails("");
-          PrintState();
+ 
           break;
         }
       }
@@ -513,15 +473,9 @@ void FourierTransformer<ComputeType, InputType, OutputType>::InvFFT(bool transpo
           }
           else
           {
-            MyFFTDebugPrintWithDetails("");
-            PrintState();
             SetPrecisionAndExectutionMethod(c2c_inv_none);
-            MyFFTDebugPrintWithDetails("");
-            PrintState();
             transform_stage_completed = TransformStageCompleted::inv; // technically not complete, needed for copy on validation of partial fft.
             SetPrecisionAndExectutionMethod(c2r_none);
-            MyFFTDebugPrintWithDetails("");
-            PrintState();
 
           }          
           // // FFT_C2C(false);
@@ -811,11 +765,11 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetDimensions(Dimen
           break;
         }
         case fwd: {
-          memory_size_to_copy = compute_memory_allocated/2;
+          memory_size_to_copy = fwd_output_memory_allocated; 
           break;
         }
         case inv: {
-          memory_size_to_copy = output_memory_allocated;
+          memory_size_to_copy = inv_output_memory_allocated;
           break;
         }
       } // switch transform_stage_completed
@@ -1025,7 +979,7 @@ void block_fft_kernel_R2C_DECREASE(const ScalarType* __restrict__  input_values,
 
   // Reduce from shared memory into registers, ending up with only P valid outputs.
   io<FFT>::store_r2c_reduced(thread_data, output_values, mem_offsets.pixel_pitch_output, mem_offsets.shared_output);
-	
+
 
 } // end of block_fft_kernel_R2C_DECREASE
 
@@ -1964,8 +1918,9 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         int shared_memory = std::max( FFT::shared_memory_size, (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input/32) * (unsigned int)sizeof(complex_type));
 
         CheckSharedMemory(shared_memory, device_properties);
-        cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_R2C_DECREASE<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
-    
+        cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_R2C_DECREASE<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));  
+
+
         precheck
         block_fft_kernel_R2C_DECREASE<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
         ( scalar_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
@@ -2458,8 +2413,13 @@ LaunchParams FourierTransformer<ComputeType, InputType, OutputType>::SetLaunchPa
   if (IsR2CType(kernel_type)) {
     L.gridDims = dim3(1, fwd_dims_in.y, 1); 
     L.mem_offsets.pixel_pitch_input = fwd_dims_in.w*2; // scalar type, natural 
+
     if (transform_dimension == 1) { L.mem_offsets.pixel_pitch_output = fwd_dims_out.w; }
-    else { L.mem_offsets.pixel_pitch_output = fwd_dims_out.y; }
+    else 
+    { 
+      if (size_change_type == decrease) L.mem_offsets.pixel_pitch_output = fwd_dims_in.y;
+      else L.mem_offsets.pixel_pitch_output = fwd_dims_out.y;
+    }
   } 
   else if (IsC2RType(kernel_type)) {
     L.gridDims = dim3(1, inv_dims_out.y, 1);
