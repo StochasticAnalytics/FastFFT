@@ -193,12 +193,10 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CopyHostToDevice()
   SetDimensions(CopyFromHost);
 	MyFFTDebugAssertTrue(is_in_memory_host_pointer, "Host memory not allocated");
 
-  // MyFFTDebugPrintWithDetails("Copying host to device");
   // MyFFTPrint(std::to_string(output_memory_allocated) + " bytes of host memory to device");
   // FIXME switch to stream ordered malloc
 	if ( ! is_in_memory_device_pointer )
 	{
-
     // Allocate enough for the out of place buffer as well.
     // MyFFTDebugPrintWithDetails("Allocating device memory for input pointer");
     precheck
@@ -221,17 +219,13 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CopyHostToDevice()
       d_ptr.position_space_buffer = &d_ptr.position_space[buffer_address]; // compute 
       d_ptr.momentum_space_buffer = (float2 *)d_ptr.position_space_buffer;
     }
-
-
  
 		is_in_memory_device_pointer = true;
 	}
 
-
   precheck
   cudaErr(cudaMemcpyAsync(d_ptr.position_space, pinnedPtr, memory_size_to_copy * sizeof(InputType),cudaMemcpyDeviceToHost,cudaStreamPerThread));
   postcheck
-
   // TODO r/n assuming InputType is _half, _half2, float, or _float2 (real, complex, real, complex) need to handle other types and convert
   bool should_block_until_complete = true; // FIXME after switching to stream ordered malloc this will not be needed.
 	if (should_block_until_complete) cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
@@ -522,7 +516,6 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CrossCorrelate(floa
 
   // Set the member pointer to the passed pointer
   d_ptr.image_to_search = image_to_search;
-
   switch (transform_dimension)
   {
     case 1: {
@@ -530,6 +523,8 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CrossCorrelate(floa
       break;
     }
     case 2: {
+      MyFFTPrintWithDetails("");
+
       switch (fwd_size_change_type)
       {
         case no_change: {
@@ -540,6 +535,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CrossCorrelate(floa
           // FFT_C2R_decomposed(true);
         }
         case increase: {
+
           SetDimensions(FwdTransform);
           SetPrecisionAndExectutionMethod(r2c_increase,   true);
           switch (inv_size_change_type)
@@ -565,7 +561,10 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CrossCorrelate(floa
 
               break;
             }
-          }
+            default: {
+              MyFFTRunTimeAssertTrue(false, "Invalid size change type");
+            }
+          } // switch on inv size change type
     
           // FFT_R2C_WithPadding();   
           // FFT_C2C_WithPadding_ConjMul_C2C(image_to_search, swap_real_space_quadrants);  
@@ -573,10 +572,36 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CrossCorrelate(floa
           break;
         }
         case decrease: {
-          MyFFTRunTimeAssertTrue(false, "2D FFT Cross correlation without size decrease not yet supported");
+          SetDimensions(FwdTransform);
+          SetPrecisionAndExectutionMethod(r2c_decrease,   true);
+          switch (inv_size_change_type)
+          {
+            case no_change: {
+              SetPrecisionAndExectutionMethod(xcorr_transposed, true);
+              SetPrecisionAndExectutionMethod(c2r_none,   false); // TODO the output could be smaller
+              transform_stage_completed = TransformStageCompleted::inv;
+              break;
+            }
+            case increase: {
+
+              MyFFTRunTimeAssertTrue(false, "2D FFT Cross correlation with fwd and inv size increase is not supported");
+              break;
+            }
+            case decrease: {
+
+              MyFFTRunTimeAssertTrue(false, "2D FFT Cross correlation with fwd decrease and inv size decrease is a work in progress");
+              break;
+            }
+            default: {
+              MyFFTRunTimeAssertTrue(false, "Invalid size change type");
+            }
           break;
         }
-      }
+        default: {
+          MyFFTRunTimeAssertTrue(false, "Invalid size change type");
+        }
+      } // switch on fwd size change type
+
       break; // case 2
     }
     case 3: {
@@ -682,7 +707,11 @@ void FourierTransformer<ComputeType, InputType, OutputType>::ValidateDimensions(
   }
   else if (fwd_dims_out.x < fwd_dims_in.x || fwd_dims_out.y < fwd_dims_in.y || fwd_dims_out.z < fwd_dims_in.z)
   {
-    MyFFTRunTimeAssertTrue( false, "Trimming (subset of output points) is yet to be implemented.");
+    // For now we must pad in all dimensions, this is not needed and should be lifted. FIXME
+    MyFFTDebugAssertTrue(fwd_dims_out.x <= fwd_dims_in.x, "If padding, all dimensions must be <=, x out > x in");
+    MyFFTDebugAssertTrue(fwd_dims_out.y <= fwd_dims_in.y, "If padding, all dimensions must be <=, y out > y in");
+    MyFFTDebugAssertTrue(fwd_dims_out.z <= fwd_dims_in.z, "If padding, all dimensions must be <=, z out > z in");
+
     fwd_size_change_type = decrease;
   }
   else if (fwd_dims_out.x == fwd_dims_in.x && fwd_dims_out.y == fwd_dims_in.y && fwd_dims_out.z == fwd_dims_in.z)

@@ -404,321 +404,373 @@ void unit_impulse_test(std::vector<int>size, bool do_increase_size)
 
 }
 
-void compare_libraries(short4 input_size, short4 output_size)
+void compare_libraries(std::vector<int>size, int size_change_type)
 {
 
   bool skip_cufft_for_profiling = false;
   bool set_padding_callback = false; // the padding callback is slower than pasting in b/c the read size of the pointers is larger than the actual data. do not use.
   bool set_conjMult_callback = true;
-  if (input_size.x == output_size.x && input_size.y == output_size.y && input_size.z == output_size.z) 
+  bool is_size_change_decrease = false;
+
+  if (size_change_type < 0) { is_size_change_decrease = true; }
+
+  short4 input_size;
+  short4 output_size;
+  for (int iSize = 0; iSize < size.size() - 1 ; iSize++)
   {
-    // Also will change the path called in FastFFT to just be fwd/inv xform.
-    set_conjMult_callback = false;
-  }
-
-  bool test_passed = true;
-  long address = 0;
-
-  float sum;
-  float2 sum_complex;
-
-  Image< float, float2 > FT_input(input_size);
-  Image< float, float2 > FT_output(output_size);
-  Image< float, float2 > cuFFT_input(input_size);
-  Image< float, float2 > cuFFT_output(output_size);
-
-  Image< float, float2> target_search_image(output_size);
-  Image< float, float2> positive_control(output_size);
-
-
-   // We just make one instance of the FourierTransformer class, with calc type float.
-  // For the time being input and output are also float. TODO calc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
-  FastFFT::FourierTransformer<float, float, float> FT;
-    // Create an instance to copy memory also for the cufft tests.
-  FastFFT::FourierTransformer<float, float, float> cuFFT;
-  FastFFT::FourierTransformer<float, float, float> targetFT;
-
-  // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
-  FT.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, output_size.x,output_size.y,output_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-  FT.SetInverseFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-  cuFFT.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, output_size.x,output_size.y,output_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-  cuFFT.SetInverseFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-  
-  targetFT.SetForwardFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-  targetFT.SetInverseFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-
-
-  FT_input.real_memory_allocated = FT.ReturnInputMemorySize();
-  FT_output.real_memory_allocated = FT.ReturnInvOutputMemorySize();
-  
-  cuFFT_input.real_memory_allocated = cuFFT.ReturnInputMemorySize();
-  cuFFT_output.real_memory_allocated = cuFFT.ReturnInvOutputMemorySize();
-
-  target_search_image.real_memory_allocated = targetFT.ReturnInputMemorySize();
-  positive_control.real_memory_allocated = targetFT.ReturnInvOutputMemorySize();
-
-
-  bool set_fftw_plan = false;
-  FT_input.Allocate(set_fftw_plan);
-  FT_output.Allocate(set_fftw_plan);
-
-  cuFFT_input.Allocate(set_fftw_plan);
-  cuFFT_output.Allocate(set_fftw_plan);
-
-  target_search_image.Allocate(true);
-  positive_control.Allocate(true);
-
-
-  // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
-  // ensures faster transfer. If false, it will be pinned for you.
-  FT.SetInputPointer(FT_input.real_values, false);
-  cuFFT.SetInputPointer(cuFFT_input.real_values, false);
-  targetFT.SetInputPointer(target_search_image.real_values, false);
-
-  // Set a unit impulse at the center of the input array.
-  FT.SetToConstant<float>(FT_input.real_values, FT_input.real_memory_allocated, 0.0f);
-  FT.SetToConstant<float>(cuFFT_input.real_values, cuFFT_input.real_memory_allocated, 0.0f);
-  FT.SetToConstant<float>(FT_output.real_values, FT_input.real_memory_allocated, 0.0f);
-  FT.SetToConstant<float>(cuFFT_output.real_values, cuFFT_input.real_memory_allocated, 0.0f);
-  FT.SetToConstant<float>(target_search_image.real_values, target_search_image.real_memory_allocated, 0.0f);
-  FT.SetToConstant<float>(positive_control.real_values, target_search_image.real_memory_allocated, 0.0f);
-
-
-  // Place these values at the origin of the image and after convolution, should be at 0,0,0.
-  float testVal_1 = 2.0f;
-  float testVal_2 = 3.0f;
-  FT_input.real_values[0] = testVal_1;
-  cuFFT_input.real_values[0] = testVal_1;
-  target_search_image.real_values[0] = testVal_2;//target_search_image.size.w*2*target_search_image.size.y/2 + target_search_image.size.x/2] = testVal_2;
-  positive_control.real_values[0] = testVal_1;//target_search_image.size.w*2*target_search_image.size.y/2 + target_search_image.size.x/2] = testVal_1;
-
-  // Transform the target on the host prior to transfer.
-  target_search_image.FwdFFT();
-
-  // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
-  FT.CopyHostToDevice();
-  cuFFT.CopyHostToDevice();
-  targetFT.CopyHostToDevice();
-  // Wait on the transfers to finish.
-  cudaErr(cudaStreamSynchronize(cudaStreamPerThread));  
-
-  // Positive control on the host.
-  positive_control.FwdFFT();
-  positive_control.MultiplyConjugateImage(target_search_image.complex_values);
-  positive_control.InvFFT();
-
-
-  // address = 0;
-  // test_passed = true;
-  // for (int z = 1; z <  positive_control.size.z ; z++)
-  // {   
-  //   for (int y = 1; y < positive_control.size.y; y++)
-  //   {  
-  //     for (int x = 1; x < positive_control.size.x; x++)
-  //     {
-  //       if (positive_control.real_values[address] != 0.0f) test_passed = false;
-  //     }
-  //   }
-  // }
-  // if (test_passed) 
-  // {
-  //   if (positive_control.real_values[address] == positive_control.size.x*positive_control.size.y*positive_control.size.z*testVal_1*testVal_2)
-  //   {
-  //     std::cout << "Test passed for FFTW positive control.\n" << std::endl;
-  //   }
-  //   else
-  //   {
-  //     std::cout << "Test failed for FFTW positive control. Value at zero is  " << positive_control.real_values[address] << std::endl;
-  //   }
-  // }
-  // else
-  // {
-  //   std::cout << "Test failed for positive control, non-zero values found away from the origin." << std::endl;
-  // }
-
-
-  cuFFT_output.create_timing_events(); 
-  cuFFT_input.MakeCufftPlan();
-  cuFFT_output.MakeCufftPlan();
-
-  //////////////////////////////////////////
-  //////////////////////////////////////////
-  // Warm up and check for accuracy
-  if (set_conjMult_callback)
-  {
-    FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
-  }
-  else
-  {
-    FT.FwdFFT();
-    FT.InvFFT();
-  }
-  FT.CopyDeviceToHost(FT_output.real_values,false, false);
-
-  // address = 0;
-  // test_passed = true;
-  // for (int z = 1; z <  FT_output.size.z ; z++)
-  // {   
-  //   for (int y = 1; y < FT_output.size.y; y++)
-  //   {  
-  //     for (int x = 1; x < FT_output.size.x; x++)
-  //     {
-  //       if (FT_output.real_values[address] != 0.0f) test_passed = false;
-  //     }
-  //   }
-  // }
-  // if (test_passed) 
-  // {
-  //   if (FT_output.real_values[address] == FT_output.size.x*FT_output.size.y*FT_output.size.z*testVal_1*testVal_2)
-  //   {
-  //     std::cout << "Test passed for FastFFT positive control.\n" << std::endl;
-  //   }
-  //   else
-  //   {
-  //     std::cout << "Test failed for FastFFT positive control. Value at zero is  " << FT_output.real_values[address] << std::endl;
-  //   }
-  // }
-  // else
-  // {
-  //   std::cout << "Test failed for FastFFT control, non-zero values found away from the origin." << std::endl;
-  // }
-
-  //////////////////////////////////////////
-  // //////////////////////////////////////////
-  // int n = 0;
-  // for (int x = 0; x <  FT_output.size.x ; x++)
-  // {
-    
-  //   std::cout << x << "[ ";
-  //   for (int y = 0; y < FT_output.size.y; y++)
-  //   {  
-  //     std::cout << FT_output.real_values[x + y*FT_output.size.w*2] << " ";
-  //     n++;
-  //     if (n == 32) {n = 0; std::cout << std::endl ;} // line wrapping
-  //   }
-  //   std::cout << "] " << std::endl;
-  //   n = 0;
-  // }
-
-
-  const int n_loops = 3000;
-  cuFFT_output.record_start();
-  for (int i = 0; i < n_loops; ++i)
-  {
-    if (set_conjMult_callback)
+    int oSize = iSize + 1;
+    while (oSize < size.size())
     {
-      FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
-    }
-    else
-    {
-      FT.FwdFFT();
-      FT.InvFFT();
-    }
-  }
-  cuFFT_output.record_stop();
-  cuFFT_output.synchronize();
-  cuFFT_output.print_time("FastFFT");
-  float FastFFT_time = cuFFT_output.elapsed_gpu_ms;
 
-  if (set_padding_callback) 
-  {
-    precheck
-    cufftReal* overlap_pointer;
-    overlap_pointer = cuFFT.d_ptr.position_space;
-    cuFFT_output.SetClipIntoCallback(overlap_pointer, cuFFT_input.size.x, cuFFT_input.size.y, cuFFT_input.size.w*2);
-    postcheck
-  }
+      if (is_size_change_decrease)
+      {
+        output_size = make_short4(size[iSize],size[iSize],1,0);
+        input_size  = make_short4(size[oSize],size[oSize],1,0);  
+      }
+      else
+      {
+        input_size  = make_short4(size[iSize],size[iSize],1,0);
+        output_size = make_short4(size[oSize],size[oSize],1,0);  
 
-  if (set_conjMult_callback)
-  {
-    precheck
-    // FIXME scaling factor
-    cuFFT_output.SetComplexConjMultiplyAndLoadCallBack( (cufftComplex *) targetFT.d_ptr.momentum_space_buffer, 1.0f);
-    postcheck
-  }
+      }
+      std::cout << std::endl << "Testing padding from  " << input_size.x << " to " << output_size.x << std::endl;
 
 
-  if (! skip_cufft_for_profiling)
-  {
-  //////////////////////////////////////////
-  //////////////////////////////////////////
-  // Warm up and check for accuracy
-  cuFFT.ClipIntoTopLeft();
-  // cuFFT.ClipIntoReal(cuFFT_output.size.x/2, cuFFT_output.size.y/2, cuFFT_output.size.z/2);
 
-  cuFFT.CopyDeviceToHost(cuFFT_output.real_values,false, false);
-  // cuFFT.ClipIntoReal(input_size.x/2, input_size.y/2, input_size.z/2);
-  precheck
-  cudaErr(cufftExecR2C(cuFFT_output.cuda_plan_forward, (cufftReal*)cuFFT.d_ptr.position_space, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer));
-  postcheck
-  precheck
-  cudaErr(cufftExecC2R(cuFFT_output.cuda_plan_inverse, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer, (cufftReal*)cuFFT.d_ptr.position_space));
-  postcheck  
-  cuFFT.CopyDeviceToHost(cuFFT_output.real_values,false, false);
+      if ( is_size_change_decrease || ( input_size.x == output_size.x && input_size.y == output_size.y && input_size.z == output_size.z ) )
+      {
+        // Also will change the path called in FastFFT to just be fwd/inv xform.
+        set_conjMult_callback = false;
+      }
 
-  // address = 0;
-  // test_passed = true;
-  // for (int z = 1; z <  cuFFT_output.size.z ; z++)
-  // {   
-  //   for (int y = 1; y < cuFFT_output.size.y; y++)
-  //   {  
-  //     for (int x = 1; x < cuFFT_output.size.x; x++)
-  //     {
-  //       if (cuFFT_output.real_values[address] != 0.0f) test_passed = false;
-  //     }
-  //   }
-  // }
-  // if (test_passed) 
-  // {
-  //   if (cuFFT_output.real_values[address] == cuFFT_output.size.x*cuFFT_output.size.y*cuFFT_output.size.z*testVal_1*testVal_2)
-  //   {
-  //     std::cout << "Test passed for cuFFT positive control.\n" << std::endl;
-  //   }
-  //   else
-  //   {
-  //     std::cout << "Test failed for cuFFT positive control. Value at zero is  " << cuFFT_output.real_values[address] << std::endl;
-  //   }
-  // }
-  // else
-  // {
-  //   std::cout << "Test failed for cuFFT control, non-zero values found away from the origin." << std::endl;
-  // }
-  //////////////////////////////////////////
-  //////////////////////////////////////////
-  // n = 0;
-  // for (int x = 0; x <  cuFFT_output.size.x ; x++)
-  // {
+      bool test_passed = true;
+      long address = 0;
+
+      float sum;
+      float2 sum_complex;
+
+      Image< float, float2 > FT_input(input_size);
+      Image< float, float2 > FT_output(output_size);
+      Image< float, float2 > cuFFT_input(input_size);
+      Image< float, float2 > cuFFT_output(output_size);
+
+      short4 target_size;
+
+      if (is_size_change_decrease) target_size = input_size;
+      else target_size = output_size;
     
-  //   std::cout << x << "[ ";
-  //   for (int y = 0; y < cuFFT_output.size.y; y++)
-  //   {  
-  //     std::cout << cuFFT_output.real_values[x + y*cuFFT_output.size.w*2] << " ";
-  //     n++;
-  //     if (n == 32) {n = 0; std::cout << std::endl ;} // line wrapping
-  //   }
-  //   std::cout << "] " << std::endl;
-  //   n = 0;
-  // }
+      Image< float, float2> target_search_image(target_size);
+      Image< float, float2> positive_control(target_size);
 
-  cuFFT_output.record_start();
-  for (int i = 0; i < n_loops; ++i)
-  {
-    if (set_conjMult_callback) cuFFT.ClipIntoTopLeft();
-    // cuFFT.ClipIntoReal(input_size.x/2, input_size.y/2, input_size.z/2);
+  
 
-    precheck
-    cudaErr(cufftExecR2C(cuFFT_output.cuda_plan_forward, (cufftReal*)cuFFT.d_ptr.position_space, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer));
-    postcheck
 
-    precheck
-    cudaErr(cufftExecC2R(cuFFT_output.cuda_plan_inverse, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer, (cufftReal*)cuFFT.d_ptr.position_space));
-    postcheck
-  }
-  cuFFT_output.record_stop();
-  cuFFT_output.synchronize();
-  cuFFT_output.print_time("cuFFT");
-} // end of if (! skip_cufft_for_profiling)
-  std::cout << "Ratio cuFFT/FastFFT : " << cuFFT_output.elapsed_gpu_ms/FastFFT_time << std::endl;
+      // We just make one instance of the FourierTransformer class, with calc type float.
+      // For the time being input and output are also float. TODO calc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
+      FastFFT::FourierTransformer<float, float, float> FT;
+        // Create an instance to copy memory also for the cufft tests.
+      FastFFT::FourierTransformer<float, float, float> cuFFT;
+      FastFFT::FourierTransformer<float, float, float> targetFT;
+
+      // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
+      FT.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, output_size.x,output_size.y,output_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+      FT.SetInverseFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+      cuFFT.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, output_size.x,output_size.y,output_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+      cuFFT.SetInverseFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+      
+      targetFT.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, output_size.x,output_size.y,output_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+      targetFT.SetInverseFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+
+
+      FT_input.real_memory_allocated = FT.ReturnInputMemorySize();
+      FT_output.real_memory_allocated = FT.ReturnInvOutputMemorySize();
+      
+      cuFFT_input.real_memory_allocated = cuFFT.ReturnInputMemorySize();
+      cuFFT_output.real_memory_allocated = cuFFT.ReturnInvOutputMemorySize();
+
+      std::cout  <<"FT, Cufft in/out, real memory allocated " << FT_input.real_memory_allocated << " " << cuFFT_input.real_memory_allocated << " " << FT_output.real_memory_allocated << " " << cuFFT_output.real_memory_allocated << std::endl;
+
+      if (is_size_change_decrease) target_search_image.real_memory_allocated = targetFT.ReturnInputMemorySize();
+      else target_search_image.real_memory_allocated = targetFT.ReturnInvOutputMemorySize(); // the larger of the two.
+
+      positive_control.real_memory_allocated = target_search_image.real_memory_allocated; // this won't change size
+
+      std::cout << "target and positive in/out, real memory allocate " << target_search_image.real_memory_allocated << " " << positive_control.real_memory_allocated << std::endl;
+
+      bool set_fftw_plan = false;
+      FT_input.Allocate(set_fftw_plan);
+      FT_output.Allocate(set_fftw_plan);
+
+      cuFFT_input.Allocate(set_fftw_plan);
+      cuFFT_output.Allocate(set_fftw_plan);
+
+      target_search_image.Allocate(true);
+      positive_control.Allocate(true);
+
+
+      // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
+      // ensures faster transfer. If false, it will be pinned for you.
+      FT.SetInputPointer(FT_input.real_values, false);
+      cuFFT.SetInputPointer(cuFFT_input.real_values, false);
+      targetFT.SetInputPointer(target_search_image.real_values, false);
+
+      // Set a unit impulse at the center of the input array.
+      FT.SetToConstant<float>(FT_input.real_values, FT_input.real_memory_allocated, 0.0f);
+      FT.SetToConstant<float>(cuFFT_input.real_values, cuFFT_input.real_memory_allocated, 0.0f);
+      FT.SetToConstant<float>(FT_output.real_values, FT_output.real_memory_allocated, 0.0f);
+      FT.SetToConstant<float>(cuFFT_output.real_values, cuFFT_output.real_memory_allocated, 0.0f);
+      FT.SetToConstant<float>(target_search_image.real_values, target_search_image.real_memory_allocated, 0.0f);
+      FT.SetToConstant<float>(positive_control.real_values, target_search_image.real_memory_allocated, 0.0f);
+
+
+      // Place these values at the origin of the image and after convolution, should be at 0,0,0.
+      float testVal_1 = 2.0f;
+      float testVal_2 = 3.0f;
+      FT_input.real_values[0] = testVal_1;
+      cuFFT_input.real_values[0] = testVal_1;
+      target_search_image.real_values[0] = testVal_2;//target_search_image.size.w*2*target_search_image.size.y/2 + target_search_image.size.x/2] = testVal_2;
+      positive_control.real_values[0] = testVal_1;//target_search_image.size.w*2*target_search_image.size.y/2 + target_search_image.size.x/2] = testVal_1;
+      
+
+      // Transform the target on the host prior to transfer.
+      target_search_image.FwdFFT();
+      
+      // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
+      FT.CopyHostToDevice();
+      
+
+      cuFFT.CopyHostToDevice();
+      
+
+      targetFT.CopyHostToDevice();
+      
+
+      // Wait on the transfers to finish.
+      cudaErr(cudaStreamSynchronize(cudaStreamPerThread));  
+
+      // Positive control on the host.
+      positive_control.FwdFFT();
+      positive_control.MultiplyConjugateImage(target_search_image.complex_values);
+      positive_control.InvFFT();
+
+
+      // address = 0;
+      // test_passed = true;
+      // for (int z = 1; z <  positive_control.size.z ; z++)
+      // {   
+      //   for (int y = 1; y < positive_control.size.y; y++)
+      //   {  
+      //     for (int x = 1; x < positive_control.size.x; x++)
+      //     {
+      //       if (positive_control.real_values[address] != 0.0f) test_passed = false;
+      //     }
+      //   }
+      // }
+      // if (test_passed) 
+      // {
+      //   if (positive_control.real_values[address] == positive_control.size.x*positive_control.size.y*positive_control.size.z*testVal_1*testVal_2)
+      //   {
+      //     std::cout << "Test passed for FFTW positive control.\n" << std::endl;
+      //   }
+      //   else
+      //   {
+      //     std::cout << "Test failed for FFTW positive control. Value at zero is  " << positive_control.real_values[address] << std::endl;
+      //   }
+      // }
+      // else
+      // {
+      //   std::cout << "Test failed for positive control, non-zero values found away from the origin." << std::endl;
+      // }
+
+
+      cuFFT_output.create_timing_events(); 
+      cuFFT_input.MakeCufftPlan();
+      cuFFT_output.MakeCufftPlan();
+
+      //////////////////////////////////////////
+      //////////////////////////////////////////
+      // Warm up and check for accuracy
+      if (set_conjMult_callback || is_size_change_decrease ) // we set set_conjMult_callback = false 
+      {
+        FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
+      }
+      else
+      {
+        FT.FwdFFT();
+        FT.InvFFT();
+      }
+
+      FT.CopyDeviceToHost(FT_output.real_values,false, false);
+
+      // address = 0;
+      // test_passed = true;
+      // for (int z = 1; z <  FT_output.size.z ; z++)
+      // {   
+      //   for (int y = 1; y < FT_output.size.y; y++)
+      //   {  
+      //     for (int x = 1; x < FT_output.size.x; x++)
+      //     {
+      //       if (FT_output.real_values[address] != 0.0f) test_passed = false;
+      //     }
+      //   }
+      // }
+      // if (test_passed) 
+      // {
+      //   if (FT_output.real_values[address] == FT_output.size.x*FT_output.size.y*FT_output.size.z*testVal_1*testVal_2)
+      //   {
+      //     std::cout << "Test passed for FastFFT positive control.\n" << std::endl;
+      //   }
+      //   else
+      //   {
+      //     std::cout << "Test failed for FastFFT positive control. Value at zero is  " << FT_output.real_values[address] << std::endl;
+      //   }
+      // }
+      // else
+      // {
+      //   std::cout << "Test failed for FastFFT control, non-zero values found away from the origin." << std::endl;
+      // }
+
+      //////////////////////////////////////////
+      // //////////////////////////////////////////
+      // int n = 0;
+      // for (int x = 0; x <  FT_output.size.x ; x++)
+      // {
+        
+      //   std::cout << x << "[ ";
+      //   for (int y = 0; y < FT_output.size.y; y++)
+      //   {  
+      //     std::cout << FT_output.real_values[x + y*FT_output.size.w*2] << " ";
+      //     n++;
+      //     if (n == 32) {n = 0; std::cout << std::endl ;} // line wrapping
+      //   }
+      //   std::cout << "] " << std::endl;
+      //   n = 0;
+      // }
+
+
+      const int n_loops = 3000;
+      cuFFT_output.record_start();
+      for (int i = 0; i < n_loops; ++i)
+      {
+        if (set_conjMult_callback)
+        {
+          FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
+        }
+        else
+        {
+          FT.FwdFFT();
+          FT.InvFFT();
+        }
+      }
+      cuFFT_output.record_stop();
+      cuFFT_output.synchronize();
+      cuFFT_output.print_time("FastFFT");
+      float FastFFT_time = cuFFT_output.elapsed_gpu_ms;
+
+      if (set_padding_callback) 
+      {
+        precheck
+        cufftReal* overlap_pointer;
+        overlap_pointer = cuFFT.d_ptr.position_space;
+        cuFFT_output.SetClipIntoCallback(overlap_pointer, cuFFT_input.size.x, cuFFT_input.size.y, cuFFT_input.size.w*2);
+        postcheck
+      }
+
+      if (set_conjMult_callback)
+      {
+        precheck
+        // FIXME scaling factor
+        cuFFT_output.SetComplexConjMultiplyAndLoadCallBack( (cufftComplex *) targetFT.d_ptr.momentum_space_buffer, 1.0f);
+        postcheck
+      }
+
+
+      if (! skip_cufft_for_profiling)
+      {
+        //////////////////////////////////////////
+        //////////////////////////////////////////
+        // Warm up and check for accuracy
+        cuFFT.ClipIntoTopLeft();
+        // cuFFT.ClipIntoReal(cuFFT_output.size.x/2, cuFFT_output.size.y/2, cuFFT_output.size.z/2);
+
+        cuFFT.CopyDeviceToHost(cuFFT_output.real_values,false, false);
+        // cuFFT.ClipIntoReal(input_size.x/2, input_size.y/2, input_size.z/2);
+        precheck
+        cudaErr(cufftExecR2C(cuFFT_output.cuda_plan_forward, (cufftReal*)cuFFT.d_ptr.position_space, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer));
+        postcheck
+        precheck
+        cudaErr(cufftExecC2R(cuFFT_output.cuda_plan_inverse, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer, (cufftReal*)cuFFT.d_ptr.position_space));
+        postcheck  
+        cuFFT.CopyDeviceToHost(cuFFT_output.real_values,false, false);
+
+        // address = 0;
+        // test_passed = true;
+        // for (int z = 1; z <  cuFFT_output.size.z ; z++)
+        // {   
+        //   for (int y = 1; y < cuFFT_output.size.y; y++)
+        //   {  
+        //     for (int x = 1; x < cuFFT_output.size.x; x++)
+        //     {
+        //       if (cuFFT_output.real_values[address] != 0.0f) test_passed = false;
+        //     }
+        //   }
+        // }
+        // if (test_passed) 
+        // {
+        //   if (cuFFT_output.real_values[address] == cuFFT_output.size.x*cuFFT_output.size.y*cuFFT_output.size.z*testVal_1*testVal_2)
+        //   {
+        //     std::cout << "Test passed for cuFFT positive control.\n" << std::endl;
+        //   }
+        //   else
+        //   {
+        //     std::cout << "Test failed for cuFFT positive control. Value at zero is  " << cuFFT_output.real_values[address] << std::endl;
+        //   }
+        // }
+        // else
+        // {
+        //   std::cout << "Test failed for cuFFT control, non-zero values found away from the origin." << std::endl;
+        // }
+        //////////////////////////////////////////
+        //////////////////////////////////////////
+        // n = 0;
+        // for (int x = 0; x <  cuFFT_output.size.x ; x++)
+        // {
+          
+        //   std::cout << x << "[ ";
+        //   for (int y = 0; y < cuFFT_output.size.y; y++)
+        //   {  
+        //     std::cout << cuFFT_output.real_values[x + y*cuFFT_output.size.w*2] << " ";
+        //     n++;
+        //     if (n == 32) {n = 0; std::cout << std::endl ;} // line wrapping
+        //   }
+        //   std::cout << "] " << std::endl;
+        //   n = 0;
+        // }
+
+        cuFFT_output.record_start();
+        for (int i = 0; i < n_loops; ++i)
+        {
+          if (set_conjMult_callback) cuFFT.ClipIntoTopLeft();
+          // cuFFT.ClipIntoReal(input_size.x/2, input_size.y/2, input_size.z/2);
+
+          precheck
+          cudaErr(cufftExecR2C(cuFFT_output.cuda_plan_forward, (cufftReal*)cuFFT.d_ptr.position_space, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer));
+          postcheck
+
+          precheck
+          cudaErr(cufftExecC2R(cuFFT_output.cuda_plan_inverse, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer, (cufftReal*)cuFFT.d_ptr.position_space));
+          postcheck
+        }
+        cuFFT_output.record_stop();
+        cuFFT_output.synchronize();
+        cuFFT_output.print_time("cuFFT");
+      } // end of if (! skip_cufft_for_profiling)
+      std::cout << "For size " << input_size.x << " to "<< output_size.x << ": " << std::endl;
+      std::cout << "Ratio cuFFT/FastFFT : " << cuFFT_output.elapsed_gpu_ms/FastFFT_time << std::endl;
+
+      oSize++;
+      } // while loop over pad to size
+  } // for loop over pad from size
 
 }
 
@@ -888,30 +940,17 @@ int main(int argc, char** argv) {
       // exit(1);
     #endif
 
-    for (int iSize = 0; iSize < test_size.size(); iSize++) {
+    int size_change_type = 0; // no change
 
-      // std::cout << std::endl << "Testing cufft comparison " << test_size[iSize] << " x" << std::endl;
-      input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
-      output_size = make_short4(test_size[iSize],test_size[iSize],1,0);
+    // compare_libraries(test_size, size_change_type);
 
-      compare_libraries(input_size, output_size);
+    // size_change_type = 1; // increase
+    // compare_libraries(test_size, size_change_type);
 
-    }
-   
-    for (int iSize = 0; iSize < test_size.size() - 1; iSize++) {
-      int oSize = iSize + 1;
-      while (oSize < test_size.size())
-      {
-        // std::cout << std::endl << "Testing padding from  " << test_size[iSize] << " to " << test_size[oSize] << std::endl;
-        input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
-        output_size = make_short4(test_size[oSize],test_size[oSize],1,0);
-    
-        // compare_libraries(input_size, output_size);
-        compare_libraries(output_size,input_size );
+    size_change_type = -1; // decrease
+    compare_libraries(test_size, size_change_type);
 
-        oSize++;
-      }
-    }
+
   }
   return 0;
 }
