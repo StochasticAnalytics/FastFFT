@@ -395,7 +395,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::FwdFFT(bool swap_re
           SetPrecisionAndExectutionMethod(r2c_decrease);
 
           transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
-          // SetPrecisionAndExectutionMethod(c2c_fwd_decrease); 
+          SetPrecisionAndExectutionMethod(c2c_fwd_decrease); 
  
           break;
         }
@@ -977,6 +977,7 @@ void block_fft_kernel_R2C_DECREASE(const ScalarType* __restrict__  input_values,
   // segment the shared memory it accesses to avoid conflicts.
   constexpr const unsigned int fft_shared_mem_num_elements = FFT::shared_memory_size / sizeof(complex_type);
   FFT().execute(thread_data, &shared_mem[fft_shared_mem_num_elements * threadIdx.z], workspace);
+  __syncthreads();
 
   // Full twiddle multiply and store in natural order in shared memory
   io<FFT>::reduce_block_fft(thread_data, shared_mem, twiddle_in, Q);
@@ -1141,7 +1142,9 @@ void block_fft_kernel_C2C_DECREASE(const ComplexType* __restrict__  input_values
   // DIT shuffle, bank conflict free
   io<FFT>::copy_from_shared(shared_mem, thread_data, Q);
 
-  FFT().execute(thread_data, shared_mem, workspace);
+  constexpr const unsigned int fft_shared_mem_num_elements = FFT::shared_memory_size / sizeof(complex_type);
+  FFT().execute(thread_data, &shared_mem[fft_shared_mem_num_elements * threadIdx.z], workspace);
+  __syncthreads();
 
   // Full twiddle multiply and store in natural order in shared memory
   io<FFT>::reduce_block_fft(thread_data, shared_mem, twiddle_in, Q);
@@ -1981,7 +1984,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_fwd_decrease);
         // the shared mem is mixed between storage, shuffling and FFT. For this kernel we need to add padding to avoid bank conlicts (N/32)
         // For decrease methods, the shared_input > shared_output
-        int shared_memory = std::max( FFT::shared_memory_size, (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input/32) * (unsigned int)sizeof(complex_type));
+        int shared_memory = std::max( FFT::shared_memory_size * LP.threadsPerBlock.z, (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input/32) * (unsigned int)sizeof(complex_type));
 
         CheckSharedMemory(shared_memory, device_properties);
         cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_DECREASE<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
@@ -2072,7 +2075,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_inv_decrease);
         // the shared mem is mixed between storage, shuffling and FFT. For this kernel we need to add padding to avoid bank conlicts (N/32)
         // For decrease methods, the shared_input > shared_output
-        int shared_memory = std::max( FFT::shared_memory_size, (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input/32) * (unsigned int)sizeof(complex_type));
+        int shared_memory = std::max( FFT::shared_memory_size * LP.threadsPerBlock.z, (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input/32) * (unsigned int)sizeof(complex_type));
 
         CheckSharedMemory(shared_memory, device_properties);
         cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_DECREASE<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        

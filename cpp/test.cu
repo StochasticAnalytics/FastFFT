@@ -215,8 +215,8 @@ void unit_impulse_test(std::vector<int>size, bool do_increase_size)
         input_size  = make_short4(size[oSize],size[oSize],1,0);  
       }
 
-  FastFFT::PrintVectorType(input_size);
-  FastFFT::PrintVectorType(output_size);
+  // FastFFT::PrintVectorType(input_size);
+  // FastFFT::PrintVectorType(output_size);
   bool test_passed = true;
   long address = 0;
 
@@ -301,8 +301,8 @@ void unit_impulse_test(std::vector<int>size, bool do_increase_size)
   FT.FwdFFT(swap_real_space_quadrants);
 
   int n=0;
-  if (do_increase_size)
-  {
+  // if (do_increase_size)
+  // {
         // do not deallocate, do not unpin memory
     FT.CopyDeviceToHost(host_output.real_values, false, false);
     // FastFFT::PrintVectorType(host_output.size);
@@ -323,34 +323,39 @@ void unit_impulse_test(std::vector<int>size, bool do_increase_size)
     sum = ReturnSumOfComplexAmplitudes(host_output.complex_values, host_output.real_memory_allocated/2); 
     // std::cout << sum << " " << host_output.real_memory_allocated<< std::endl;
     sum -= (host_output.real_memory_allocated/2 );
-    sum -= host_output.size.y; // for even dimension there is an extra row
-  }
-  else
-  {
-        // do not deallocate, do not unpin memory
-    FT.CopyDeviceToHost(false, false, FT.ReturnInputMemorySize());
-    FastFFT::PrintVectorType(host_input.size);
-    for (int x = 0; x <  host_input.size.y ; x++)
-    {
+    // sum -= host_output.size.y; // for even dimension there is an extra row
+  // }
+  // else
+  // {
+  //   // Fixme, this is only for size change decrease when half the xform is done.
+  //       // do not deallocate, do not unpin memory
+  //   FT.CopyDeviceToHost(false, false, FT.ReturnInputMemorySize());
+  //   FastFFT::PrintVectorType(host_input.size);
+  //   for (int x = 0; x <  host_input.size.y ; x++)
+  //   {
       
-      std::cout << x << " [ ";
-      for (int y = 0; y < host_output.size.w; y++)
-      {  
-        std::cout << host_input.complex_values[x + y*host_input.size.y].x << "," << host_input.complex_values[x + y*host_input.size.y].y << " ";
-        n++;
-        if (n == 33) {n = 0; std::cout <<  " ] " <<std::endl ;} // line wrapping
-      }
-      std::cout << "] " << std::endl;
-      n = 0;
-    } 
-    sum = ReturnSumOfComplexAmplitudes(host_input.complex_values, host_input.real_memory_allocated/2); 
-    std::printf("sum is %f, mem is %i\n", sum ,host_input.real_memory_allocated);
-    sum -= (host_input.real_memory_allocated/2 );
-    sum -= host_input.size.y;
-  }
+  //     std::cout << x << " [ ";
+  //     for (int y = 0; y < host_output.size.w; y++)
+  //     {  
+  //       std::cout << host_input.complex_values[x + y*host_input.size.y].x << "," << host_input.complex_values[x + y*host_input.size.y].y << " ";
+  //       n++;
+  //       if (n == 33) {n = 0; std::cout <<  " ] " <<std::endl ;} // line wrapping
+  //     }
+  //     std::cout << "] " << std::endl;
+  //     n = 0;
+  //   } 
+  //   // sum = ReturnSumOfComplexAmplitudes(host_input.complex_values, host_input.real_memory_allocated/2); 
+  //   // std::printf("sum is %f, mem is %i\n", sum ,host_input.real_memory_allocated);
+  //   // sum -= (host_input.real_memory_allocated/2 );
+  //   // sum -= host_input.size.y;
 
-  std::cout << "sum " << sum << std::endl;
-  if (host_input.size.x == 256) exit(0);
+  //   sum = ReturnSumOfComplexAmplitudes(host_output.complex_values, host_output.real_memory_allocated/2); 
+  //   // std::cout << sum << " " << host_output.real_memory_allocated<< std::endl;
+  //   sum -= (host_output.real_memory_allocated/2 );
+  //   sum -= host_output.size.y; // for even dimension there is an extra row
+  // }
+
+  // std::cout << "sum " << sum << std::endl;
   // std::cout << "FFT Unit Impulse Forward FFT: " << sum <<  " epsilon " << host_output.fftw_epsilon << std::endl;
   // std::cout << "epsilon " << abs(sum - host_output.fftw_epsilon) << std::endl;
   if (abs(sum) > 1e-8) {all_passed = false; FastFFT_forward_passed[iSize] = false;}
@@ -901,7 +906,9 @@ int main(int argc, char** argv) {
         input_size = make_short4(test_size[iSize],test_size[iSize],1,0);
         output_size = make_short4(test_size[oSize],test_size[oSize],1,0);
     
-        compare_libraries(input_size, output_size);
+        // compare_libraries(input_size, output_size);
+        compare_libraries(output_size,input_size );
+
         oSize++;
       }
     }
