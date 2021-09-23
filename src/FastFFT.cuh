@@ -10,7 +10,7 @@
 // When defined Turns on synchronization based checking for all FFT kernels as well as cudaErr macros
 #define HEAVYERRORCHECKING_FFT 
 // Various levels of debuging conditions and prints
-#define FFT_DEBUG_LEVEL 3
+#define FFT_DEBUG_LEVEL 4
 
 #if FFT_DEBUG_LEVEL < 1
 
@@ -104,8 +104,8 @@ namespace FastFFT {
 
   static constexpr const int bank_size = 32;
   static constexpr const int bank_padded = bank_size + 1;
-  static constexpr const int ubank_size = 32;
-  static constexpr const int ubank_padded = ubank_size + 1;
+  static constexpr const unsigned int ubank_size = 32;
+  static constexpr const unsigned int ubank_padded = ubank_size + 1;
   __device__ __forceinline__ int GetSharedMemPaddedIndex(const int index)
   {
     return ( index % bank_size ) + ( (index / bank_size) * bank_padded );
@@ -444,7 +444,7 @@ struct io
                                                  complex_type*        thread_data,
                                                  const unsigned int   Q) 
   {
-    const unsigned int stride = stride_size();
+    const unsigned int stride = stride_size() * Q; // I think the Q is needed, but double check me TODO
     unsigned int       index  = (threadIdx.x * Q) + threadIdx.z;
     for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
     {
@@ -471,7 +471,7 @@ struct io
     {
       // ( index * threadIdx.z) == ( k % P * n2 )
       SINCOS( twiddle_in * (index * threadIdx.z) ,&twiddle.y,&twiddle.x);
-      // thread_data[i] *= twiddle;
+      thread_data[i] *= twiddle;
       shared_mem[GetSharedMemPaddedIndex(index)] = thread_data[i];
       index += stride;
     }
@@ -555,7 +555,6 @@ struct io
       index += stride;
     }
   } // copy_from_shared
-
   static inline __device__ void store_r2c_transposed(const complex_type* thread_data,
                                                      complex_type*       output,
                                                      int                 pixel_pitch) 

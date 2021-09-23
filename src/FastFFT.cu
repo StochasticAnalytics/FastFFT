@@ -244,7 +244,8 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CopyDeviceToHost( b
  
   SetDimensions(CopyToHost);  
   if (n_elements_to_copy != 0) memory_size_to_copy = n_elements_to_copy;
-
+  PrintState();
+  std::cout << "N elements " << n_elements_to_copy << std::endl;
 	MyFFTDebugAssertTrue(is_in_memory_device_pointer, "GPU memory not allocated");
 
   ComputeType* copy_pointer;
@@ -390,11 +391,11 @@ void FourierTransformer<ComputeType, InputType, OutputType>::FwdFFT(bool swap_re
           break;
         }
         case decrease: {
-\
+
           SetPrecisionAndExectutionMethod(r2c_decrease);
 
           transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
-          SetPrecisionAndExectutionMethod(c2c_fwd_decrease); 
+          // SetPrecisionAndExectutionMethod(c2c_fwd_decrease); 
  
           break;
         }
@@ -972,14 +973,16 @@ void block_fft_kernel_R2C_DECREASE(const ScalarType* __restrict__  input_values,
   // DIT shuffle, bank conflict free
   io<FFT>::copy_from_shared(shared_mem, thread_data, Q);
 
-  FFT().execute(thread_data, shared_mem, workspace);
+  // The FFT operator has no idea we are using threadIdx.z to get multiple sub transforms, so we need to 
+  // segment the shared memory it accesses to avoid conflicts.
+  constexpr const unsigned int fft_shared_mem_num_elements = FFT::shared_memory_size / sizeof(complex_type);
+  FFT().execute(thread_data, &shared_mem[fft_shared_mem_num_elements * threadIdx.z], workspace);
 
   // Full twiddle multiply and store in natural order in shared memory
   io<FFT>::reduce_block_fft(thread_data, shared_mem, twiddle_in, Q);
 
   // Reduce from shared memory into registers, ending up with only P valid outputs.
   io<FFT>::store_r2c_reduced(thread_data, output_values, mem_offsets.pixel_pitch_output, mem_offsets.shared_output);
-
 
 } // end of block_fft_kernel_R2C_DECREASE
 
@@ -1915,12 +1918,12 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_decrease);
 
         // the shared mem is mixed between storage, shuffling and FFT. For this kernel we need to add padding to avoid bank conlicts (N/32)
-        int shared_memory = std::max( FFT::shared_memory_size, (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input/32) * (unsigned int)sizeof(complex_type));
+        int shared_memory = std::max( FFT::shared_memory_size * LP.threadsPerBlock.z, (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input/32) * (unsigned int)sizeof(complex_type));
 
         CheckSharedMemory(shared_memory, device_properties);
         cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_R2C_DECREASE<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));  
 
-
+        
         precheck
         block_fft_kernel_R2C_DECREASE<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
         ( scalar_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
