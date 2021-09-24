@@ -526,7 +526,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CrossCorrelate(floa
       MyFFTPrintWithDetails("");
 
       switch (fwd_size_change_type)
-      {
+    {
         case no_change: {
           MyFFTRunTimeAssertTrue(false, "2D FFT Cross correlation without size change not yet supported");
           break;
@@ -541,7 +541,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CrossCorrelate(floa
           switch (inv_size_change_type)
           {
             case no_change: {
-              SetPrecisionAndExectutionMethod(xcorr_transposed, true);
+              SetPrecisionAndExectutionMethod(xcorr_increase, true);
               SetPrecisionAndExectutionMethod(c2r_none,   false); // TODO the output could be smaller
               transform_stage_completed = TransformStageCompleted::inv;
 
@@ -567,7 +567,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CrossCorrelate(floa
           } // switch on inv size change type
     
           // FFT_R2C_WithPadding();   
-          // FFT_C2C_WithPadding_ConjMul_C2C(image_to_search, swap_real_space_quadrants);  
+          // FFT_C2C_INCREASE_ConjMul_C2C(image_to_search, swap_real_space_quadrants);  
           // FFT_C2R_Transposed();
           break;
         }
@@ -577,7 +577,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CrossCorrelate(floa
           switch (inv_size_change_type)
           {
             case no_change: {
-              SetPrecisionAndExectutionMethod(xcorr_transposed, true);
+              SetPrecisionAndExectutionMethod(xcorr_increase, true);
               SetPrecisionAndExectutionMethod(c2r_none,   false); // TODO the output could be smaller
               transform_stage_completed = TransformStageCompleted::inv;
               break;
@@ -593,14 +593,16 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CrossCorrelate(floa
               break;
             }
             default: {
-              MyFFTRunTimeAssertTrue(false, "Invalid size change type");
+              MyFFTRunTimeAssertTrue(false, "Invalid inv size change type");
             }
           break;
         }
         default: {
-          MyFFTRunTimeAssertTrue(false, "Invalid size change type");
+          MyFFTRunTimeAssertTrue(false, "Invalid fwd size change type");
         }
-      } // switch on fwd size change type
+        break;
+      } // case decrease
+    } // switch on fwd size change type
 
       break; // case 2
     }
@@ -640,7 +642,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CrossCorrelate(__ha
           switch (inv_size_change_type)
           {
             case no_change: {
-              SetPrecisionAndExectutionMethod(xcorr_transposed, true);
+              SetPrecisionAndExectutionMethod(xcorr_increase, true);
               SetPrecisionAndExectutionMethod(c2r_none,   false); // TODO the output could be smaller
               transform_stage_completed = TransformStageCompleted::inv;
 
@@ -1055,7 +1057,7 @@ void thread_fft_kernel_C2C_decomposed_ConjMul(const ComplexType* __restrict__ im
 
 template<class FFT, class invFFT, class ComplexType>
 __launch_bounds__(invFFT::max_threads_per_block) __global__
-void block_fft_kernel_C2C_WithPadding_ConjMul_C2C(const ComplexType* __restrict__ image_to_search, const ComplexType*  __restrict__ input_values, ComplexType*  __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv)
+void block_fft_kernel_C2C_INCREASE_ConjMul_C2C(const ComplexType* __restrict__ image_to_search, const ComplexType*  __restrict__ input_values, ComplexType*  __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv)
 {
 
 //	// Initialize the shared memory, assuming everyting matches the input data X size in
@@ -1081,11 +1083,11 @@ void block_fft_kernel_C2C_WithPadding_ConjMul_C2C(const ComplexType* __restrict_
 
 
 
-} // end of block_fft_kernel_C2C_WithPadding_ConjMul_C2C
+} // end of block_fft_kernel_C2C_INCREASE_ConjMul_C2C
 
 template<class FFT, class invFFT, class ComplexType>
 __launch_bounds__(invFFT::max_threads_per_block) __global__
-void block_fft_kernel_C2C_WithPadding_ConjMul_C2C_SwapRealSpaceQuadrants(const ComplexType* __restrict__ image_to_search, const ComplexType*  __restrict__ input_values, ComplexType*  __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv)
+void block_fft_kernel_C2C_INCREASE_ConjMul_C2C_SwapRealSpaceQuadrants(const ComplexType* __restrict__ image_to_search, const ComplexType*  __restrict__ input_values, ComplexType*  __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv)
 {
 
 //	// Initialize the shared memory, assuming everyting matches the input data X size in
@@ -1856,10 +1858,10 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
       if (swap_real_space_quadrants)
       {
         MyFFTRunTimeAssertTrue(false, "decomposed xcorr with swap real space quadrants is not implemented.");
-        cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_WithPadding_ConjMul_C2C_SwapRealSpaceQuadrants<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+        cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_INCREASE_ConjMul_C2C_SwapRealSpaceQuadrants<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
 
         // precheck
-        // block_fft_kernel_C2C_WithPadding_ConjMul_C2C_SwapRealSpaceQuadrants<FFT,invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+        // block_fft_kernel_C2C_INCREASE_ConjMul_C2C_SwapRealSpaceQuadrants<FFT,invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
         // ( (complex_type*) image_to_search, (complex_type*)  d_ptr.momentum_space_buffer,  (complex_type*) d_ptr.momentum_space, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace_fwd, workspace_inv);
         // postcheck
       }
@@ -2170,12 +2172,12 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         break;
       }
 
-      case xcorr_transposed: {
+      case xcorr_increase: {
   
         using FFT    = decltype( FFT_base_arch() + Type<fft_type::c2c>() + Direction<fft_direction::forward>() ); 
         using invFFT = decltype( FFT_base_arch() + Type<fft_type::c2c>() + Direction<fft_direction::inverse>() ); 
           
-        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, xcorr_transposed);
+        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, xcorr_increase);
   
         cudaError_t error_code = cudaSuccess;
         auto workspace_fwd = make_workspace<FFT>(error_code); // presumably larger of the two
@@ -2194,19 +2196,19 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         bool swap_real_space_quadrants = false;   
         if (swap_real_space_quadrants)
         {
-          cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_WithPadding_ConjMul_C2C_SwapRealSpaceQuadrants<FFT,invFFT, complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+          cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_INCREASE_ConjMul_C2C_SwapRealSpaceQuadrants<FFT,invFFT, complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
 
           precheck
-          block_fft_kernel_C2C_WithPadding_ConjMul_C2C_SwapRealSpaceQuadrants<FFT,invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+          block_fft_kernel_C2C_INCREASE_ConjMul_C2C_SwapRealSpaceQuadrants<FFT,invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
           ( (complex_type *)d_ptr.image_to_search, complex_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace_fwd, workspace_inv);
           postcheck
         }
         else
         {
-          cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_WithPadding_ConjMul_C2C<FFT, invFFT, complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+          cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_INCREASE_ConjMul_C2C<FFT, invFFT, complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
 
           precheck
-          block_fft_kernel_C2C_WithPadding_ConjMul_C2C<FFT, invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+          block_fft_kernel_C2C_INCREASE_ConjMul_C2C<FFT, invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
           ( (complex_type *)d_ptr.image_to_search, complex_input, complex_output , LP.mem_offsets, LP.twiddle_in,LP.Q, workspace_fwd, workspace_inv);
           postcheck
         }
@@ -2247,7 +2249,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::GetTransformSize(Ke
     case r2c_increase:
       AssertDivisibleAndFactorOf2( fwd_dims_out.x, fwd_dims_in.x );
       break;        
-    case xcorr_transposed:
+    case xcorr_increase:
       AssertDivisibleAndFactorOf2( fwd_dims_out.y, fwd_dims_out.y ); // FIXME
       break;
 
@@ -2687,8 +2689,8 @@ LaunchParams FourierTransformer<ComputeType, InputType, OutputType>::SetLaunchPa
       
 
     
-      case xcorr_transposed:
-        MyFFTRunTimeAssertFalse(transform_dimension == 1 || transform_dimension == 3, "xcorr_transposed is not supported for 1d/3d yet." );
+      case xcorr_increase:
+        MyFFTRunTimeAssertFalse(transform_dimension == 1 || transform_dimension == 3, "xcorr_increase is not supported for 1d/3d yet." );
   
       // Cross correlation case
       // The added complexity, in instructions and shared memory usage outweigh the cost of just running the full length C2C on the forward.

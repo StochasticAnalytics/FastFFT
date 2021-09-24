@@ -350,7 +350,7 @@ private:
                     c2r_decomposed, 
                     c2r_decomposed_transposed, 
                     c2r_none, c2r_decrease, c2r_increase,
-                    xcorr_transposed, 
+                    xcorr_increase, 
                     xcorr_decomposed }; // Used to specify the origin of the data
   // WARNING this is flimsy and prone to breaking, you must ensure the order matches the KernelType enum.
   std::vector<std::string> 
@@ -363,7 +363,7 @@ private:
                     "c2r_decomposed", 
                     "c2r_decomposed_transposed", 
                     "c2r_none", "c2r_decrease", "c2r_increase",
-                    "xcorr_transposed", 
+                    "xcorr_increase", 
                     "xcorr_decomposed" };
 
   inline bool IsThreadType(KernelType kernel_type)
@@ -379,7 +379,7 @@ private:
              kernel_type == c2c_fwd_none || kernel_type == c2c_fwd_decrease || kernel_type == c2c_fwd_increase ||
              kernel_type == c2c_inv_none || kernel_type == c2c_inv_decrease || kernel_type == c2c_inv_increase ||
              kernel_type == c2r_none || kernel_type == c2r_decrease || kernel_type == c2r_increase ||
-             kernel_type == xcorr_transposed )
+             kernel_type == xcorr_increase )
     { 
       return false;
     }

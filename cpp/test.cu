@@ -167,7 +167,7 @@ void const_image_test(std::vector<int> size)
     // } 
     if (sum != powf(dims_in.x*dims_in.y*dims_in.z,2)) {all_passed = false; FastFFT_roundTrip_passed[n] = false;}
     // MyFFTDebugAssertTestTrue( sum == powf(dims_in.x*dims_in.y*dims_in.z,2),"FastFFT constant image round trip failed for size");
-  }
+  } // loop over sizes
   
   if (all_passed)
   {
@@ -890,7 +890,9 @@ void run_oned(std::vector<int> size)
 
 
 }
-int main(int argc, char** argv) {
+
+int main(int argc, char** argv) 
+{
 
   std::printf("Entering main in tests.cpp\n");
   std::printf("Standard is %i\n\n",__cplusplus);
@@ -953,4 +955,5 @@ int main(int argc, char** argv) {
 
   }
   return 0;
-}
+};
+
