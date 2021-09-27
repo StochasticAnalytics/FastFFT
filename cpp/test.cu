@@ -926,8 +926,8 @@ int main(int argc, char** argv)
     // exit(0);
 
 
-    // const_image_test(test_size);
-    // unit_impulse_test(test_size, true);
+    const_image_test(test_size);
+    unit_impulse_test(test_size, true);
     unit_impulse_test(test_size, false);
 
 
@@ -946,8 +946,8 @@ int main(int argc, char** argv)
 
     // compare_libraries(test_size, size_change_type);
 
-    // size_change_type = 1; // increase
-    // compare_libraries(test_size, size_change_type);
+    size_change_type = 1; // increase
+    compare_libraries(test_size, size_change_type);
 
     size_change_type = -1; // decrease
     compare_libraries(test_size, size_change_type);

@@ -523,8 +523,6 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CrossCorrelate(floa
       break;
     }
     case 2: {
-      MyFFTPrintWithDetails("");
-
       switch (fwd_size_change_type)
     {
         case no_change: {
@@ -613,11 +611,11 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CrossCorrelate(floa
             }
           break;
         }
-        default: {
-          MyFFTRunTimeAssertTrue(false, "Invalid fwd size change type");
-        }
         break;
       } // case decrease
+      default: {
+        MyFFTRunTimeAssertTrue(false, "Invalid fwd size change type");
+      }
     } // switch on fwd size change type
 
       break; // case 2
