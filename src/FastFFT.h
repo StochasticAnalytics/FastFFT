@@ -350,7 +350,10 @@ private:
                     c2r_decomposed, 
                     c2r_decomposed_transposed, 
                     c2r_none, c2r_decrease, c2r_increase,
-                    xcorr_increase, 
+                    xcorr_fwd_increase_inv_none, //  (e.g. template matching)
+                    xcorr_fwd_decrease_inv_none, // (e.g. Fourier cropping)
+                    xcorr_fwd_none_inv_decrease, // (e.g. movie/particle translational search)
+                    xcorr_fwd_decrease_inv_decrease, // (e.g. bandlimit, xcorr, translational search)
                     xcorr_decomposed }; // Used to specify the origin of the data
   // WARNING this is flimsy and prone to breaking, you must ensure the order matches the KernelType enum.
   std::vector<std::string> 
@@ -363,7 +366,10 @@ private:
                     "c2r_decomposed", 
                     "c2r_decomposed_transposed", 
                     "c2r_none", "c2r_decrease", "c2r_increase",
-                    "xcorr_increase", 
+                    "xcorr_fwd_increase_inv_none", 
+                    "xcorr_fwd_decrease_inv_none",
+                    "xcorr_fwd_none_inv_decrease",
+                    "xcorr_fwd_decrease_inv_decrease",
                     "xcorr_decomposed" };
 
   inline bool IsThreadType(KernelType kernel_type)
@@ -379,7 +385,7 @@ private:
              kernel_type == c2c_fwd_none || kernel_type == c2c_fwd_decrease || kernel_type == c2c_fwd_increase ||
              kernel_type == c2c_inv_none || kernel_type == c2c_inv_decrease || kernel_type == c2c_inv_increase ||
              kernel_type == c2r_none || kernel_type == c2r_decrease || kernel_type == c2r_increase ||
-             kernel_type == xcorr_increase )
+             kernel_type == xcorr_fwd_increase_inv_none || kernel_type == xcorr_fwd_decrease_inv_none || kernel_type == xcorr_fwd_none_inv_decrease || kernel_type == xcorr_fwd_decrease_inv_decrease)
     { 
       return false;
     }
@@ -411,11 +417,14 @@ private:
     else return false; 
   }
 
+  // This is used to set the sign of the twiddle factor for decomposed kernels, whether threaded, or part of a block fft.
+  // For mixed kernels (eg. xcorr_* the size type is defined by where the size change happens.
   inline bool IsForwardType(KernelType kernel_type)
   {
       if (kernel_type == r2c_decomposed || kernel_type == r2c_decomposed_transposed ||
           kernel_type == r2c_none || kernel_type == r2c_decrease || kernel_type == r2c_increase ||
-          kernel_type == c2c_fwd_none || kernel_type == c2c_fwd_decrease || kernel_type == c2c_fwd_increase)
+          kernel_type == c2c_fwd_none || kernel_type == c2c_fwd_decrease || kernel_type == c2c_fwd_increase ||
+          kernel_type == xcorr_fwd_decrease_inv_none || kernel_type == xcorr_fwd_increase_inv_none)
 
     {
       return true;
