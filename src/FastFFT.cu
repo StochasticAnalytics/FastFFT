@@ -238,14 +238,13 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CopyDeviceToHost( b
  
   SetDimensions(CopyToHost);  
   if (n_elements_to_copy != 0) memory_size_to_copy = n_elements_to_copy;
-  PrintState();
-  std::cout << "N elements " << n_elements_to_copy << std::endl;
+  
+  std::cout << "N elements " << n_elements_to_copy << " memory to copy " << memory_size_to_copy <<  std::endl;
 	MyFFTDebugAssertTrue(is_in_memory_device_pointer, "GPU memory not allocated");
-
+  PrintState();
   ComputeType* copy_pointer;
   if (is_in_buffer_memory) copy_pointer = d_ptr.position_space_buffer;
   else copy_pointer = d_ptr.position_space;
-
 
   // FIXME this is assuming the input type matches the compute type.
   precheck
@@ -255,9 +254,12 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CopyDeviceToHost( b
   // Just set true her for now
   bool should_block_until_complete = true;
 	if (should_block_until_complete) cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
+
   	// TODO add asserts etc.
 	if (free_gpu_memory) { Deallocate();}
+
   if (unpin_host_memory) { UnPinHostMemory();}
+
 
 }
 
@@ -267,7 +269,8 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CopyDeviceToHost(Ou
  
   SetDimensions(CopyToHost);
   if (n_elements_to_copy != 0) memory_size_to_copy = n_elements_to_copy;
-
+	MyFFTDebugAssertTrue(is_in_memory_device_pointer, "GPU memory not allocated");
+  PrintState();
 	MyFFTDebugAssertTrue(is_in_memory_device_pointer, "GPU memory not allocated");
   // Assuming the output is not pinned, TODO change to optionally maintain as host_input as well.
   OutputType* tmpPinnedPtr;
@@ -298,7 +301,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CopyDeviceToHost(Ou
   if (should_block_until_complete) cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
 
   precheck
-  cudaErr(cudaHostUnregister(tmpPinnedPtr));
+  cudaErr(cudaHostUnregister(output_pointer));
   postcheck
 
 	if (free_gpu_memory) { Deallocate();}
@@ -516,107 +519,127 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CrossCorrelate(floa
 
   // Set the member pointer to the passed pointer
   d_ptr.image_to_search = image_to_search;
+  MyFFTPrintWithDetails("");
+
   switch (transform_dimension)
   {
+    MyFFTPrintWithDetails("");
+
     case 1: {
+      MyFFTPrintWithDetails("");
+
       MyFFTRunTimeAssertTrue(false, "1D FFT Cross correlation not yet supported");
       break;
     }
     case 2: {
+      MyFFTPrintWithDetails("");
       switch (fwd_size_change_type)
-    {
-        case no_change: {
-          switch (inv_size_change_type)
-          {
-            case no_change: {
-              MyFFTRunTimeAssertTrue(false, "2D FFT Cross correlation no change/ nochange not yet supported");
-              break;
-            }
-            case increase: {
-              MyFFTRunTimeAssertTrue(false, "2D FFT Cross correlation no change/increase not yet supported");
-              break;
-            }
-            case decrease: {
-              SetPrecisionAndExectutionMethod(xcorr_fwd_none_inv_decrease, true);
-              SetPrecisionAndExectutionMethod(c2r_decrease,   false);
-              transform_stage_completed = TransformStageCompleted::inv;
-              break;
-            }
-            default: {
-              MyFFTDebugAssertTrue(false, "Invalid size change type");
-              break;
-            }
-          } // switch on inv size change type
-          break;
-        } // case fwd no change
-        case increase: {
+      {
+          case no_change: {
+            MyFFTPrintWithDetails("");
 
-          SetDimensions(FwdTransform);
-          SetPrecisionAndExectutionMethod(r2c_increase,   true);
-          switch (inv_size_change_type)
-          {
-            case no_change: {
-              SetPrecisionAndExectutionMethod(xcorr_fwd_increase_inv_none, true);
-              SetPrecisionAndExectutionMethod(c2r_none,   false);
-              transform_stage_completed = TransformStageCompleted::inv;
-              break;
-            }
-            case increase: {
-              // I don't see where increase increase makes any sense
-              // FIXME add a check on this in the validation step.
-              MyFFTRunTimeAssertTrue(false, "2D FFT Cross correlation with fwd and inv size increase is not supported");
-              break;
-            }
-            case decrease: {
-              // with FwdTransform set, call c2c
-              // Set InvTransform
-              // Call new kernel that handles the conj mul inv c2c trimmed, and inv c2r in one go.
-              MyFFTRunTimeAssertTrue(false, "2D FFT Cross correlation with fwd increase and inv size decrease is a work in progress");
+            SetDimensions(FwdTransform);
+            SetPrecisionAndExectutionMethod(r2c_none,   true);
+            switch (inv_size_change_type)
+            {
+              case no_change: {
+                MyFFTRunTimeAssertTrue(false, "2D FFT Cross correlation no change/ nochange not yet supported");
+                break;
+              }
+              case increase: {
+                MyFFTRunTimeAssertTrue(false, "2D FFT Cross correlation no change/increase not yet supported");
+                break;
+              }
+              case decrease: {
+                MyFFTPrintWithDetails("");
 
-              break;
-            }
-            default: {
-              MyFFTRunTimeAssertTrue(false, "Invalid size change type");
-            }
-          } // switch on inv size change type
-    
-          // FFT_R2C_WithPadding();   
-          // FFT_C2C_INCREASE_ConjMul_C2C(image_to_search, swap_real_space_quadrants);  
-          // FFT_C2R_Transposed();
+                SetPrecisionAndExectutionMethod(xcorr_fwd_none_inv_decrease, true);
+                transform_stage_completed = TransformStageCompleted::fwd;
+
+                SetPrecisionAndExectutionMethod(c2r_decrease,   false);
+
+                transform_stage_completed = TransformStageCompleted::inv;
+                break;
+              }
+              default: {
+                MyFFTDebugAssertTrue(false, "Invalid size change type");
+                break;
+              }
+            } // switch on inv size change type
+            break;
+          } // case fwd no change
+          case increase: {
+            MyFFTPrintWithDetails("");
+            SetDimensions(FwdTransform);
+            SetPrecisionAndExectutionMethod(r2c_increase,   true);
+            switch (inv_size_change_type)
+            {
+              case no_change: {
+                MyFFTPrintWithDetails("");
+
+                SetPrecisionAndExectutionMethod(xcorr_fwd_increase_inv_none, true);
+                SetPrecisionAndExectutionMethod(c2r_none,   false);
+                transform_stage_completed = TransformStageCompleted::inv;
+                break;
+              }
+              case increase: {
+                // I don't see where increase increase makes any sense
+                // FIXME add a check on this in the validation step.
+                MyFFTRunTimeAssertTrue(false, "2D FFT Cross correlation with fwd and inv size increase is not supported");
+                break;
+              }
+              case decrease: {
+                // with FwdTransform set, call c2c
+                // Set InvTransform
+                // Call new kernel that handles the conj mul inv c2c trimmed, and inv c2r in one go.
+                MyFFTRunTimeAssertTrue(false, "2D FFT Cross correlation with fwd increase and inv size decrease is a work in progress");
+
+                break;
+              }
+              default: {
+                MyFFTRunTimeAssertTrue(false, "Invalid size change type");
+              }
+            } // switch on inv size change type
+      
+            // FFT_R2C_WithPadding();   
+            // FFT_C2C_INCREASE_ConjMul_C2C(image_to_search, swap_real_space_quadrants);  
+            // FFT_C2R_Transposed();
+            break;
+          }
+          case decrease: {
+            MyFFTPrintWithDetails("CrossCorrelate fwd decrease");
+
+            SetDimensions(FwdTransform);
+            SetPrecisionAndExectutionMethod(r2c_decrease,   true);
+            switch (inv_size_change_type)
+            {
+              case no_change: {
+                SetPrecisionAndExectutionMethod(xcorr_fwd_increase_inv_none, true);
+                SetPrecisionAndExectutionMethod(c2r_none,   false); // TODO the output could be smaller
+                transform_stage_completed = TransformStageCompleted::inv;
+                break;
+              }
+              case increase: {
+
+                MyFFTRunTimeAssertTrue(false, "2D FFT Cross correlation with fwd and inv size increase is not supported");
+                break;
+              }
+              case decrease: {
+
+                MyFFTRunTimeAssertTrue(false, "2D FFT Cross correlation with fwd decrease and inv size decrease is a work in progress");
+                break;
+              }
+              default: {
+                MyFFTRunTimeAssertTrue(false, "Invalid inv size change type");
+              }
+            break;
+          }
           break;
+        } // case decrease
+        default: {
+          MyFFTRunTimeAssertTrue(false, "Invalid fwd size change type");
         }
-        case decrease: {
-          SetDimensions(FwdTransform);
-          SetPrecisionAndExectutionMethod(r2c_decrease,   true);
-          switch (inv_size_change_type)
-          {
-            case no_change: {
-              SetPrecisionAndExectutionMethod(xcorr_fwd_increase_inv_none, true);
-              SetPrecisionAndExectutionMethod(c2r_none,   false); // TODO the output could be smaller
-              transform_stage_completed = TransformStageCompleted::inv;
-              break;
-            }
-            case increase: {
-
-              MyFFTRunTimeAssertTrue(false, "2D FFT Cross correlation with fwd and inv size increase is not supported");
-              break;
-            }
-            case decrease: {
-
-              MyFFTRunTimeAssertTrue(false, "2D FFT Cross correlation with fwd decrease and inv size decrease is a work in progress");
-              break;
-            }
-            default: {
-              MyFFTRunTimeAssertTrue(false, "Invalid inv size change type");
-            }
-          break;
-        }
-        break;
-      } // case decrease
-      default: {
-        MyFFTRunTimeAssertTrue(false, "Invalid fwd size change type");
-      }
-    } // switch on fwd size change type
+      } // switch on fwd size change type
 
       break; // case 2
     }
@@ -708,8 +731,8 @@ void FourierTransformer<ComputeType, InputType, OutputType>::ValidateDimensions(
   MyFFTDebugAssertTrue(is_set_input_pointer, "The input data pointer is not set");
 
   MyFFTRunTimeAssertTrue( fwd_dims_out.x == inv_dims_in.x &&
-                          fwd_dims_out.y == inv_dims_out.y &&
-                          fwd_dims_out.z == inv_dims_out.z, "Error in validating the dimension: Currently all fwd out should match inv in.");
+                          fwd_dims_out.y == inv_dims_in.y &&
+                          fwd_dims_out.z == inv_dims_in.z, "Error in validating the dimension: Currently all fwd out should match inv in.");
 
   // Validate the forward transform
   if (fwd_dims_out.x > fwd_dims_in.x || fwd_dims_out.y > fwd_dims_in.y || fwd_dims_out.z > fwd_dims_in.z)
@@ -752,7 +775,6 @@ void FourierTransformer<ComputeType, InputType, OutputType>::ValidateDimensions(
   }
   else if (inv_dims_out.x < inv_dims_in.x || inv_dims_out.y < inv_dims_in.y || inv_dims_out.z < inv_dims_in.z)
   {
-    MyFFTRunTimeAssertTrue( false, "Trimming (subset of output points) is yet to be implemented.");
     inv_size_change_type = decrease;
   }
   else if (inv_dims_out.x == inv_dims_in.x && inv_dims_out.y == inv_dims_in.y && inv_dims_out.z == inv_dims_in.z)
@@ -1424,7 +1446,7 @@ void block_fft_kernel_C2R_NONE(const ComplexType* __restrict__  input_values, Sc
 } // end of block_fft_kernel_C2R_NONE
 
 template<class FFT, class ComplexType, class ScalarType>
-__launch_bounds__(FFT::max_threads_per_block) __global__
+__global__
 void block_fft_kernel_C2R_DECREASE(const ComplexType*  __restrict__ input_values, ScalarType*  __restrict__ output_values, Offsets mem_offsets, const float twiddle_in, const unsigned int Q, typename FFT::workspace_type workspace)
 {
 
@@ -2210,10 +2232,11 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2R_DECREASE<FFT,complex_type, scalar_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory)); 
 
         precheck
-        block_fft_kernel_C2R_DECREASE<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, FFT::shared_memory_size, cudaStreamPerThread>> >
+        block_fft_kernel_C2R_DECREASE<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
         ( complex_input, scalar_output, LP.mem_offsets, LP.twiddle_in, LP.Q, workspace);
         postcheck
-        
+   
+        break;
       }
 
       case c2r_increase: {

@@ -666,7 +666,7 @@ struct io
   {
     const unsigned int stride = stride_size();
     unsigned int       index  = threadIdx.x + (threadIdx.z*size_of<FFT>::value);
-    for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+    for (unsigned int i = 0; i < FFT::elements_per_thread / 2; i++) 
     {
       shared_mem[GetSharedMemPaddedIndex(index)] = input[pixel_pitch*index];
       index += stride;

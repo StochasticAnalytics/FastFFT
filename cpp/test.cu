@@ -407,7 +407,7 @@ void unit_impulse_test(std::vector<int>size, bool do_increase_size)
 void compare_libraries(std::vector<int>size, int size_change_type)
 {
 
-  bool skip_cufft_for_profiling = false;
+  bool skip_cufft_for_profiling = true;
   bool set_padding_callback = false; // the padding callback is slower than pasting in b/c the read size of the pointers is larger than the actual data. do not use.
   bool set_conjMult_callback = true;
   bool is_size_change_decrease = false;
@@ -456,13 +456,11 @@ void compare_libraries(std::vector<int>size, int size_change_type)
 
       short4 target_size;
 
-      if (is_size_change_decrease) target_size = input_size;
+      if (is_size_change_decrease) target_size = input_size; // assuming xcorr_fwd_NONE_inv_DECREASE
       else target_size = output_size;
     
       Image< float, float2> target_search_image(target_size);
       Image< float, float2> positive_control(target_size);
-
-  
 
 
       // We just make one instance of the FourierTransformer class, with calc type float.
@@ -472,14 +470,30 @@ void compare_libraries(std::vector<int>size, int size_change_type)
       FastFFT::FourierTransformer<float, float, float> cuFFT;
       FastFFT::FourierTransformer<float, float, float> targetFT;
 
-      // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
-      FT.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, output_size.x,output_size.y,output_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-      FT.SetInverseFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-      cuFFT.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, output_size.x,output_size.y,output_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-      cuFFT.SetInverseFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-      
-      targetFT.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, output_size.x,output_size.y,output_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-      targetFT.SetInverseFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+      if ( is_size_change_decrease )
+      {
+        FT.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, input_size.x,input_size.y,input_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+        FT.SetInverseFFTPlan(input_size.x,input_size.y,input_size.z, output_size.x,output_size.y,output_size.z, true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+
+        // For the subset of outputs this is just the input size, assuming the program then accesses just the valid data (could explicitly put into a new array which would be even slower.)
+        cuFFT.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, input_size.x,input_size.y,input_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+        cuFFT.SetInverseFFTPlan(input_size.x,input_size.y,input_size.z, input_size.x,input_size.y,input_size.z, true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+        
+        targetFT.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, input_size.x,input_size.y,input_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+        targetFT.SetInverseFFTPlan(input_size.x,input_size.y,input_size.z, output_size.x,output_size.y,output_size.z, true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);        
+      }
+      else
+      {
+        FT.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, output_size.x,output_size.y,output_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+        FT.SetInverseFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+
+        cuFFT.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, input_size.x,input_size.y,input_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+        cuFFT.SetInverseFFTPlan(input_size.x,input_size.y,input_size.z, input_size.x,input_size.y,input_size.z, true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+        
+        targetFT.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, output_size.x,output_size.y,output_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+        targetFT.SetInverseFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+      }
+
 
 
       FT_input.real_memory_allocated = FT.ReturnInputMemorySize();
@@ -488,7 +502,6 @@ void compare_libraries(std::vector<int>size, int size_change_type)
       cuFFT_input.real_memory_allocated = cuFFT.ReturnInputMemorySize();
       cuFFT_output.real_memory_allocated = cuFFT.ReturnInvOutputMemorySize();
 
-      std::cout  <<"FT, Cufft in/out, real memory allocated " << FT_input.real_memory_allocated << " " << cuFFT_input.real_memory_allocated << " " << FT_output.real_memory_allocated << " " << cuFFT_output.real_memory_allocated << std::endl;
 
       if (is_size_change_decrease) target_search_image.real_memory_allocated = targetFT.ReturnInputMemorySize();
       else target_search_image.real_memory_allocated = targetFT.ReturnInvOutputMemorySize(); // the larger of the two.
@@ -515,6 +528,7 @@ void compare_libraries(std::vector<int>size, int size_change_type)
       targetFT.SetInputPointer(target_search_image.real_values, false);
 
       // Set a unit impulse at the center of the input array.
+      // For now just considering the real space image to have been implicitly quadrant swapped so the center is at the origin.
       FT.SetToConstant<float>(FT_input.real_values, FT_input.real_memory_allocated, 0.0f);
       FT.SetToConstant<float>(cuFFT_input.real_values, cuFFT_input.real_memory_allocated, 0.0f);
       FT.SetToConstant<float>(FT_output.real_values, FT_output.real_memory_allocated, 0.0f);
@@ -555,104 +569,110 @@ void compare_libraries(std::vector<int>size, int size_change_type)
 
 
       // address = 0;
-      // test_passed = true;
-      // for (int z = 1; z <  positive_control.size.z ; z++)
-      // {   
-      //   for (int y = 1; y < positive_control.size.y; y++)
-      //   {  
-      //     for (int x = 1; x < positive_control.size.x; x++)
-      //     {
-      //       if (positive_control.real_values[address] != 0.0f) test_passed = false;
-      //     }
-      //   }
-      // }
-      // if (test_passed) 
-      // {
-      //   if (positive_control.real_values[address] == positive_control.size.x*positive_control.size.y*positive_control.size.z*testVal_1*testVal_2)
-      //   {
-      //     std::cout << "Test passed for FFTW positive control.\n" << std::endl;
-      //   }
-      //   else
-      //   {
-      //     std::cout << "Test failed for FFTW positive control. Value at zero is  " << positive_control.real_values[address] << std::endl;
-      //   }
-      // }
-      // else
-      // {
-      //   std::cout << "Test failed for positive control, non-zero values found away from the origin." << std::endl;
-      // }
+      test_passed = true;
+      for (int z = 1; z <  positive_control.size.z ; z++)
+      {   
+        for (int y = 1; y < positive_control.size.y; y++)
+        {  
+          for (int x = 1; x < positive_control.size.x; x++)
+          {
+            if (positive_control.real_values[address] != 0.0f) test_passed = false;
+          }
+        }
+      }
+      if (test_passed) 
+      {
+        if (positive_control.real_values[address] == positive_control.size.x*positive_control.size.y*positive_control.size.z*testVal_1*testVal_2)
+        {
+          std::cout << "Test passed for FFTW positive control.\n" << std::endl;
+        }
+        else
+        {
+          std::cout << "Test failed for FFTW positive control. Value at zero is  " << positive_control.real_values[address] << std::endl;
+        }
+      }
+      else
+      {
+        std::cout << "Test failed for positive control, non-zero values found away from the origin." << std::endl;
+      }
 
 
       cuFFT_output.create_timing_events(); 
       cuFFT_input.MakeCufftPlan();
       cuFFT_output.MakeCufftPlan();
 
+
       //////////////////////////////////////////
       //////////////////////////////////////////
       // Warm up and check for accuracy
       if (set_conjMult_callback || is_size_change_decrease ) // we set set_conjMult_callback = false 
       {
-        FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
+        MyFFTPrintWithDetails("");
+        FT.CrossCorrelate(targetFT.d_ptr.momentum_space, false);
       }
       else
       {
+        MyFFTPrintWithDetails("");
+
         FT.FwdFFT();
         FT.InvFFT();
       }
+      MyFFTPrintWithDetails("");
 
       FT.CopyDeviceToHost(FT_output.real_values,false, false);
+      MyFFTPrintWithDetails("");
 
-      // address = 0;
-      // test_passed = true;
-      // for (int z = 1; z <  FT_output.size.z ; z++)
-      // {   
-      //   for (int y = 1; y < FT_output.size.y; y++)
-      //   {  
-      //     for (int x = 1; x < FT_output.size.x; x++)
-      //     {
-      //       if (FT_output.real_values[address] != 0.0f) test_passed = false;
-      //     }
-      //   }
-      // }
-      // if (test_passed) 
-      // {
-      //   if (FT_output.real_values[address] == FT_output.size.x*FT_output.size.y*FT_output.size.z*testVal_1*testVal_2)
-      //   {
-      //     std::cout << "Test passed for FastFFT positive control.\n" << std::endl;
-      //   }
-      //   else
-      //   {
-      //     std::cout << "Test failed for FastFFT positive control. Value at zero is  " << FT_output.real_values[address] << std::endl;
-      //   }
-      // }
-      // else
-      // {
-      //   std::cout << "Test failed for FastFFT control, non-zero values found away from the origin." << std::endl;
-      // }
+      address = 0;
+      test_passed = true;
+      for (int z = 1; z <  FT_output.size.z ; z++)
+      {   
+        for (int y = 1; y < FT_output.size.y; y++)
+        {  
+          for (int x = 1; x < FT_output.size.x; x++)
+          {
+            if (FT_output.real_values[address] != 0.0f) test_passed = false;
+          }
+        }
+      }
+      if (test_passed) 
+      {
+        if (FT_output.real_values[address] == FT_output.size.x*FT_output.size.y*FT_output.size.z*testVal_1*testVal_2)
+        {
+          std::cout << "Test passed for FastFFT positive control.\n" << std::endl;
+        }
+        else
+        {
+          std::cout << "Test failed for FastFFT positive control. Value at zero is  " << FT_output.real_values[address] << std::endl;
+        }
+      }
+      else
+      {
+        std::cout << "Test failed for FastFFT control, non-zero values found away from the origin." << std::endl;
+      }
 
+      ////////////////////////////////////////
       //////////////////////////////////////////
-      // //////////////////////////////////////////
-      // int n = 0;
-      // for (int x = 0; x <  FT_output.size.x ; x++)
-      // {
+      int n = 0;
+      for (int x = 0; x <  FT_output.size.x ; x++)
+      {
         
-      //   std::cout << x << "[ ";
-      //   for (int y = 0; y < FT_output.size.y; y++)
-      //   {  
-      //     std::cout << FT_output.real_values[x + y*FT_output.size.w*2] << " ";
-      //     n++;
-      //     if (n == 32) {n = 0; std::cout << std::endl ;} // line wrapping
-      //   }
-      //   std::cout << "] " << std::endl;
-      //   n = 0;
-      // }
+        std::cout << x << "[ ";
+        for (int y = 0; y < FT_output.size.y; y++)
+        {  
+          std::cout << FT_output.real_values[x + y*FT_output.size.w*2] << " ";
+          n++;
+          if (n == 32) {n = 0; std::cout << std::endl ;} // line wrapping
+        }
+        std::cout << "] " << std::endl;
+        n = 0;
+      }
 
-
+exit(1);
       const int n_loops = 3000;
       cuFFT_output.record_start();
       for (int i = 0; i < n_loops; ++i)
       {
-        if (set_conjMult_callback)
+        if (set_conjMult_callback || is_size_change_decrease )
         {
           FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
         }
@@ -684,24 +704,63 @@ void compare_libraries(std::vector<int>size, int size_change_type)
         postcheck
       }
 
+      MyFFTPrintWithDetails("");
 
       if (! skip_cufft_for_profiling)
       {
         //////////////////////////////////////////
         //////////////////////////////////////////
         // Warm up and check for accuracy
-        cuFFT.ClipIntoTopLeft();
-        // cuFFT.ClipIntoReal(cuFFT_output.size.x/2, cuFFT_output.size.y/2, cuFFT_output.size.z/2);
+        if (is_size_change_decrease)
+        {
 
-        cuFFT.CopyDeviceToHost(cuFFT_output.real_values,false, false);
+          precheck
+          cudaErr(cufftExecR2C(cuFFT_input.cuda_plan_forward, (cufftReal*)cuFFT.d_ptr.position_space, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer));
+          postcheck
+          MyFFTPrintWithDetails("");
+  
+          precheck
+          cudaErr(cufftExecC2R(cuFFT_input.cuda_plan_inverse, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer, (cufftReal*)cuFFT.d_ptr.position_space));
+          postcheck  
+          MyFFTPrintWithDetails("");
+        }
+        else
+        {
+          cuFFT.ClipIntoTopLeft();
+          // cuFFT.ClipIntoReal(cuFFT_output.size.x/2, cuFFT_output.size.y/2, cuFFT_output.size.z/2);
+          cuFFT.CopyDeviceToHost(cuFFT_output.real_values,false, false);
+
+          precheck
+          cudaErr(cufftExecR2C(cuFFT_output.cuda_plan_forward, (cufftReal*)cuFFT.d_ptr.position_space, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer));
+          postcheck
+          MyFFTPrintWithDetails("");
+  
+          precheck
+          cudaErr(cufftExecC2R(cuFFT_output.cuda_plan_inverse, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer, (cufftReal*)cuFFT.d_ptr.position_space));
+          postcheck  
+          MyFFTPrintWithDetails(""); 
+        }
+        MyFFTPrintWithDetails("");
+
         // cuFFT.ClipIntoReal(input_size.x/2, input_size.y/2, input_size.z/2);
-        precheck
-        cudaErr(cufftExecR2C(cuFFT_output.cuda_plan_forward, (cufftReal*)cuFFT.d_ptr.position_space, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer));
-        postcheck
-        precheck
-        cudaErr(cufftExecC2R(cuFFT_output.cuda_plan_inverse, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer, (cufftReal*)cuFFT.d_ptr.position_space));
-        postcheck  
-        cuFFT.CopyDeviceToHost(cuFFT_output.real_values,false, false);
+ 
+
+
+        if (is_size_change_decrease)
+        {
+          MyFFTPrintWithDetails("");
+
+          cuFFT.CopyDeviceToHost(false, false);
+
+        }
+        else
+        {
+          MyFFTPrintWithDetails("");
+
+          cuFFT.CopyDeviceToHost(cuFFT_output.real_values,false, false);
+        }
+        MyFFTPrintWithDetails("");
+
 
         // address = 0;
         // test_passed = true;
@@ -750,16 +809,31 @@ void compare_libraries(std::vector<int>size, int size_change_type)
         cuFFT_output.record_start();
         for (int i = 0; i < n_loops; ++i)
         {
+          std::cout << i << "i / " << n_loops << "n_loops" << std::endl;
           if (set_conjMult_callback) cuFFT.ClipIntoTopLeft();
           // cuFFT.ClipIntoReal(input_size.x/2, input_size.y/2, input_size.z/2);
 
-          precheck
-          cudaErr(cufftExecR2C(cuFFT_output.cuda_plan_forward, (cufftReal*)cuFFT.d_ptr.position_space, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer));
-          postcheck
+          if (is_size_change_decrease)
+          {
+            precheck
+            cudaErr(cufftExecR2C(cuFFT_input.cuda_plan_forward, (cufftReal*)cuFFT.d_ptr.position_space, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer));
+            postcheck
+  
+            precheck
+            cudaErr(cufftExecC2R(cuFFT_input.cuda_plan_inverse, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer, (cufftReal*)cuFFT.d_ptr.position_space));
+            postcheck
+          }
+          else
+          {
+            precheck
+            cudaErr(cufftExecR2C(cuFFT_output.cuda_plan_forward, (cufftReal*)cuFFT.d_ptr.position_space, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer));
+            postcheck
+  
+            precheck
+            cudaErr(cufftExecC2R(cuFFT_output.cuda_plan_inverse, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer, (cufftReal*)cuFFT.d_ptr.position_space));
+            postcheck
+          }
 
-          precheck
-          cudaErr(cufftExecC2R(cuFFT_output.cuda_plan_inverse, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer, (cufftReal*)cuFFT.d_ptr.position_space));
-          postcheck
         }
         cuFFT_output.record_stop();
         cuFFT_output.synchronize();
@@ -916,7 +990,7 @@ int main(int argc, char** argv)
   short4 input_size;
   short4 output_size;
 
-  std::vector<int> test_size = { 64, 128, 256, 512, 1024, 2048, 4096};
+  std::vector<int> test_size = { 16, 32, 64, 128, 256, 512, 1024, 2048, 4096};
 
 
   if (run_validation_tests)  {
