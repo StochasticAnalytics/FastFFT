@@ -1475,7 +1475,7 @@ void block_fft_kernel_C2R_NONE(const ComplexType* __restrict__  input_values, Sc
 
   io<FFT>::load_c2r_transposed(&input_values[blockIdx.y], thread_data, mem_offsets.pixel_pitch_input);
 
-  #if FFT_STAGE > 2
+  #if FFT_STAGE > 3
     // For loop zero the twiddles don't need to be computed
     FFT().execute(thread_data, shared_mem, workspace);
   #endif
@@ -1502,7 +1502,7 @@ void block_fft_kernel_C2R_DECREASE(const ComplexType*  __restrict__ input_values
   // DIT shuffle, bank conflict free
   io<FFT>::copy_from_shared(shared_mem, thread_data, Q);
 
-  #if FFT_STAGE > 2
+  #if FFT_STAGE > 3
     FFT().execute(thread_data, shared_mem, workspace);
   #endif
 
@@ -1533,12 +1533,12 @@ void thread_fft_kernel_C2R_decomposed(const ComplexType*  __restrict__ input_val
 
   io_thread<FFT>::load_c2r(&input_values[blockIdx.y*mem_offsets.pixel_pitch_input], thread_data, Q, mem_offsets.pixel_pitch_input);
 
-  #if FFT_STAGE > 2
+  #if FFT_STAGE > 3
     // We then have Q FFTs of size size_of<FFT>::value (P in the paper)
     FFT().execute(thread_data);
   #endif
 
-  // The macro for   #if FFT_STAGE > 2 remap_decomposed_segments_c2r
+  // The macro for   #if FFT_STAGE > 3 remap_decomposed_segments_c2r
   // Now we need to aggregate each of the Q transforms into each output block of size P
   io_thread<FFT>::remap_decomposed_segments_c2r(thread_data, shared_mem_C2R_decomposed, twiddle_in, Q);
 
@@ -1562,7 +1562,7 @@ void thread_fft_kernel_C2R_decomposed_transposed(const ComplexType*  __restrict_
 
   io_thread<FFT>::load_c2r_transposed(&input_values[blockIdx.y], thread_data, Q, mem_offsets.pixel_pitch_input, mem_offsets.pixel_pitch_output/2);
 
-  #if FFT_STAGE > 2
+  #if FFT_STAGE > 3
     // We then have Q FFTs of size size_of<FFT>::value (P in the paper)
     FFT().execute(thread_data);
   #endif
@@ -2218,8 +2218,9 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
 
         cudaError_t error_code = cudaSuccess;
         auto workspace = make_workspace<FFT>(error_code);
-
+        std::cout << " IN inv none" << std::endl;
         #if FFT_STAGE > 2
+          std::cout << " IN inv none macro block if" << std::endl;
           int shared_memory = FFT::shared_memory_size;
 
           CheckSharedMemory(shared_memory, device_properties);
@@ -2230,6 +2231,8 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
           ( complex_input, complex_output, LP.mem_offsets, workspace);
           postcheck
         #else
+          std::cout << " IN inv none macro block else" << std::endl;
+
           // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
           if (is_in_buffer_memory) is_in_buffer_memory = false;
           else is_in_buffer_memory = true;          

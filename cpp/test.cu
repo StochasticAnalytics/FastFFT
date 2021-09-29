@@ -147,18 +147,23 @@ void const_image_test(std::vector<int> size)
     }
     if (host_output.complex_values[0].x != (float)dims_out.x * (float)dims_out.y * (float)dims_out.z) test_passed = false;
 
-    #if FFT_STAGE == 0
-      PrintArray(host_output.real_values, dims_out.x, dims_in.y, dims_out.w);
-      std::cout << "stage 0 " << std::endl;
-    #elif FFT_STAGE == 1
-      PrintArray(host_output.complex_values, dims_in.y, dims_out.w);
-      std::cout << "stage 1 " << std::endl;
-    #else
-      PrintArray(host_output.complex_values, dims_in.y, dims_out.w);
-      std::cout << "stage 2 " << std::endl;
-    #endif
+    if (false)
+    {
+      #if FFT_STAGE == 0
+        PrintArray(host_output.real_values, dims_out.x, dims_in.y, dims_out.w);
+        std::cout << "stage 0 " << std::endl;
+      #elif FFT_STAGE == 1
+        PrintArray(host_output.complex_values, dims_in.y, dims_out.w);
+        std::cout << "stage 1 " << std::endl;
+      #elif FFT_STAGE == 2
+        PrintArray(host_output.complex_values, dims_in.y, dims_out.w);
+        std::cout << "stage 2 " << std::endl;
+      # else
+        std::cout << " This block is only valid for FFT_STAGE == 0 || 1 || 2 " << std::endl;
+      #endif   
+      exit(0);
+    }
 
-    exit(1);
 
     if (test_passed == false) {all_passed = false; FastFFT_forward_passed[n] = false;}
     // MyFFTDebugAssertTestTrue( test_passed, "FastFFT unit impulse forward FFT");
@@ -167,40 +172,25 @@ void const_image_test(std::vector<int> size)
 
     FT.InvFFT();
     FT.CopyDeviceToHost( true, true);
-    
+ 
+    if (true)
+    {
+      #if FFT_STAGE == 3
+        PrintArray(host_output.real_values, dims_out.x, dims_out.y, dims_out.w);
+        std::cout << "stage 3 " << std::endl;
+      #elif FFT_STAGE == 4
+        PrintArray(host_output.real_values, dims_out.x, dims_out.y, dims_out.w);
+        std::cout << "stage 4 " << std::endl;
+      #else
+        std::cout << " This block is only valid for FFT_STAGE == 3 || 4 " << std::endl;
+      #endif   
+
+      exit(0);
+    }
     // Assuming the outputs are always even dimensions, padding_jump_val is always 2.
     sum = ReturnSumOfReal(host_output.real_values, dims_out);
 
-    // COMPLEX TODO make these functions.
-    //   int n=0;
-    //   for (int x = 0; x <  host_output.size.y ; x++)
-    // {
-      
-    //   std::cout << x << "[ ";
-    //   for (int y = 0; y < host_output.size.w; y++)
-    //   {  
-    //     std::cout << host_output.complex_values[x + y*host_output.size.y].x << "," << host_output.complex_values[x + y*host_output.size.y].y << " ";
-    //     n++;
-    //     if (n == 34) {n = 0; std::cout << std::endl ;} // line wrapping
-    //   }
-    //   std::cout << "] " << std::endl;
-    //   n = 0;
-    // }
-      // REAL
-    //  int n=0;
-    // for (int x = 0; x <  host_output.size.x ; x++)
-    // {
-      
-    //   std::cout << x << "[ ";
-    //   for (int y = 0; y < host_output.size.y; y++)
-    //   {  
-    //     std::cout << host_output.real_values[x + y*host_output.size.w*2] <<  " ";
-    //     n++;
-    //     if (n == 32) {n = 0; std::cout << std::endl ;} // line wrapping
-    //   }
-    //   std::cout << "] " << std::endl;
-    //   n = 0;
-    // } 
+
     if (sum != powf(dims_in.x*dims_in.y*dims_in.z,2)) {all_passed = false; FastFFT_roundTrip_passed[n] = false;}
     // MyFFTDebugAssertTestTrue( sum == powf(dims_in.x*dims_in.y*dims_in.z,2),"FastFFT constant image round trip failed for size");
   } // loop over sizes
