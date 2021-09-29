@@ -241,8 +241,7 @@ void unit_impulse_test(std::vector<int>size, bool do_increase_size)
         input_size  = make_short4(size[oSize],size[oSize],1,0);  
       }
 
-  // FastFFT::PrintVectorType(input_size);
-  // FastFFT::PrintVectorType(output_size);
+
   bool test_passed = true;
   long address = 0;
 
@@ -391,7 +390,7 @@ void unit_impulse_test(std::vector<int>size, bool do_increase_size)
   FT.InvFFT();
   FT.CopyDeviceToHost(host_output.real_values, true, true);
 
-  if (true)
+  if (false)
   {
     #if FFT_STAGE == 3
       PrintArray(host_output.real_values, dims_out.x, dims_out.y, dims_out.w);
@@ -435,7 +434,7 @@ void unit_impulse_test(std::vector<int>size, bool do_increase_size)
 void compare_libraries(std::vector<int>size, int size_change_type)
 {
 
-  bool skip_cufft_for_profiling = true;
+  bool skip_cufft_for_profiling = false;
   bool set_padding_callback = false; // the padding callback is slower than pasting in b/c the read size of the pointers is larger than the actual data. do not use.
   bool set_conjMult_callback = true;
   bool is_size_change_decrease = false;
@@ -486,6 +485,8 @@ void compare_libraries(std::vector<int>size, int size_change_type)
 
       if (is_size_change_decrease) target_size = input_size; // assuming xcorr_fwd_NONE_inv_DECREASE
       else target_size = output_size;
+
+
     
       Image< float, float2> target_search_image(target_size);
       Image< float, float2> positive_control(target_size);
@@ -515,14 +516,17 @@ void compare_libraries(std::vector<int>size, int size_change_type)
         FT.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, output_size.x,output_size.y,output_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
         FT.SetInverseFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
 
-        cuFFT.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, input_size.x,input_size.y,input_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
-        cuFFT.SetInverseFFTPlan(input_size.x,input_size.y,input_size.z, input_size.x,input_size.y,input_size.z, true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+        cuFFT.SetForwardFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+        cuFFT.SetInverseFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
         
-        targetFT.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, output_size.x,output_size.y,output_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+        targetFT.SetForwardFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
         targetFT.SetInverseFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
       }
 
-
+      short4 fwd_dims_in = FT.ReturnFwdInputDimensions();
+      short4 fwd_dims_out = FT.ReturnFwdOutputDimensions();
+      short4 inv_dims_in = FT.ReturnInvInputDimensions();
+      short4 inv_dims_out = FT.ReturnInvOutputDimensions();
 
       FT_input.real_memory_allocated = FT.ReturnInputMemorySize();
       FT_output.real_memory_allocated = FT.ReturnInvOutputMemorySize();
@@ -564,7 +568,7 @@ void compare_libraries(std::vector<int>size, int size_change_type)
       FT.SetToConstant<float>(target_search_image.real_values, target_search_image.real_memory_allocated, 0.0f);
       FT.SetToConstant<float>(positive_control.real_values, target_search_image.real_memory_allocated, 0.0f);
 
-
+  
       // Place these values at the origin of the image and after convolution, should be at 0,0,0.
       float testVal_1 = 2.0f;
       float testVal_2 = 3.0f;
@@ -572,7 +576,7 @@ void compare_libraries(std::vector<int>size, int size_change_type)
       cuFFT_input.real_values[0] = testVal_1;
       target_search_image.real_values[0] = testVal_2;//target_search_image.size.w*2*target_search_image.size.y/2 + target_search_image.size.x/2] = testVal_2;
       positive_control.real_values[0] = testVal_1;//target_search_image.size.w*2*target_search_image.size.y/2 + target_search_image.size.x/2] = testVal_1;
-      
+
 
       // Transform the target on the host prior to transfer.
       target_search_image.FwdFFT();
@@ -635,20 +639,16 @@ void compare_libraries(std::vector<int>size, int size_change_type)
       // Warm up and check for accuracy
       if (set_conjMult_callback || is_size_change_decrease ) // we set set_conjMult_callback = false 
       {
-        MyFFTPrintWithDetails("");
         FT.CrossCorrelate(targetFT.d_ptr.momentum_space, false);
       }
       else
       {
-        MyFFTPrintWithDetails("");
-
         FT.FwdFFT();
         FT.InvFFT();
-      }
-      MyFFTPrintWithDetails("");
+      }      
 
       FT.CopyDeviceToHost(FT_output.real_values,false, false);
-      MyFFTPrintWithDetails("");
+      
 
       address = 0;
       test_passed = true;
@@ -680,22 +680,43 @@ void compare_libraries(std::vector<int>size, int size_change_type)
 
       ////////////////////////////////////////
       //////////////////////////////////////////
-      int n = 0;
-      for (int x = 0; x <  FT_output.size.x ; x++)
+      if (false)
       {
-        
-        std::cout << x << "[ ";
-        for (int y = 0; y < FT_output.size.y; y++)
-        {  
-          std::cout << FT_output.real_values[x + y*FT_output.size.w*2] << " ";
-          n++;
-          if (n == 32) {n = 0; std::cout << std::endl ;} // line wrapping
-        }
-        std::cout << "] " << std::endl;
-        n = 0;
+        #if FFT_STAGE == 0
+          PrintArray(FT_output.real_values, fwd_dims_in.x, fwd_dims_in.y, fwd_dims_in.w);
+          std::cout << "stage 0 " << std::endl;
+        #elif FFT_STAGE == 1
+          // If we are doing a fwd increase, the data will have only been expanded along the (transposed) X dimension at this point
+          // So the (apparent) X is dims_in.y not output_size.y
+          // decrease is currently just tested on the output. Really, to simplify there should be 3 different functions, fwd_none_inv_decrease (current decrease), fwd_decrease_inc_decrease (not yet) fwd_increase_inv_none
+          if (is_size_change_decrease) 
+          {
+            std::cout << "stage 1 decrease" << std::endl;
+            PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.w);
+          }
+          else 
+          {
+            std::cout << "stage 1 increase" << std::endl;
+            PrintArray(FT_output.complex_values, fwd_dims_in.y, fwd_dims_out.w);
+          }
+
+        #elif FFT_STAGE == 2
+          // Now the array is fully expanded to output_size, but still transposed
+          PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.w);
+          std::cout << "stage 2 " << std::endl;
+
+        #elif FFT_STAGE == 3
+          PrintArray(FT_output.complex_values,inv_dims_out.y, inv_dims_out.w);
+          std::cout << "stage 3 " << std::endl;
+        #elif FFT_STAGE == 4
+          PrintArray(FT_output.real_values, inv_dims_out.x, inv_dims_out.y, inv_dims_out.w);
+          std::cout << "stage 4 " << std::endl;
+        #endif   
+
+        exit(0);
       }
 
-exit(1);
+
       const int n_loops = 3000;
       cuFFT_output.record_start();
       for (int i = 0; i < n_loops; ++i)
@@ -732,7 +753,7 @@ exit(1);
         postcheck
       }
 
-      MyFFTPrintWithDetails("");
+      
 
       if (! skip_cufft_for_profiling)
       {
@@ -745,100 +766,39 @@ exit(1);
           precheck
           cudaErr(cufftExecR2C(cuFFT_input.cuda_plan_forward, (cufftReal*)cuFFT.d_ptr.position_space, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer));
           postcheck
-          MyFFTPrintWithDetails("");
+          
   
           precheck
           cudaErr(cufftExecC2R(cuFFT_input.cuda_plan_inverse, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer, (cufftReal*)cuFFT.d_ptr.position_space));
           postcheck  
-          MyFFTPrintWithDetails("");
+          
         }
         else
         {
-          cuFFT.ClipIntoTopLeft();
+          // cuFFT.ClipIntoTopLeft();
           // cuFFT.ClipIntoReal(cuFFT_output.size.x/2, cuFFT_output.size.y/2, cuFFT_output.size.z/2);
-          cuFFT.CopyDeviceToHost(cuFFT_output.real_values,false, false);
+          // cuFFT.CopyDeviceToHost(cuFFT_output.real_values,false, false);
 
           precheck
           cudaErr(cufftExecR2C(cuFFT_output.cuda_plan_forward, (cufftReal*)cuFFT.d_ptr.position_space, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer));
           postcheck
-          MyFFTPrintWithDetails("");
+          
   
           precheck
           cudaErr(cufftExecC2R(cuFFT_output.cuda_plan_inverse, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer, (cufftReal*)cuFFT.d_ptr.position_space));
           postcheck  
-          MyFFTPrintWithDetails(""); 
+           
         }
-        MyFFTPrintWithDetails("");
+        
 
-        // cuFFT.ClipIntoReal(input_size.x/2, input_size.y/2, input_size.z/2);
- 
+        
 
-
-        if (is_size_change_decrease)
-        {
-          MyFFTPrintWithDetails("");
-
-          cuFFT.CopyDeviceToHost(false, false);
-
-        }
-        else
-        {
-          MyFFTPrintWithDetails("");
-
-          cuFFT.CopyDeviceToHost(cuFFT_output.real_values,false, false);
-        }
-        MyFFTPrintWithDetails("");
-
-
-        // address = 0;
-        // test_passed = true;
-        // for (int z = 1; z <  cuFFT_output.size.z ; z++)
-        // {   
-        //   for (int y = 1; y < cuFFT_output.size.y; y++)
-        //   {  
-        //     for (int x = 1; x < cuFFT_output.size.x; x++)
-        //     {
-        //       if (cuFFT_output.real_values[address] != 0.0f) test_passed = false;
-        //     }
-        //   }
-        // }
-        // if (test_passed) 
-        // {
-        //   if (cuFFT_output.real_values[address] == cuFFT_output.size.x*cuFFT_output.size.y*cuFFT_output.size.z*testVal_1*testVal_2)
-        //   {
-        //     std::cout << "Test passed for cuFFT positive control.\n" << std::endl;
-        //   }
-        //   else
-        //   {
-        //     std::cout << "Test failed for cuFFT positive control. Value at zero is  " << cuFFT_output.real_values[address] << std::endl;
-        //   }
-        // }
-        // else
-        // {
-        //   std::cout << "Test failed for cuFFT control, non-zero values found away from the origin." << std::endl;
-        // }
-        //////////////////////////////////////////
-        //////////////////////////////////////////
-        // n = 0;
-        // for (int x = 0; x <  cuFFT_output.size.x ; x++)
-        // {
-          
-        //   std::cout << x << "[ ";
-        //   for (int y = 0; y < cuFFT_output.size.y; y++)
-        //   {  
-        //     std::cout << cuFFT_output.real_values[x + y*cuFFT_output.size.w*2] << " ";
-        //     n++;
-        //     if (n == 32) {n = 0; std::cout << std::endl ;} // line wrapping
-        //   }
-        //   std::cout << "] " << std::endl;
-        //   n = 0;
-        // }
 
         cuFFT_output.record_start();
         for (int i = 0; i < n_loops; ++i)
         {
-          std::cout << i << "i / " << n_loops << "n_loops" << std::endl;
-          if (set_conjMult_callback) cuFFT.ClipIntoTopLeft();
+          // std::cout << i << "i / " << n_loops << "n_loops" << std::endl;
+          // if (set_conjMult_callback) cuFFT.ClipIntoTopLeft();
           // cuFFT.ClipIntoReal(input_size.x/2, input_size.y/2, input_size.z/2);
 
           if (is_size_change_decrease)
@@ -1018,7 +978,7 @@ int main(int argc, char** argv)
   short4 input_size;
   short4 output_size;
 
-  std::vector<int> test_size = { 16, 32, 64, 128, 256, 512, 1024, 2048, 4096};
+  std::vector<int> test_size = {  64, 128, 256, 512, 1024, 2048, 4096};
 
 
   if (run_validation_tests)  {
@@ -1051,8 +1011,8 @@ int main(int argc, char** argv)
     size_change_type = 1; // increase
     compare_libraries(test_size, size_change_type);
 
-    size_change_type = -1; // decrease
-    compare_libraries(test_size, size_change_type);
+    // size_change_type = -1; // decrease
+    // compare_libraries(test_size, size_change_type);
 
 
   }
