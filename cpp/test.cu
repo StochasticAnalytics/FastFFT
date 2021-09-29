@@ -3,6 +3,43 @@
 #include <cufft.h>
 #include <cufftXt.h>
 
+void PrintArray( float2* array, short NX, short NY, int line_wrapping = 34)
+{
+    // COMPLEX TODO make these functions.
+      int n=0;
+    for (int x = 0; x <  NX ; x++)
+    {
+      
+      std::cout << x << "[ ";
+      for (int y = 0; y < NY; y++)
+      {  
+        std::cout << array[x + y*NX].x << "," << array[x + y*NX].y << " ";
+        n++;
+        if (n == line_wrapping) {n = 0; std::cout << std::endl ;} // line wrapping
+      }
+      std::cout << "] " << std::endl;
+      n = 0;
+    }
+};
+
+void PrintArray(float* array, short NX, short NY, short NW, int line_wrapping = 34)
+{
+  
+  int n=0;
+  for (int x = 0; x <  NX ; x++)
+  {
+
+    std::cout << x << "[ ";
+    for (int y = 0; y < NY; y++)
+    {  
+      std::cout << array[x + y*NW*2] <<  " ";
+      n++;
+      if (n == line_wrapping) {n = 0; std::cout << std::endl ;} // line wrapping
+    }
+    std::cout << "] " << std::endl;
+    n = 0;
+  } 
+};
 
 // The Fourier transform of a constant should be a unit impulse, and on back fft, without normalization, it should be a constant * N.
 // It is assumed the input/output have the same dimension (i.e. no padding)
@@ -109,20 +146,19 @@ void const_image_test(std::vector<int> size)
       if (host_output.complex_values[index].x != 0.0f && host_output.complex_values[index].y != 0.0f) {test_passed = false;} // std::cout << host_output.complex_values[index].x  << " " << host_output.complex_values[index].y << " " << std::endl;}
     }
     if (host_output.complex_values[0].x != (float)dims_out.x * (float)dims_out.y * (float)dims_out.z) test_passed = false;
-    // int nn=0;
-    // for (int x = 0; x <  host_output.size.y ; x++)
-    // {
-      
-    //   std::cout << x << "[ ";
-    //   for (int y = 0; y < host_output.size.w; y++)
-    //   {  
-    //     std::cout << host_output.complex_values[x + y*host_output.size.y].x << "," << host_output.complex_values[x + y*host_output.size.y].y << " ";
-    //     nn++;
-    //     if (nn == 34) {nn = 0; std::cout << std::endl ;} // line wrapping
-    //   }
-    //   std::cout << "] " << std::endl;
-    //   nn = 0;
-    // }
+
+    #if FFT_STAGE == 0
+      PrintArray(host_output.real_values, dims_out.x, dims_in.y, dims_out.w);
+      std::cout << "stage 0 " << std::endl;
+    #elif FFT_STAGE == 1
+      PrintArray(host_output.complex_values, dims_in.y, dims_out.w);
+      std::cout << "stage 1 " << std::endl;
+    #else
+      PrintArray(host_output.complex_values, dims_in.y, dims_out.w);
+      std::cout << "stage 2 " << std::endl;
+    #endif
+
+    exit(1);
 
     if (test_passed == false) {all_passed = false; FastFFT_forward_passed[n] = false;}
     // MyFFTDebugAssertTestTrue( test_passed, "FastFFT unit impulse forward FFT");

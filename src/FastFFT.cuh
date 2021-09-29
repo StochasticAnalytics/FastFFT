@@ -472,8 +472,8 @@ struct io
   // const decorator on the thread mem, as we want to modify it with the twiddle factors
   // before reducing the full shared mem space.
 
-  // FIXME This is unfortunate duplicated in reduce_block_fft_c2r with the exception of the
-  // macro defintion to debug. Changes here must be applied to reduce_block_fft_c3r
+  // FIXME This is unfortunate duplicated in reduce_block_fft_c2r /r2cwith the exception of the
+  // macro defintion to debug. Changes here must be applied to reduce_block_fft_c2r r2c
   // TODO: Remove this duplication if possible
   static inline __device__ void reduce_block_fft(complex_type*       thread_data,
                                                  complex_type*       shared_mem,
@@ -561,6 +561,51 @@ struct io
       __syncthreads();
     }
   } // reduce_block_fft
+
+    // FIXME This is an unfortunate duplication of reduce_block_fft with the exception of the
+  // macro defintion to debug. Changes here must be applied to reduce_block_fft
+  // TODO: Remove this if possible
+  static inline __device__ void reduce_block_fft_r2c(complex_type*       thread_data,
+                                                     complex_type*       shared_mem,
+                                                     const float         twiddle_in,
+                                                     const unsigned int  Q) 
+  {
+    const unsigned int stride = stride_size();
+    unsigned int       index  = threadIdx.x + (threadIdx.z*size_of<FFT>::value);
+    complex_type twiddle;
+    // In the first loop, all threads participate and write back to natural order in shared memory
+    // while also updating with the full size twiddle factor.
+    for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+    {
+      #if FFT_STAGE > 0
+        // ( index * threadIdx.z) == ( k % P * n2 )
+        SINCOS( twiddle_in * (index * threadIdx.z) ,&twiddle.y,&twiddle.x);
+        thread_data[i] *= twiddle;
+      #endif
+
+      shared_mem[GetSharedMemPaddedIndex(index)] = thread_data[i];
+      index += stride;
+    }
+    __syncthreads();
+
+    // Now we reduce the shared memory into the first block of size P
+    // Reuse index 
+    for (index = 2; index <= Q; index *= 2)
+    {
+      // Some threads drop out each loop
+      if (threadIdx.z % index == 0)
+      {
+        for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+        {
+          #if FFT_STAGE > 0
+            thread_data[i] += shared_mem[GetSharedMemPaddedIndex(threadIdx.x + (i*stride) + (index/2 * size_of<FFT>::value))];
+          #endif
+        }
+      } // end if condition
+        // All threads can reach this point
+        __syncthreads();
+    } // reduce_block_fft
+  }
 
   static inline __device__ void store_r2c_reduced(const complex_type* thread_data,
                                                   complex_type*       output,
