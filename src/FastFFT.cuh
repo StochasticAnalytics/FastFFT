@@ -532,7 +532,7 @@ struct io
     // while also updating with the full size twiddle factor.
     for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
     {
-      #if FFT_STAGE > 2
+      #if FFT_STAGE > 3
         // ( index * threadIdx.z) == ( k % P * n2 )
         SINCOS( twiddle_in * (index * threadIdx.z) ,&twiddle.y,&twiddle.x);
         thread_data[i] *= twiddle;
@@ -552,7 +552,7 @@ struct io
       {
         for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
         {
-          #if FFT_STAGE > 2
+          #if FFT_STAGE > 3
             thread_data[i] += shared_mem[GetSharedMemPaddedIndex(threadIdx.x + (i*stride) + (index/2 * size_of<FFT>::value))];
           #endif
         }
@@ -1223,7 +1223,7 @@ struct io_thread
     twiddle_in *= threadIdx.x; // twiddle factor arg now just needs to multiplied by K = (index + i) 
     for (unsigned int i = 0; i < size_of<FFT>::value; i++)
     {
-      #if FFT_STAGE > 2
+      #if FFT_STAGE > 3
         SINCOS( twiddle_in * (index + i) ,&twiddle.y,&twiddle.x);
         shared_output[index +  i] = (twiddle.x*thread_data[i].x - twiddle.y*thread_data[i].y); // assuming the output is real, only the real parts add, so don't bother with the complex
       #else
@@ -1232,7 +1232,7 @@ struct io_thread
     }  
     __syncthreads(); // make sure all the shared mem is initialized to the starting value. There should be no contention as every thread is working on its own block of memory. 
 
-    #if FFT_STAGE > 2
+    #if FFT_STAGE > 3
       for (unsigned int sub_fft = 1; sub_fft < Q; sub_fft++)
       {
         // wrap around, 0 --> 1, Q-1 --> 0 etc.

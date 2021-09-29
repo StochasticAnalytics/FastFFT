@@ -173,7 +173,7 @@ void const_image_test(std::vector<int> size)
     FT.InvFFT();
     FT.CopyDeviceToHost( true, true);
  
-    if (true)
+    if (false)
     {
       #if FFT_STAGE == 3
         PrintArray(host_output.real_values, dims_out.x, dims_out.y, dims_out.w);
@@ -327,59 +327,57 @@ void unit_impulse_test(std::vector<int>size, bool do_increase_size)
   FT.FwdFFT(swap_real_space_quadrants);
 
   int n=0;
-  // if (do_increase_size)
-  // {
-        // do not deallocate, do not unpin memory
+  if (do_increase_size)
+  {
     FT.CopyDeviceToHost(host_output.real_values, false, false);
-    // FastFFT::PrintVectorType(host_output.size);
-    // for (int x = 0; x <  host_output.size.y ; x++)
-    // {
-      
-    //   std::cout << x << " [ ";
-    //   for (int y = 0; y < host_output.size.w; y++)
-    //   {  
-    //     std::cout << host_output.complex_values[x + y*host_output.size.y].x << "," << host_output.complex_values[x + y*host_output.size.y].y << " ";
-    //     n++;
-    //     if (n == 33) {n = 0; std::cout <<  " ] " <<std::endl ;} // line wrapping
-    //   }
-    //   // std::cout << "] " << std::endl;
-    //   n = 0;
-    // }
+    if (false)
+    {
+      #if FFT_STAGE == 0
+        PrintArray(host_output.real_values, dims_out.x, dims_out.y, dims_out.w);
+        std::cout << "stage 0 " << std::endl;
+      #elif FFT_STAGE == 1
+        // If we are doing a fwd increase, the data will have only been expanded along the (transposed) X dimension at this point
+        // So the (apparent) X is dims_in.y not dims_out.y
+        PrintArray(host_output.complex_values, dims_in.y, dims_out.w);
+        std::cout << "stage 1 " << std::endl;
+      #elif FFT_STAGE == 2
+        // Now the array is fully expanded to dims_out, but still transposed
+        PrintArray(host_output.complex_values, dims_out.y, dims_out.w);
+        std::cout << "stage 2 " << std::endl;
+      # else
+        std::cout << " This block is only valid for FFT_STAGE == 0 || 1 || 2 " << std::endl;
+      #endif   
+      exit(0);
+    }
+  }
+  else
+  {
+    FT.CopyDeviceToHost(false, false, FT.ReturnInputMemorySize());
+    if (false)
+    {
+      #if FFT_STAGE == 0
+        PrintArray(host_input.real_values, dims_out.x, dims_out.y, dims_out.w);
+        std::cout << "stage 0 " << std::endl;
+      #elif FFT_STAGE == 1
+        // If we are doing a fwd increase, the data will have only been expanded along the (transposed) X dimension at this point
+        // So the (apparent) X is dims_in.y not dims_out.y
+        PrintArray(host_input.complex_values, dims_in.y, dims_out.w);
+        std::cout << "stage 1 " << std::endl;
+      #elif FFT_STAGE == 2
+        // Now the array is fully expanded to dims_out, but still transposed
+        PrintArray(host_input.complex_values, dims_out.y, dims_out.w);
+        std::cout << "stage 2 " << std::endl;
+      # else
+        std::cout << " This block is only valid for FFT_STAGE == 0 || 1 || 2 " << std::endl;
+      #endif   
+      exit(0);
+    }
+  }
 
     sum = ReturnSumOfComplexAmplitudes(host_output.complex_values, host_output.real_memory_allocated/2); 
     // std::cout << sum << " " << host_output.real_memory_allocated<< std::endl;
     sum -= (host_output.real_memory_allocated/2 );
     // sum -= host_output.size.y; // for even dimension there is an extra row
-  // }
-  // else
-  // {
-  //   // Fixme, this is only for size change decrease when half the xform is done.
-  //       // do not deallocate, do not unpin memory
-  //   FT.CopyDeviceToHost(false, false, FT.ReturnInputMemorySize());
-  //   FastFFT::PrintVectorType(host_input.size);
-  //   for (int x = 0; x <  host_input.size.y ; x++)
-  //   {
-      
-  //     std::cout << x << " [ ";
-  //     for (int y = 0; y < host_output.size.w; y++)
-  //     {  
-  //       std::cout << host_input.complex_values[x + y*host_input.size.y].x << "," << host_input.complex_values[x + y*host_input.size.y].y << " ";
-  //       n++;
-  //       if (n == 33) {n = 0; std::cout <<  " ] " <<std::endl ;} // line wrapping
-  //     }
-  //     std::cout << "] " << std::endl;
-  //     n = 0;
-  //   } 
-  //   // sum = ReturnSumOfComplexAmplitudes(host_input.complex_values, host_input.real_memory_allocated/2); 
-  //   // std::printf("sum is %f, mem is %i\n", sum ,host_input.real_memory_allocated);
-  //   // sum -= (host_input.real_memory_allocated/2 );
-  //   // sum -= host_input.size.y;
-
-  //   sum = ReturnSumOfComplexAmplitudes(host_output.complex_values, host_output.real_memory_allocated/2); 
-  //   // std::cout << sum << " " << host_output.real_memory_allocated<< std::endl;
-  //   sum -= (host_output.real_memory_allocated/2 );
-  //   sum -= host_output.size.y; // for even dimension there is an extra row
-  // }
 
   // std::cout << "sum " << sum << std::endl;
   // std::cout << "FFT Unit Impulse Forward FFT: " << sum <<  " epsilon " << host_output.fftw_epsilon << std::endl;
@@ -392,17 +390,21 @@ void unit_impulse_test(std::vector<int>size, bool do_increase_size)
 
   FT.InvFFT();
   FT.CopyDeviceToHost(host_output.real_values, true, true);
-  // for (int x = 0; x < 128; x++)
-  // {
-  //   int n=0;
-  //   std::cout << x << "[ ";
-  //   for (int y = 0; y < 128; y++)
-  //   {  
-  //     std::cout << host_output[x + y*130]<< " ";
-  //   }
-  //   std::cout << "] " << n << std::endl;
-  // }
-  // Assuming the outputs are always even dimensions, padding_jump_val is always 2.
+
+  if (true)
+  {
+    #if FFT_STAGE == 3
+      PrintArray(host_output.real_values, dims_out.x, dims_out.y, dims_out.w);
+      std::cout << "stage 3 " << std::endl;
+    #elif FFT_STAGE == 4
+      PrintArray(host_output.real_values, dims_out.x, dims_out.y, dims_out.w);
+      std::cout << "stage 4 " << std::endl;
+    #else
+      std::cout << " This block is only valid for FFT_STAGE == 3 || 4 " << std::endl;
+    #endif   
+
+    exit(0);
+  }
   sum = ReturnSumOfReal(host_output.real_values, dims_out);
   if (sum != dims_out.x*dims_out.y*dims_out.z) {all_passed = false; FastFFT_roundTrip_passed[iSize] = false;}
 
@@ -1026,8 +1028,8 @@ int main(int argc, char** argv)
     // exit(0);
 
 
-    const_image_test(test_size);
-    unit_impulse_test(test_size, true);
+    // const_image_test(test_size);
+    // unit_impulse_test(test_size, true);
     unit_impulse_test(test_size, false);
 
 

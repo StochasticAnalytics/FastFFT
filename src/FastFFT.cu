@@ -382,9 +382,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::FwdFFT(bool swap_re
           SetPrecisionAndExectutionMethod(r2c_increase);
           transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
           SetPrecisionAndExectutionMethod(c2c_fwd_increase);   
-       
-          // FFT_R2C_WithPadding(transpose_output);
-          // FFT_C2C_WithPadding(swap_real_space_quadrants);
+
           break;
         }
         case decrease: {
@@ -476,10 +474,6 @@ void FourierTransformer<ComputeType, InputType, OutputType>::InvFFT(bool transpo
             SetPrecisionAndExectutionMethod(c2r_none);
 
           }          
-          // // FFT_C2C(false);
-          // // FFT_C2R_Transposed();
-          // FFT_C2C_decomposed(false);
-          // FFT_C2R_decomposed(true);
           break;
         }
         case increase: {
@@ -995,37 +989,38 @@ void block_fft_kernel_R2C_INCREASE(const ScalarType* __restrict__  input_values,
     // For the other fragments we need the initial twiddle
 	for (int sub_fft = 1; sub_fft < Q-1; sub_fft++)
 	{
-
-	  io<FFT>::copy_from_shared(shared_input, thread_data, input_MAP);
-		for (int i = 0; i < FFT::elements_per_thread; i++)
-		{
-			// Pre shift with twiddle
-			__sincosf(twiddle_factor_args[i]*sub_fft,&twiddle.y,&twiddle.x);
-			thread_data[i] *= twiddle;
-		  // increment the output mapping. 
-			output_MAP[i]++;
-		}
-
     #if FFT_STAGE > 0
+      io<FFT>::copy_from_shared(shared_input, thread_data, input_MAP);
+      for (int i = 0; i < FFT::elements_per_thread; i++)
+      {
+        // Pre shift with twiddle
+        __sincosf(twiddle_factor_args[i]*sub_fft,&twiddle.y,&twiddle.x);
+        thread_data[i] *= twiddle;
+        // increment the output mapping. 
+        output_MAP[i]++;
+      }
+   
       FFT().execute(thread_data, shared_mem, workspace);
     #endif
+
     io<FFT>::store_r2c_transposed(thread_data, output_values, output_MAP, mem_offsets.pixel_pitch_output);
 	}
 
-  // For the last fragment we need to also do a bounds check.
-  io<FFT>::copy_from_shared(shared_input, thread_data, input_MAP);
-  for (int i = 0; i < FFT::elements_per_thread; i++)
-  {
-    // Pre shift with twiddle
-    __sincosf(twiddle_factor_args[i]*(Q-1),&twiddle.y,&twiddle.x);
-    thread_data[i] *= twiddle;
-    // increment the output mapping. 
-    output_MAP[i]++;
-  }
-
   #if FFT_STAGE > 0
+    // For the last fragment we need to also do a bounds check.
+    io<FFT>::copy_from_shared(shared_input, thread_data, input_MAP);
+    for (int i = 0; i < FFT::elements_per_thread; i++)
+    {
+      // Pre shift with twiddle
+      __sincosf(twiddle_factor_args[i]*(Q-1),&twiddle.y,&twiddle.x);
+      thread_data[i] *= twiddle;
+      // increment the output mapping. 
+      output_MAP[i]++;
+    }
+
     FFT().execute(thread_data, shared_mem, workspace);
   #endif
+
   io<FFT>::store_r2c_transposed(thread_data, output_values, output_MAP, mem_offsets.pixel_pitch_output, mem_offsets.shared_output);
 	
 
@@ -1061,7 +1056,7 @@ void block_fft_kernel_R2C_DECREASE(const ScalarType* __restrict__  input_values,
   #endif
 
   // Full twiddle multiply and store in natural order in shared memory
-  io<FFT>::reduce_block_fft(thread_data, shared_mem, twiddle_in, Q);
+  io<FFT>::reduce_block_fft_r2c(thread_data, shared_mem, twiddle_in, Q);
  
   // Reduce from shared memory into registers, ending up with only P valid outputs.
   io<FFT>::store_r2c_reduced(thread_data, output_values, mem_offsets.pixel_pitch_output, mem_offsets.shared_output);
@@ -1275,14 +1270,12 @@ void block_fft_kernel_C2C_DECREASE(const ComplexType* __restrict__  input_values
   // DIT shuffle, bank conflict free
   io<FFT>::copy_from_shared(shared_mem, thread_data, Q);
 
-  #if FFT_STAGE > 1
-    constexpr const unsigned int fft_shared_mem_num_elements = FFT::shared_memory_size / sizeof(complex_type);
-    FFT().execute(thread_data, &shared_mem[fft_shared_mem_num_elements * threadIdx.z], workspace);
-    __syncthreads();
-  #endif
+
+  constexpr const unsigned int fft_shared_mem_num_elements = FFT::shared_memory_size / sizeof(complex_type);
+  FFT().execute(thread_data, &shared_mem[fft_shared_mem_num_elements * threadIdx.z], workspace);
+  __syncthreads();
 
   // Full twiddle multiply and store in natural order in shared memory
-  // #if FFT_STAGE > 1 inside this function because we need to shuffle memory even if we don't do the FFT
   io<FFT>::reduce_block_fft(thread_data, shared_mem, twiddle_in, Q);
 
   // Reduce from shared memory into registers, ending up with only P valid outputs.
@@ -1318,7 +1311,6 @@ void block_fft_kernel_C2C_INCREASE(const ComplexType*  __restrict__ input_values
   // No need to __syncthreads as each thread only accesses its own shared mem anyway
   io<FFT>::load_shared(&input_values[blockIdx.y*mem_offsets.pixel_pitch_input], shared_input_complex, thread_data, twiddle_factor_args, twiddle_in, input_MAP, output_MAP, Q);
 
-  // The macro for   #if FFT_STAGE > 1 is defined in the calling function for this kernel as it can be fwd or inv > 1 or > 2
 	// In the first FFT the modifying twiddle factor is 1 so the data are reeal
 	FFT().execute(thread_data, shared_mem, workspace);
 
@@ -1388,7 +1380,6 @@ void block_fft_kernel_C2C_INCREASE_SwapRealSpaceQuadrants(const ComplexType*  __
   // No need to __syncthreads as each thread only accesses its own shared mem anyway
   io<FFT>::load_shared(&input_values[blockIdx.y*mem_offsets.pixel_pitch_input], shared_input_complex, thread_data, twiddle_factor_args, twiddle_in, input_MAP, output_MAP, Q);
 
-  // The macro for   #if FFT_STAGE > 1 is defined in the calling function for this kernel as it can be fwd or inv > 1 or > 2
 	// In the first FFT the modifying twiddle factor is 1 so the data are reeal
 	FFT().execute(thread_data, shared_mem, workspace);
 
