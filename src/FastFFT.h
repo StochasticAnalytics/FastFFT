@@ -11,6 +11,29 @@
 
 namespace FastFFT {
 
+    // For debugging
+
+  inline void PrintVectorType(int3 input) 
+  {
+    std::cout << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
+  }
+  inline void PrintVectorType(int4 input) 
+  {
+    std::cout << "(x,y,z,w) " << input.x << " " << input.y << " " << input.z << " " << input.w << std::endl;
+  }
+    inline void PrintVectorType(dim3 input) 
+  {
+    std::cout << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
+  }
+  inline void PrintVectorType(short3 input) 
+  {
+    std::cout << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
+  }
+  inline void PrintVectorType(short4 input) 
+  {
+    std::cout << "(x,y,z,w) " << input.x << " " << input.y << " " << input.z << " " << input.w << std::endl;
+  }
+
   constexpr const float PIf = 3.14159275358979323846f;
 
   typedef
@@ -119,7 +142,8 @@ public:
 
   short padding_jump_val;
   int   input_memory_allocated;
-  int   output_memory_allocated;
+  int   fwd_output_memory_allocated;
+  int   inv_output_memory_allocated;
   int   compute_memory_allocated;
   int   memory_size_to_copy;
 
@@ -158,9 +182,11 @@ public:
 
   void CopyHostToDevice();
   // By default we are blocking with a stream sync until complete for simplicity. This is overkill and should FIXME.
-  void CopyDeviceToHost(bool free_gpu_memory, bool unpin_host_memory);
+  // If int n_elements_to_copy = 0 the appropriate size will be determined by the state of the transform completed (none, fwd, inv.) 
+  // For partial increase/decrease transforms, needed for testing, this will be invalid, so specify the int n_elements_to_copy.
+  void CopyDeviceToHost(bool free_gpu_memory, bool unpin_host_memory, int n_elements_to_copy = 0);
   // When the size changes, we need a new host pointer
-  void CopyDeviceToHost(OutputType* output_pointer, bool free_gpu_memory = true, bool unpin_host_memory = true);
+  void CopyDeviceToHost(OutputType* output_pointer, bool free_gpu_memory = true, bool unpin_host_memory = true, int n_elements_to_copy = 0);
   // FFT calls
 
   void FwdFFT(bool swap_real_space_quadrants = false, bool transpose_output = true);
@@ -174,7 +200,9 @@ public:
   // For all real valued inputs, assumed for any InputType that is not float2 or __half2
 
   int inline ReturnInputMemorySize() { return input_memory_allocated; }
-  int inline ReturnOutputMemorySize() { return output_memory_allocated; }
+  int inline ReturnFwdOutputMemorySize() { return fwd_output_memory_allocated; }
+  int inline ReturnInvOutputMemorySize() { return inv_output_memory_allocated; }
+
   short4 inline ReturnFwdInputDimensions() { return fwd_dims_in; }
   short4 inline ReturnFwdOutputDimensions() { return fwd_dims_out; }
   short4 inline ReturnInvInputDimensions() { return fwd_dims_in; }
@@ -198,6 +226,55 @@ public:
 
   // Input is real or complex inferred from InputType
   DevicePointers<InputType*, ComputeType*> d_ptr;
+
+   void PrintState()
+  {
+    std::cout << "================================================================" << std::endl; 
+    std::cout << "Device Properties: " << std::endl;
+    std::cout << "================================================================" << std::endl; 
+
+    std::cout << "Device idx: " << device_properties.device_id << std::endl;
+    std::cout << "max_shared_memory_per_block: " << device_properties.max_shared_memory_per_block << std::endl;
+    std::cout << "max_shared_memory_per_SM: " << device_properties.max_shared_memory_per_SM << std::endl;
+    std::cout << "max_registers_per_block: " << device_properties.max_registers_per_block << std::endl;
+    std::cout << "max_persisting_L2_cache_size: " << device_properties.max_persisting_L2_cache_size << std::endl;
+    std::cout << std::endl;
+
+    std::cout << "State Variables:\n" << std::endl;
+    std::cout << "is_in_memory_host_pointer " << is_in_memory_host_pointer << std::endl;
+    std::cout << "is_in_memory_device_pointer " << is_in_memory_device_pointer << std::endl;
+    std::cout << "is_in_buffer_memory " << is_in_buffer_memory << std::endl;
+    std::cout << "is_host_memory_pinned " << is_host_memory_pinned << std::endl;
+    std::cout << "is_fftw_padded_input " << is_fftw_padded_input << std::endl;
+    std::cout << "is_fftw_padded_output " << is_fftw_padded_output << std::endl;
+    std::cout << "is_real_valued_input " << is_real_valued_input << std::endl;
+    std::cout << "is_set_input_params " << is_set_input_params << std::endl;
+    std::cout << "is_set_output_params " << is_set_output_params << std::endl;
+    std::cout << "is_size_validated " << is_size_validated << std::endl;
+    std::cout << "is_set_input_pointer " << is_set_input_pointer << std::endl;
+    std::cout << std::endl;
+
+    std::cout << "Size variables:\n" << std::endl;
+    std::cout << "transform_size.N " << transform_size.N << std::endl;
+    std::cout << "transform_size.L " << transform_size.L << std::endl;
+    std::cout << "transform_size.P " << transform_size.P << std::endl;
+    std::cout << "transform_size.Q " << transform_size.Q << std::endl;
+    std::cout << "fwd_dims_in.x,y,z "; PrintVectorType(fwd_dims_in); std::cout << std::endl;
+    std::cout << "fwd_dims_out.x,y,z " ; PrintVectorType(fwd_dims_out); std::cout<< std::endl;
+    std::cout << "inv_dims_in.x,y,z " ; PrintVectorType(inv_dims_in); std::cout<< std::endl;
+    std::cout << "inv_dims_out.x,y,z " ; PrintVectorType(inv_dims_out); std::cout<< std::endl;
+    std::cout << std::endl;
+
+    std::cout << "Misc:\n" << std::endl;
+    std::cout << "compute_memory_allocated " << compute_memory_allocated << std::endl;
+    std::cout << "memory size to copy " << memory_size_to_copy << std::endl;
+    std::cout << "fwd_size_change_type " << SizeChangeName[fwd_size_change_type] << std::endl;
+    std::cout << "inv_size_change_type " << SizeChangeName[inv_size_change_type] << std::endl;
+    std::cout << "transform stage complete " << TransformStageCompletedName[transform_stage_completed] << std::endl;
+    std::cout << "input_origin_type " << OriginTypeName[input_origin_type] << std::endl;
+    std::cout << "output_origin_type " << OriginTypeName[output_origin_type] << std::endl;
+    
+  }; // PrintState()
 
 private:
 
@@ -273,7 +350,10 @@ private:
                     c2r_decomposed, 
                     c2r_decomposed_transposed, 
                     c2r_none, c2r_decrease, c2r_increase,
-                    xcorr_transposed, 
+                    xcorr_fwd_increase_inv_none, //  (e.g. template matching)
+                    xcorr_fwd_decrease_inv_none, // (e.g. Fourier cropping)
+                    xcorr_fwd_none_inv_decrease, // (e.g. movie/particle translational search)
+                    xcorr_fwd_decrease_inv_decrease, // (e.g. bandlimit, xcorr, translational search)
                     xcorr_decomposed }; // Used to specify the origin of the data
   // WARNING this is flimsy and prone to breaking, you must ensure the order matches the KernelType enum.
   std::vector<std::string> 
@@ -286,7 +366,10 @@ private:
                     "c2r_decomposed", 
                     "c2r_decomposed_transposed", 
                     "c2r_none", "c2r_decrease", "c2r_increase",
-                    "xcorr_transposed", 
+                    "xcorr_fwd_increase_inv_none", 
+                    "xcorr_fwd_decrease_inv_none",
+                    "xcorr_fwd_none_inv_decrease",
+                    "xcorr_fwd_decrease_inv_decrease",
                     "xcorr_decomposed" };
 
   inline bool IsThreadType(KernelType kernel_type)
@@ -302,7 +385,7 @@ private:
              kernel_type == c2c_fwd_none || kernel_type == c2c_fwd_decrease || kernel_type == c2c_fwd_increase ||
              kernel_type == c2c_inv_none || kernel_type == c2c_inv_decrease || kernel_type == c2c_inv_increase ||
              kernel_type == c2r_none || kernel_type == c2r_decrease || kernel_type == c2r_increase ||
-             kernel_type == xcorr_transposed )
+             kernel_type == xcorr_fwd_increase_inv_none || kernel_type == xcorr_fwd_decrease_inv_none || kernel_type == xcorr_fwd_none_inv_decrease || kernel_type == xcorr_fwd_decrease_inv_decrease)
     { 
       return false;
     }
@@ -334,11 +417,14 @@ private:
     else return false; 
   }
 
+  // This is used to set the sign of the twiddle factor for decomposed kernels, whether threaded, or part of a block fft.
+  // For mixed kernels (eg. xcorr_* the size type is defined by where the size change happens.
   inline bool IsForwardType(KernelType kernel_type)
   {
       if (kernel_type == r2c_decomposed || kernel_type == r2c_decomposed_transposed ||
           kernel_type == r2c_none || kernel_type == r2c_decrease || kernel_type == r2c_increase ||
-          kernel_type == c2c_fwd_none || kernel_type == c2c_fwd_decrease || kernel_type == c2c_fwd_increase)
+          kernel_type == c2c_fwd_none || kernel_type == c2c_fwd_decrease || kernel_type == c2c_fwd_increase ||
+          kernel_type == xcorr_fwd_decrease_inv_none || kernel_type == xcorr_fwd_increase_inv_none)
 
     {
       return true;
@@ -411,28 +497,7 @@ private:
   template <class FFT_base_arch, bool use_thread_method = false>
   void SetAndLaunchKernel(KernelType kernel_type, bool do_forward_transform);
 
-  // For debugging
 
-  inline void PrintVectorType(int3 input) 
-  {
-    std::cout << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
-  }
-  inline void PrintVectorType(int4 input) 
-  {
-    std::cout << "(x,y,z,w) " << input.x << " " << input.y << " " << input.z << " " << input.w << std::endl;
-  }
-    inline void PrintVectorType(dim3 input) 
-  {
-    std::cout << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
-  }
-  inline void PrintVectorType(short3 input) 
-  {
-    std::cout << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
-  }
-  inline void PrintVectorType(short4 input) 
-  {
-    std::cout << "(x,y,z,w) " << input.x << " " << input.y << " " << input.z << " " << input.w << std::endl;
-  }
 
   void PrintLaunchParameters(LaunchParams LP)
   {
@@ -449,54 +514,7 @@ private:
     std::cout << "  pixel pitch output: " << LP.mem_offsets.pixel_pitch_output << std::endl;
 
   };
-  void PrintState()
-  {
-    std::cout << "================================================================" << std::endl; 
-    std::cout << "Device Properties: " << std::endl;
-    std::cout << "================================================================" << std::endl; 
-
-    std::cout << "Device idx: " << device_properties.device_id << std::endl;
-    std::cout << "max_shared_memory_per_block: " << device_properties.max_shared_memory_per_block << std::endl;
-    std::cout << "max_shared_memory_per_SM: " << device_properties.max_shared_memory_per_SM << std::endl;
-    std::cout << "max_registers_per_block: " << device_properties.max_registers_per_block << std::endl;
-    std::cout << "max_persisting_L2_cache_size: " << device_properties.max_persisting_L2_cache_size << std::endl;
-    std::cout << std::endl;
-
-    std::cout << "State Variables:\n" << std::endl;
-    std::cout << "is_in_memory_host_pointer " << is_in_memory_host_pointer << std::endl;
-    std::cout << "is_in_memory_device_pointer " << is_in_memory_device_pointer << std::endl;
-    std::cout << "is_in_buffer_memory " << is_in_buffer_memory << std::endl;
-    std::cout << "is_host_memory_pinned " << is_host_memory_pinned << std::endl;
-    std::cout << "is_fftw_padded_input " << is_fftw_padded_input << std::endl;
-    std::cout << "is_fftw_padded_output " << is_fftw_padded_output << std::endl;
-    std::cout << "is_real_valued_input " << is_real_valued_input << std::endl;
-    std::cout << "is_set_input_params " << is_set_input_params << std::endl;
-    std::cout << "is_set_output_params " << is_set_output_params << std::endl;
-    std::cout << "is_size_validated " << is_size_validated << std::endl;
-    std::cout << "is_set_input_pointer " << is_set_input_pointer << std::endl;
-    std::cout << std::endl;
-
-    std::cout << "Size variables:\n" << std::endl;
-    std::cout << "transform_size.N " << transform_size.N << std::endl;
-    std::cout << "transform_size.L " << transform_size.L << std::endl;
-    std::cout << "transform_size.P " << transform_size.P << std::endl;
-    std::cout << "transform_size.Q " << transform_size.Q << std::endl;
-    std::cout << "fwd_dims_in.x,y,z "; PrintVectorType(fwd_dims_in); std::cout << std::endl;
-    std::cout << "fwd_dims_out.x,y,z " ; PrintVectorType(fwd_dims_out); std::cout<< std::endl;
-    std::cout << "inv_dims_in.x,y,z " ; PrintVectorType(inv_dims_in); std::cout<< std::endl;
-    std::cout << "inv_dims_out.x,y,z " ; PrintVectorType(inv_dims_out); std::cout<< std::endl;
-    std::cout << std::endl;
-
-    std::cout << "Misc:\n" << std::endl;
-    std::cout << "compute_memory_allocated " << compute_memory_allocated << std::endl;
-    std::cout << "memory size to copy " << memory_size_to_copy << std::endl;
-    std::cout << "fwd_size_change_type " << SizeChangeName[fwd_size_change_type] << std::endl;
-    std::cout << "inv_size_change_type " << SizeChangeName[inv_size_change_type] << std::endl;
-    std::cout << "transform stage complete " << TransformStageCompletedName[transform_stage_completed] << std::endl;
-    std::cout << "input_origin_type " << OriginTypeName[input_origin_type] << std::endl;
-    std::cout << "output_origin_type " << OriginTypeName[output_origin_type] << std::endl;
-    
-  }; // PrintState()
+ 
 
 
 }; // class Fourier Transformer

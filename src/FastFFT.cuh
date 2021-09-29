@@ -8,9 +8,9 @@
 
 
 // When defined Turns on synchronization based checking for all FFT kernels as well as cudaErr macros
-// #define HEAVYERRORCHECKING_FFT 
+#define HEAVYERRORCHECKING_FFT 
 // Various levels of debuging conditions and prints
-#define FFT_DEBUG_LEVEL 0
+#define FFT_DEBUG_LEVEL 4
 
 #if FFT_DEBUG_LEVEL < 1
 
@@ -54,10 +54,10 @@
 
 
 // Always in use
-#define MyFFTPrint(...)	//{std::cerr << __VA_ARGS__  << std::endl;}
-#define MyFFTPrintWithDetails(...)	//{std::cerr << __VA_ARGS__  << " From: " << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl;}
-#define MyFFTRunTimeAssertTrue(cond, msg, ...) //{if ((cond) != true) { std::cerr << msg   << std::endl << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}}
-#define MyFFTRunTimeAssertFalse(cond, msg, ...) //{if ((cond) == true) { std::cerr << msg  << std::endl << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}}
+#define MyFFTPrint(...)	{std::cerr << __VA_ARGS__  << std::endl;}
+#define MyFFTPrintWithDetails(...)	{std::cerr << __VA_ARGS__  << " From: " << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl;}
+#define MyFFTRunTimeAssertTrue(cond, msg, ...) {if ((cond) != true) { std::cerr << msg   << std::endl << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}}
+#define MyFFTRunTimeAssertFalse(cond, msg, ...) {if ((cond) == true) { std::cerr << msg  << std::endl << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}}
 
 // Note we are using std::cerr b/c the wxWidgets apps running in cisTEM are capturing std::cout
 #ifndef HEAVYERRORCHECKING_FFT 
@@ -104,15 +104,15 @@ namespace FastFFT {
 
   static constexpr const int bank_size = 32;
   static constexpr const int bank_padded = bank_size + 1;
-  static constexpr const int ubank_size = 32;
-  static constexpr const int ubank_padded = ubank_size + 1;
-  __device__ __forceinline__ int GetShmemPaddedIndex(const int index)
+  static constexpr const unsigned int ubank_size = 32;
+  static constexpr const unsigned int ubank_padded = ubank_size + 1;
+  __device__ __forceinline__ int GetSharedMemPaddedIndex(const int index)
   {
-    return ( index % bank_size ) + ( index / bank_size * bank_padded );
+    return ( index % bank_size ) + ( (index / bank_size) * bank_padded );
   }
-  __device__ __forceinline__ int GetShmemPaddedIndex(const unsigned int index)
+  __device__ __forceinline__ int GetSharedMemPaddedIndex(const unsigned int index)
   {
-    return ( index % ubank_size ) + ( index / ubank_size * ubank_padded );
+    return ( index % ubank_size ) + ( (index / ubank_size) * ubank_padded );
   }
 
   // Complex a * conj b multiplication
@@ -151,7 +151,13 @@ void CheckSharedMemory(int& memory_requested, DeviceProps& dp) {
   MyFFTRunTimeAssertFalse(memory_requested > dp.max_shared_memory_per_SM, "The shared memory requested is greater than permitted for this arch.") ;
   // if (memory_requested > dp.max_shared_memory_per_block) { memory_requested = dp.max_shared_memory_per_block; }
 }
+void CheckSharedMemory(unsigned int& memory_requested, DeviceProps& dp) {
 
+  // Depends on GetCudaDeviceProps having been called, which should be happening in the constructor.
+  // Throw an error if requesting more than allowed, otherwise, we'll set to requested and let the rest be L1 Cache.
+  MyFFTRunTimeAssertFalse(memory_requested > dp.max_shared_memory_per_SM, "The shared memory requested is greater than permitted for this arch.") ;
+  // if (memory_requested > dp.max_shared_memory_per_block) { memory_requested = dp.max_shared_memory_per_block; }
+}
 
 using namespace cufftdx;
 
@@ -182,6 +188,10 @@ template<class FFT, class ComplexType = typename FFT::value_type, class ScalarTy
 __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_R2C_INCREASE(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 
+// __launch_bounds__(FFT::max_threads_per_block)  we don't know this because it is threadDim.x * threadDim.z - this could be templated if it affects performance significantly
+template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
+__global__
+void block_fft_kernel_R2C_DECREASE(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 
 /////////////
 // C2C
@@ -191,17 +201,30 @@ template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_C2C_INCREASE(const ComplexType* __restrict__  input_values, ComplexType*  __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 
+// __launch_bounds__(FFT::max_threads_per_block)  we don't know this because it is threadDim.x * threadDim.z - this could be templated if it affects performance significantly
+template<class FFT, class ComplexType = typename FFT::value_type>
+__global__
+void block_fft_kernel_C2C_DECREASE(const ComplexType* __restrict__  input_values, ComplexType*  __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
+
 template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_C2C_WithPadding_SwapRealSpaceQuadrants(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 
 template<class FFT, class invFFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2C_WithPadding_ConjMul_C2C( const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv);
+void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul( const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, 
+                                                Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv);
 
 template<class FFT, class invFFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2C_WithPadding_ConjMul_C2C_SwapRealSpaceQuadrants( const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv);
+void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul_SwapRealSpaceQuadrants(const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, 
+                                                                      Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv);
+
+template<class FFT, class invFFT, class ComplexType = typename FFT::value_type>
+__global__
+void block_fft_kernel_C2C_FWD_NONE_INV_DECREASE_ConjMul( const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, 
+                                                Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv);
+
 
 template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
@@ -216,7 +239,10 @@ template<class FFT, class ComplexType = typename FFT::value_type, class ScalarTy
 __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_C2R_NONE(const ComplexType*  __restrict__ input_values, ScalarType*  __restrict__ output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
 
-
+// __launch_bounds__(FFT::max_threads_per_block)  we don't know this because it is threadDim.x * threadDim.z - this could be templated if it affects performance significantly
+template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
+__global__
+void block_fft_kernel_C2R_DECREASE(const ComplexType*  __restrict__ input_values, ScalarType*  __restrict__ output_values, Offsets mem_offsets, const float twiddle_in, const unsigned int Q, typename FFT::workspace_type workspace);
 
 //////////////////////////////
 // Thread FFT based Kernel definitions
@@ -415,6 +441,96 @@ struct io
 
   } // load_r2c_shared}
 
+  static inline __device__ void load_r2c_shared_and_pad(const scalar_type*  input,
+                                                        complex_type*       shared_mem) 
+  {
+    const unsigned int stride = stride_size();
+    unsigned int       index  = threadIdx.x + (threadIdx.z*size_of<FFT>::value);
+    for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+    {
+      shared_mem[GetSharedMemPaddedIndex(index)] = complex_type(input[index], 0.f);
+      index += stride; 
+    }
+    __syncthreads();
+  } // load_r2c_shared_and_pad
+
+  static inline __device__ void copy_from_shared(const complex_type*  shared_mem,
+                                                 complex_type*        thread_data,
+                                                 const unsigned int   Q) 
+  {
+    const unsigned int stride = stride_size() * Q; // I think the Q is needed, but double check me TODO
+    unsigned int       index  = (threadIdx.x * Q) + threadIdx.z;
+    for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+    {
+      thread_data[i] = shared_mem[GetSharedMemPaddedIndex(index)];
+      index += stride;
+    }
+    __syncthreads(); // FFT().execute is setup to reuse the shared mem, so we need to sync here. Optionally, we could allocate more shared mem and remove this sync
+  } // copy_from_shared
+
+  // Note that unlike most functions in this file, this one does not have a
+  // const decorator on the thread mem, as we want to modify it with the twiddle factors
+  // before reducing the full shared mem space.
+  static inline __device__ void reduce_block_fft(complex_type*       thread_data,
+                                                 complex_type*       shared_mem,
+                                                 const float         twiddle_in,
+                                                 const unsigned int  Q) 
+  {
+    const unsigned int stride = stride_size();
+    unsigned int       index  = threadIdx.x + (threadIdx.z*size_of<FFT>::value);
+    complex_type twiddle;
+    // In the first loop, all threads participate and write back to natural order in shared memory
+    // while also updating with the full size twiddle factor.
+    for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+    {
+      // ( index * threadIdx.z) == ( k % P * n2 )
+      SINCOS( twiddle_in * (index * threadIdx.z) ,&twiddle.y,&twiddle.x);
+      thread_data[i] *= twiddle;
+      shared_mem[GetSharedMemPaddedIndex(index)] = thread_data[i];
+      index += stride;
+    }
+    __syncthreads();
+
+    // Now we reduce the shared memory into the first block of size P
+    // Reuse index 
+    for (index = 2; index <= Q; index *= 2)
+    {
+      // Some threads drop out each loop
+      if (threadIdx.z % index == 0)
+      {
+        for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+        {
+          thread_data[i] += shared_mem[GetSharedMemPaddedIndex(threadIdx.x + (i*stride) + (index/2 * size_of<FFT>::value))];
+        }
+      } // end if condition
+      // All threads can reach this point
+      __syncthreads();
+    }
+  } // reduce_block_fft
+
+  static inline __device__ void store_r2c_reduced(const complex_type* thread_data,
+                                                  complex_type*       output,
+                                                  const unsigned int           pixel_pitch,
+                                                  const unsigned int           memory_limit)
+  {
+    if (threadIdx.z == 0)
+    {
+      // Finally we write out the first size_of<FFT>::values to global
+      const unsigned int stride = stride_size();
+      unsigned int       index  = threadIdx.x;
+      for (unsigned int i = 0; i <= FFT::elements_per_thread / 2  ; i++) 
+      {
+        if (index < memory_limit)
+        {
+          // transposed index.
+          output[index*pixel_pitch + blockIdx.y] = thread_data[i];  
+        }
+        index += stride;
+      }    
+
+    } // if on first sub fft (threadIdx.z == 0)
+  } // store_r2c_reduced
+
   // when using load_shared || load_r2c_shared, we need then copy from shared mem into the registers.
   // notice we still need the packed complex values for the xform.
   static inline __device__ void copy_from_shared(const scalar_type* shared_input,
@@ -544,6 +660,29 @@ struct io
     }
   } // load_c2r_transposed
 
+  static inline __device__ void load_c2r_shared_and_pad(const complex_type*  input,
+                                                        complex_type*       shared_mem,
+                                                        const unsigned int  pixel_pitch) 
+  {
+    const unsigned int stride = stride_size();
+    unsigned int       index  = threadIdx.x + (threadIdx.z*size_of<FFT>::value);
+    for (unsigned int i = 0; i < FFT::elements_per_thread / 2; i++) 
+    {
+      shared_mem[GetSharedMemPaddedIndex(index)] = input[pixel_pitch*index];
+      index += stride;
+    }
+    // This should work, but could also pass in the memory limit as on r2c_store_transposed
+    constexpr unsigned int threads_per_fft       = cufftdx::size_of<FFT>::value / FFT::elements_per_thread;
+    constexpr unsigned int output_values_to_load = (cufftdx::size_of<FFT>::value / 2) + 1;
+    // threads_per_fft == 1 means that EPT == SIZE, so we need to load one more element
+    constexpr unsigned int values_left_to_load = threads_per_fft == 1 ? 1 : (output_values_to_load % threads_per_fft);
+    if (threadIdx.x < values_left_to_load) 
+    {
+      shared_mem[GetSharedMemPaddedIndex(index)] = input[pixel_pitch*index];
+    }
+    __syncthreads();
+  } // load_c2r_shared_and_pad
+
   // this may benefit from asynchronous execution
   static inline __device__ void load(const complex_type* input,
                                      complex_type*       thread_data) 
@@ -669,6 +808,59 @@ struct io
       index += stride;
     }
   } // store_coalesced
+
+
+  static inline __device__ void load_c2c_shared_and_pad(const complex_type*  input,
+                                                        complex_type*       shared_mem) 
+  {
+    const unsigned int stride = stride_size();
+    unsigned int       index  = threadIdx.x + (threadIdx.z*size_of<FFT>::value);
+    for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+    {
+      shared_mem[GetSharedMemPaddedIndex(index)] = input[index];
+      index += stride;
+    }
+    __syncthreads();
+  } // load_c2c_shared_and_pad
+
+  static inline __device__ void store_c2c_reduced(const complex_type* thread_data,
+                                                  complex_type*       output)
+  {
+    if (threadIdx.z == 0)
+    {
+      // Finally we write out the first size_of<FFT>::values to global
+      const unsigned int stride = stride_size();
+      unsigned int       index  = threadIdx.x + (threadIdx.z*size_of<FFT>::value);
+      for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+      {
+        if (index < size_of<FFT>::value)
+        {
+          // transposed index.
+          output[index] = thread_data[i];
+        }
+      index += stride;
+      }
+    }
+  } // store_c2c_reduced
+
+
+  static inline __device__ void store_c2r_reduced(const complex_type* thread_data,
+                                                  scalar_type*       output)
+  {
+    // Finally we write out the first size_of<FFT>::values to global
+    const unsigned int stride = stride_size();
+    unsigned int       index  = threadIdx.x + (threadIdx.z*size_of<FFT>::value);
+    for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+    {
+      if (index < size_of<FFT>::value)
+      {
+        // transposed index.
+        output[index] =reinterpret_cast<const scalar_type*>(thread_data)[i];
+      }
+      index += stride;
+    }
+  } // store_c2r_reduced
+
 //
   static inline __device__ void store_transposed(const complex_type* thread_data,
                                               complex_type*       output,
