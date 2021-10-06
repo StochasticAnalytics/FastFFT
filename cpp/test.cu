@@ -449,7 +449,7 @@ void compare_libraries(std::vector<int>size, int size_change_type)
 
 
 
-      if ( is_size_change_decrease || ( input_size.x == output_size.x && input_size.y == output_size.y && input_size.z == output_size.z ) )
+      if ( ( input_size.x == output_size.x && input_size.y == output_size.y && input_size.z == output_size.z ) )
       {
         // Also will change the path called in FastFFT to just be fwd/inv xform.
         set_conjMult_callback = false;
@@ -515,8 +515,7 @@ void compare_libraries(std::vector<int>size, int size_change_type)
 
       FT_input.real_memory_allocated = FT.ReturnInputMemorySize();
       FT_output.real_memory_allocated = FT.ReturnInvOutputMemorySize();
-      std::cout << "FT_input.real_memory_allocated = " << FT_input.real_memory_allocated << std::endl;
-      std::cout << "FT_output.real_memory_allocated = " << FT_output.real_memory_allocated << std::endl;
+
 
       cuFFT_input.real_memory_allocated = cuFFT.ReturnInputMemorySize();
       cuFFT_output.real_memory_allocated = cuFFT.ReturnInvOutputMemorySize();
@@ -527,7 +526,6 @@ void compare_libraries(std::vector<int>size, int size_change_type)
 
       positive_control.real_memory_allocated = target_search_image.real_memory_allocated; // this won't change size
 
-      std::cout << "target and positive in/out, real memory allocate " << target_search_image.real_memory_allocated << " " << positive_control.real_memory_allocated << std::endl;
 
       bool set_fftw_plan = false;
       FT_input.Allocate(set_fftw_plan);
@@ -641,10 +639,6 @@ void compare_libraries(std::vector<int>size, int size_change_type)
 
 
       
-      // PrintArray(FT_input.real_values, fwd_dims_in.x, fwd_dims_in.y, fwd_dims_in.w);
-      std::cout << std::endl;
-      FastFFT::PrintVectorType(inv_dims_in);
-      FastFFT::PrintVectorType(inv_dims_out);
       if (is_size_change_decrease)
       {
         FT.CopyDeviceToHost(false, false);
@@ -709,30 +703,61 @@ void compare_libraries(std::vector<int>size, int size_change_type)
       
       address = 0;
       test_passed = true;
-      for (int z = 1; z <  FT_output.size.z ; z++)
-      {   
-        for (int y = 1; y < FT_output.size.y; y++)
-        {  
-          for (int x = 1; x < FT_output.size.x; x++)
-          {
-            if (FT_output.real_values[address] != 0.0f) test_passed = false;
+      if (is_size_change_decrease)
+      {
+        for (int z = 1; z <  FT_input.size.z ; z++)
+        {   
+          for (int y = 1; y < FT_input.size.y; y++)
+          {  
+            for (int x = 1; x < FT_input.size.x; x++)
+            {
+              if (FT_input.real_values[address] != 0.0f) test_passed = false;
+            }
           }
         }
-      }
-      if (test_passed) 
-      {
-        if (FT_output.real_values[address] == FT_output.size.x*FT_output.size.y*FT_output.size.z*testVal_1*testVal_2)
+        if (test_passed) 
         {
-          std::cout << "Test passed for FastFFT positive control.\n" << std::endl;
+          if (FT_input.real_values[address] == FT_input.size.x*FT_input.size.y*FT_input.size.z*testVal_1*testVal_2)
+          {
+            std::cout << "Test passed for FastFFT positive control.\n" << std::endl;
+          }
+          else
+          {
+            std::cout << "Test failed for FastFFT positive control. Value at zero is  " << FT_input.real_values[address] << std::endl;
+          }
         }
         else
         {
-          std::cout << "Test failed for FastFFT positive control. Value at zero is  " << FT_output.real_values[address] << std::endl;
+          std::cout << "Test failed for FastFFT control, non-zero values found away from the origin." << std::endl;
         }
       }
       else
       {
-        std::cout << "Test failed for FastFFT control, non-zero values found away from the origin." << std::endl;
+        for (int z = 1; z <  FT_output.size.z ; z++)
+        {   
+          for (int y = 1; y < FT_output.size.y; y++)
+          {  
+            for (int x = 1; x < FT_output.size.x; x++)
+            {
+              if (FT_output.real_values[address] != 0.0f) test_passed = false;
+            }
+          }
+        }
+        if (test_passed) 
+        {
+          if (FT_output.real_values[address] == FT_output.size.x*FT_output.size.y*FT_output.size.z*testVal_1*testVal_2)
+          {
+            std::cout << "Test passed for FastFFT positive control.\n" << std::endl;
+          }
+          else
+          {
+            std::cout << "Test failed for FastFFT positive control. Value at zero is  " << FT_output.real_values[address] << std::endl;
+          }
+        }
+        else
+        {
+          std::cout << "Test failed for FastFFT control, non-zero values found away from the origin." << std::endl;
+        }
       }
 
       ////////////////////////////////////////
@@ -858,7 +883,7 @@ void compare_libraries(std::vector<int>size, int size_change_type)
         for (int i = 0; i < n_loops; ++i)
         {
           // std::cout << i << "i / " << n_loops << "n_loops" << std::endl;
-          // if (set_conjMult_callback) cuFFT.ClipIntoTopLeft();
+          if (set_conjMult_callback) cuFFT.ClipIntoTopLeft();
           // cuFFT.ClipIntoReal(input_size.x/2, input_size.y/2, input_size.z/2);
 
           if (is_size_change_decrease)

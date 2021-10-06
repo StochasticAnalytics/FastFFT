@@ -8,9 +8,9 @@
 
 
 // When defined Turns on synchronization based checking for all FFT kernels as well as cudaErr macros
-#define HEAVYERRORCHECKING_FFT 
+//#define HEAVYERRORCHECKING_FFT 
 // Various levels of debuging conditions and prints
-#define FFT_DEBUG_LEVEL 4
+#define FFT_DEBUG_LEVEL 0
 
 #if FFT_DEBUG_LEVEL < 1
 
