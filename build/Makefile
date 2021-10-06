@@ -32,7 +32,7 @@ TARGETS=test
 # Fwd 0, 1, 2, 3( none, x, z, original y)
 # 4 intermediate ops, like conj multiplication
 # Inv 5, 6, 7 ( original y, z, x)
-debug_stage=1
+debug_stage=7
 
 all:
 	$(NVCC) -dc $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DDEBUG_FFT_STAGE=${debug_stage} -o test.o -c ../cpp/test.cu

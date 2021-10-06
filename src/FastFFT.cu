@@ -540,14 +540,9 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CrossCorrelate(floa
                 break;
               }
               case decrease: {
-               
-
+                           
                 SetPrecisionAndExectutionMethod(xcorr_fwd_none_inv_decrease, true);
-                transform_stage_completed = TransformStageCompleted::fwd;
-
                 SetPrecisionAndExectutionMethod(c2r_decrease,   false);
-
-                transform_stage_completed = TransformStageCompleted::inv;
                 break;
               }
               default: {
@@ -1176,17 +1171,21 @@ void block_fft_kernel_C2C_FWD_NONE_INV_DECREASE_ConjMul( const ComplexType* __re
     complex_type thread_data[FFT::storage_size];
   
     // Load in natural order
-    io<FFT>::load_c2c_shared_and_pad(&input_values[blockIdx.y*mem_offsets.pixel_pitch_input], shared_mem);
-  
-    // DIT shuffle, bank conflict free
-    io<FFT>::copy_from_shared(shared_mem, thread_data, Q);
-  
-    constexpr const unsigned int fft_shared_mem_num_elements = FFT::shared_memory_size / sizeof(complex_type);
-    FFT().execute(thread_data, &shared_mem[fft_shared_mem_num_elements * threadIdx.z], workspace_fwd);
-    __syncthreads();
+    io<FFT>::load(&input_values[blockIdx.y*mem_offsets.pixel_pitch_input], thread_data);
 
-    // Full twiddle multiply and store in natural order in shared memory
-    io<FFT>::reduce_block_fft(thread_data, shared_mem, twiddle_in, Q);
+    // io<FFT>::load_c2c_shared_and_pad(&input_values[blockIdx.y*mem_offsets.pixel_pitch_input], shared_mem);
+  
+    // // DIT shuffle, bank conflict free
+    // io<FFT>::copy_from_shared(shared_mem, thread_data, Q);
+  
+    // constexpr const unsigned int fft_shared_mem_num_elements = FFT::shared_memory_size / sizeof(complex_type);
+    // FFT().execute(thread_data, &shared_mem[fft_shared_mem_num_elements * threadIdx.z], workspace_fwd);
+    // __syncthreads();
+    FFT().execute(thread_data, shared_mem, workspace_fwd);
+
+
+    // // Full twiddle multiply and store in natural order in shared memory
+    // io<FFT>::reduce_block_fft(thread_data, shared_mem, twiddle_in, Q);
 
     #if DEBUG_FFT_STAGE > 3
       // Load in imageFFT to search
@@ -1195,11 +1194,20 @@ void block_fft_kernel_C2C_FWD_NONE_INV_DECREASE_ConjMul( const ComplexType* __re
 
     #if DEBUG_FFT_STAGE > 4
       // Run the inverse FFT
-      invFFT().execute(thread_data, &shared_mem[fft_shared_mem_num_elements * threadIdx.z], workspace_inv);
+      // invFFT().execute(thread_data, &shared_mem[fft_shared_mem_num_elements * threadIdx.z], workspace_inv);
+      invFFT().execute(thread_data, shared_mem, workspace_inv);
+
     #endif
 
-    // The reduced store considers threadIdx.z to ignore extra threads
-    io<invFFT>::store_c2c_reduced(thread_data, &output_values[blockIdx.y * mem_offsets.pixel_pitch_output]);
+    // // The reduced store considers threadIdx.z to ignore extra threads
+    // io<invFFT>::store_c2c_reduced(thread_data, &output_values[blockIdx.y * mem_offsets.pixel_pitch_output]);
+    #if DEBUG_FFT_STAGE < 5
+      // There is no size reduction for this debug stage, so we need to use the pixel_pitch of the input array.
+      io<invFFT>::store(thread_data, &output_values[blockIdx.y * mem_offsets.pixel_pitch_input]);
+    #else
+      io<invFFT>::store(thread_data, &output_values[blockIdx.y * mem_offsets.pixel_pitch_output], (unsigned int)mem_offsets.pixel_pitch_output);
+    #endif
+
 
 } // end of block_fft_kernel_C2C_FWD_NONE_INV_DECREASE_ConjMul
 
@@ -1461,21 +1469,29 @@ void block_fft_kernel_C2R_DECREASE(const ComplexType*  __restrict__ input_values
 
   complex_type thread_data[FFT::storage_size];
 
-  // Load transposed data into shared memory in natural order.
-  io<FFT>::load_c2r_shared_and_pad(&input_values[blockIdx.y], shared_mem, mem_offsets.pixel_pitch_input, mem_offsets.pixel_pitch_output);
 
-  // DIT shuffle, bank conflict free
-  io<FFT>::copy_from_shared(shared_mem, thread_data, Q);
+  io<FFT>::load_c2r_transposed(&input_values[blockIdx.y], thread_data, mem_offsets.pixel_pitch_input);
 
-  constexpr const unsigned int fft_shared_mem_num_elements = FFT::shared_memory_size / sizeof(complex_type);
-  FFT().execute(thread_data, &shared_mem[fft_shared_mem_num_elements * threadIdx.z], workspace);
-  __syncthreads();
+  // For loop zero the twiddles don't need to be computed
+  FFT().execute(thread_data, shared_mem, workspace);
 
-  // Full twiddle multiply and store in natural order in shared memory
-  io<FFT>::reduce_block_fft(thread_data, shared_mem, twiddle_in, Q);
+  io<FFT>::store_c2r(thread_data, &output_values[blockIdx.y*mem_offsets.pixel_pitch_output], (unsigned int)mem_offsets.pixel_pitch_output);
 
-  // Reduce from shared memory into registers, ending up with only P valid outputs.
-  io<FFT>::store_c2r_reduced(thread_data, &output_values[blockIdx.y*mem_offsets.pixel_pitch_output]);
+  // // Load transposed data into shared memory in natural order.
+  // io<FFT>::load_c2r_shared_and_pad(&input_values[blockIdx.y], shared_mem, mem_offsets.pixel_pitch_input);
+
+  // // DIT shuffle, bank conflict free
+  // io<FFT>::copy_from_shared(shared_mem, thread_data, Q);
+
+  // constexpr const unsigned int fft_shared_mem_num_elements = FFT::shared_memory_size / sizeof(complex_type);
+  // FFT().execute(thread_data, &shared_mem[fft_shared_mem_num_elements * threadIdx.z], workspace);
+  // __syncthreads();
+
+  // // Full twiddle multiply and store in natural order in shared memory
+  // io<FFT>::reduce_block_fft(thread_data, shared_mem, twiddle_in, Q);
+
+  // // Reduce from shared memory into registers, ending up with only P valid outputs.
+  // io<FFT>::store_c2r_reduced(thread_data, &output_values[blockIdx.y*mem_offsets.pixel_pitch_output]);
 
 
 } // end of block_fft_kernel_C2R_DECREASE
@@ -2039,8 +2055,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
           is_in_buffer_memory = ! is_in_buffer_memory;
         #endif
 
-        PrintState();
-        PrintLaunchParameters(LP);
+
            
         break;
       }
@@ -2316,6 +2331,8 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
           block_fft_kernel_C2R_DECREASE<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
           ( complex_input, scalar_output, LP.mem_offsets, LP.twiddle_in, LP.Q, workspace);
           postcheck
+
+          transform_stage_completed = TransformStageCompleted::inv;
         #else
           is_in_buffer_memory = ! is_in_buffer_memory;  
         #endif
@@ -2389,7 +2406,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
   
         // Max shared memory needed to store the full 1d fft remaining on the forward transform
         unsigned int shared_memory = FFT::shared_memory_size + (unsigned int)sizeof(complex_type) * LP.mem_offsets.pixel_pitch_input;
-        shared_memory = std::max( shared_memory, std::max( invFFT::shared_memory_size * LP.threadsPerBlock.z, (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input/32) * (unsigned int)sizeof(complex_type)));
+        // shared_memory = std::max( shared_memory, std::max( invFFT::shared_memory_size * LP.threadsPerBlock.z, (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input/32) * (unsigned int)sizeof(complex_type)));
 
         CheckSharedMemory(shared_memory, device_properties);
  
@@ -2398,6 +2415,8 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
           // cudaFuncSetSharedMemConfig ( (void*)block_fft_kernel_C2C_INCREASE<FFT,complex_type>, cudaSharedMemBankSizeEightByte );  
         // FIXME
         #if DEBUG_FFT_STAGE > 2
+
+
           bool swap_real_space_quadrants = false;   
           if (swap_real_space_quadrants)
           {
@@ -2418,6 +2437,8 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
             ( (complex_type *)d_ptr.image_to_search, complex_input, complex_output , LP.mem_offsets, LP.twiddle_in,LP.Q, workspace_fwd, workspace_inv);
             postcheck
           }
+          transform_stage_completed = TransformStageCompleted::fwd;
+
         #else
           is_in_buffer_memory = ! is_in_buffer_memory;
         #endif
@@ -2454,7 +2475,15 @@ void FourierTransformer<ComputeType, InputType, OutputType>::GetTransformSize(Ke
   }
   else if ( IsC2RType(kernel_type) )
   {
-    AssertDivisibleAndFactorOf2( std::max(inv_dims_in.x, inv_dims_out.x), std::min(inv_dims_in.x, inv_dims_out.x) );
+    // FIXME
+    if (kernel_type == c2r_decrease)
+    {
+      AssertDivisibleAndFactorOf2( std::max(inv_dims_in.x, inv_dims_out.x), std::max(inv_dims_in.x, inv_dims_out.x) );
+    }
+    else
+    {
+      AssertDivisibleAndFactorOf2( std::max(inv_dims_in.x, inv_dims_out.x), std::min(inv_dims_in.x, inv_dims_out.x) );
+    }
   }
   else
   {
@@ -2484,7 +2513,18 @@ void FourierTransformer<ComputeType, InputType, OutputType>::GetTransformSize(Ke
       switch (transform_dimension)
       {
         case 1: { AssertDivisibleAndFactorOf2( std::max(inv_dims_in.x, inv_dims_out.x),  std::min(inv_dims_in.x, inv_dims_out.x) ); break; }
-        case 2: { AssertDivisibleAndFactorOf2( std::max(inv_dims_in.y, inv_dims_out.y),  std::min(inv_dims_in.y, inv_dims_out.y) ); break; }
+        case 2: { 
+          if (kernel_type == xcorr_fwd_none_inv_decrease)
+          {
+            // FIXME, for now using full transform
+            AssertDivisibleAndFactorOf2( std::max(inv_dims_in.y, inv_dims_out.y),  std::max(inv_dims_in.y, inv_dims_out.y) );
+          }
+          else
+          {
+            AssertDivisibleAndFactorOf2( std::max(inv_dims_in.y, inv_dims_out.y),  std::min(inv_dims_in.y, inv_dims_out.y) ); 
+          }
+          break; 
+        }
         default: { MyFFTDebugAssertTrue(false, "ERROR: Invalid transform dimension for c2c inverse type.\n"); }
       }
     }
@@ -2702,6 +2742,15 @@ LaunchParams FourierTransformer<ComputeType, InputType, OutputType>::SetLaunchPa
   if (kernel_type == xcorr_fwd_increase_inv_none)
   {
     L.threadsPerBlock = dim3(transform_size.N/ept, 1, 1);
+  }
+
+  if (kernel_type == xcorr_fwd_none_inv_decrease)
+  {
+    L.threadsPerBlock = dim3(transform_size.N/ept, 1, 1);
+    // FIXME
+    L.gridDims = dim3(1, fwd_dims_out.w, 1);
+    L.mem_offsets.pixel_pitch_input = inv_dims_in.y;
+    L.mem_offsets.pixel_pitch_output = inv_dims_out.y;
   }
  
   return L;

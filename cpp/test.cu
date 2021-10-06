@@ -647,36 +647,32 @@ void compare_libraries(std::vector<int>size, int size_change_type)
       FastFFT::PrintVectorType(inv_dims_out);
       if (is_size_change_decrease)
       {
+        FT.CopyDeviceToHost(false, false);
         #if DEBUG_FFT_STAGE == 0
-          // We have not decreased the size yet, for xcorr_fwd_none_inv_decrease
-          FT.CopyDeviceToHost(false, false);
+
           PrintArray(FT_input.real_values, fwd_dims_in.x, fwd_dims_in.y, fwd_dims_in.w);
           MyTestPrintAndExit(" Stage 0");
         #elif DEBUG_FFT_STAGE == 1
-          // We have not decreased the size yet, for xcorr_fwd_none_inv_decrease
-          FT.CopyDeviceToHost(false, false);
+
           PrintArray(FT_input.complex_values, fwd_dims_in.y, fwd_dims_out.w);
           MyTestPrintAndExit(" Stage 1");
         #elif DEBUG_FFT_STAGE == 3
-          // We have not decreased the size yet, for xcorr_fwd_none_inv_decrease
-          FT.CopyDeviceToHost(false, false);
+
           PrintArray(FT_input.complex_values, fwd_dims_in.y, fwd_dims_out.w);
           MyTestPrintAndExit(" Stage 3");
         #elif DEBUG_FFT_STAGE == 4
-          // We have not decreased the size yet, for xcorr_fwd_none_inv_decrease
-          FT.CopyDeviceToHost(false, false);
+        
           PrintArray(FT_input.complex_values, fwd_dims_in.y, fwd_dims_out.w);
           MyTestPrintAndExit(" Stage 4");
         #elif DEBUG_FFT_STAGE == 5
-          // We have decreased the size along the transposed y-dimension
-          FT.CopyDeviceToHost(FT_output.real_values,false, false);
-          PrintArray(FT_output.complex_values, inv_dims_out.y, inv_dims_in.w);
+
+          PrintArray(FT_input.complex_values,inv_dims_out.y, inv_dims_in.w);
           MyTestPrintAndExit(" Stage 5");
-        // #elif DEBUG_FFT_STAGE == 6
-        //   PrintArray(FT_output.real_values, inv_dims_out.x, inv_dims_out.y, inv_dims_out.w);
-        //   MyTestPrintAndExit(" Stage 6");
-        // #elif DEBUG_FFT_STAGE > 7
-        //   // Do nothing, we are doing all ops and not debugging.
+        #elif DEBUG_FFT_STAGE == 7
+          PrintArray(FT_input.real_values,inv_dims_out.x, inv_dims_out.y, inv_dims_out.w);
+          MyTestPrintAndExit(" Stage 7");
+        #elif DEBUG_FFT_STAGE > 7
+          // Do nothing, we are doing all ops and not debugging.
         #else
           MyTestPrintAndExit("DEBUG_FFT_STAGE not recognized " + std::to_string(DEBUG_FFT_STAGE));
         #endif
