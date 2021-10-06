@@ -8,9 +8,9 @@
 
 
 // When defined Turns on synchronization based checking for all FFT kernels as well as cudaErr macros
-// #define HEAVYERRORCHECKING_FFT 
+#define HEAVYERRORCHECKING_FFT 
 // Various levels of debuging conditions and prints
-#define FFT_DEBUG_LEVEL 0
+#define FFT_DEBUG_LEVEL 4
 
 #if FFT_DEBUG_LEVEL < 1
 
@@ -472,9 +472,6 @@ struct io
   // const decorator on the thread mem, as we want to modify it with the twiddle factors
   // before reducing the full shared mem space.
 
-  // FIXME This is unfortunate duplicated in reduce_block_fft_c2r /r2cwith the exception of the
-  // macro defintion to debug. Changes here must be applied to reduce_block_fft_c2r r2c
-  // TODO: Remove this duplication if possible
   static inline __device__ void reduce_block_fft(complex_type*       thread_data,
                                                  complex_type*       shared_mem,
                                                  const float         twiddle_in,
@@ -487,11 +484,9 @@ struct io
     // while also updating with the full size twiddle factor.
     for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
     {
-      #if FFT_STAGE > 1
-        // ( index * threadIdx.z) == ( k % P * n2 )
-        SINCOS( twiddle_in * (index * threadIdx.z) ,&twiddle.y,&twiddle.x);
-        thread_data[i] *= twiddle;
-      #endif
+      // ( index * threadIdx.z) == ( k % P * n2 )
+      SINCOS( twiddle_in * (index * threadIdx.z) ,&twiddle.y,&twiddle.x);
+      thread_data[i] *= twiddle;
 
       shared_mem[GetSharedMemPaddedIndex(index)] = thread_data[i];
       index += stride;
@@ -507,9 +502,7 @@ struct io
       {
         for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
         {
-          #if FFT_STAGE > 1
-            thread_data[i] += shared_mem[GetSharedMemPaddedIndex(threadIdx.x + (i*stride) + (index/2 * size_of<FFT>::value))];
-          #endif
+          thread_data[i] += shared_mem[GetSharedMemPaddedIndex(threadIdx.x + (i*stride) + (index/2 * size_of<FFT>::value))];
         }
       } // end if condition
       // All threads can reach this point
@@ -517,95 +510,6 @@ struct io
     }
   } // reduce_block_fft
 
-  // FIXME This is an unfortunate duplication of reduce_block_fft with the exception of the
-  // macro defintion to debug. Changes here must be applied to reduce_block_fft
-  // TODO: Remove this if possible
-  static inline __device__ void reduce_block_fft_c2r(complex_type*       thread_data,
-                                                     complex_type*       shared_mem,
-                                                     const float         twiddle_in,
-                                                     const unsigned int  Q) 
-  {
-    const unsigned int stride = stride_size();
-    unsigned int       index  = threadIdx.x + (threadIdx.z*size_of<FFT>::value);
-    complex_type twiddle;
-    // In the first loop, all threads participate and write back to natural order in shared memory
-    // while also updating with the full size twiddle factor.
-    for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
-    {
-      #if FFT_STAGE > 3
-        // ( index * threadIdx.z) == ( k % P * n2 )
-        SINCOS( twiddle_in * (index * threadIdx.z) ,&twiddle.y,&twiddle.x);
-        thread_data[i] *= twiddle;
-      #endif
-
-        shared_mem[GetSharedMemPaddedIndex(index)] = thread_data[i];
-        index += stride;
-    }
-    __syncthreads();
-
-    // Now we reduce the shared memory into the first block of size P
-    // Reuse index 
-    for (index = 2; index <= Q; index *= 2)
-    {
-      // Some threads drop out each loop
-      if (threadIdx.z % index == 0)
-      {
-        for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
-        {
-          #if FFT_STAGE > 3
-            thread_data[i] += shared_mem[GetSharedMemPaddedIndex(threadIdx.x + (i*stride) + (index/2 * size_of<FFT>::value))];
-          #endif
-        }
-      } // end if condition
-      // All threads can reach this point
-      __syncthreads();
-    }
-  } // reduce_block_fft
-
-    // FIXME This is an unfortunate duplication of reduce_block_fft with the exception of the
-  // macro defintion to debug. Changes here must be applied to reduce_block_fft
-  // TODO: Remove this if possible
-  static inline __device__ void reduce_block_fft_r2c(complex_type*       thread_data,
-                                                     complex_type*       shared_mem,
-                                                     const float         twiddle_in,
-                                                     const unsigned int  Q) 
-  {
-    const unsigned int stride = stride_size();
-    unsigned int       index  = threadIdx.x + (threadIdx.z*size_of<FFT>::value);
-    complex_type twiddle;
-    // In the first loop, all threads participate and write back to natural order in shared memory
-    // while also updating with the full size twiddle factor.
-    for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
-    {
-      #if FFT_STAGE > 0
-        // ( index * threadIdx.z) == ( k % P * n2 )
-        SINCOS( twiddle_in * (index * threadIdx.z) ,&twiddle.y,&twiddle.x);
-        thread_data[i] *= twiddle;
-      #endif
-
-      shared_mem[GetSharedMemPaddedIndex(index)] = thread_data[i];
-      index += stride;
-    }
-    __syncthreads();
-
-    // Now we reduce the shared memory into the first block of size P
-    // Reuse index 
-    for (index = 2; index <= Q; index *= 2)
-    {
-      // Some threads drop out each loop
-      if (threadIdx.z % index == 0)
-      {
-        for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
-        {
-          #if FFT_STAGE > 0
-            thread_data[i] += shared_mem[GetSharedMemPaddedIndex(threadIdx.x + (i*stride) + (index/2 * size_of<FFT>::value))];
-          #endif
-        }
-      } // end if condition
-        // All threads can reach this point
-        __syncthreads();
-    } // reduce_block_fft
-  }
 
   static inline __device__ void store_r2c_reduced(const complex_type* thread_data,
                                                   complex_type*       output,
@@ -761,24 +665,18 @@ struct io
 
   static inline __device__ void load_c2r_shared_and_pad(const complex_type*  input,
                                                         complex_type*       shared_mem,
-                                                        const unsigned int  pixel_pitch) 
+                                                        const unsigned int  pixel_pitch,
+                                                        const unsigned int  memory_limit) 
   {
     const unsigned int stride = stride_size();
     unsigned int       index  = threadIdx.x + (threadIdx.z*size_of<FFT>::value);
-    for (unsigned int i = 0; i < FFT::elements_per_thread / 2; i++) 
+    for (unsigned int i = 0; i < FFT::elements_per_thread  ; i++) 
     {
-      shared_mem[GetSharedMemPaddedIndex(index)] = input[pixel_pitch*index];
+      if (index < memory_limit) shared_mem[GetSharedMemPaddedIndex(index)] = input[pixel_pitch*index];
+      else shared_mem[GetSharedMemPaddedIndex(index)] = complex_type(0.0f, 0.0f);
       index += stride;
     }
-    // This should work, but could also pass in the memory limit as on r2c_store_transposed
-    constexpr unsigned int threads_per_fft       = cufftdx::size_of<FFT>::value / FFT::elements_per_thread;
-    constexpr unsigned int output_values_to_load = (cufftdx::size_of<FFT>::value / 2) + 1;
-    // threads_per_fft == 1 means that EPT == SIZE, so we need to load one more element
-    constexpr unsigned int values_left_to_load = threads_per_fft == 1 ? 1 : (output_values_to_load % threads_per_fft);
-    if (threadIdx.x < values_left_to_load) 
-    {
-      shared_mem[GetSharedMemPaddedIndex(index)] = input[pixel_pitch*index];
-    }
+
     __syncthreads();
   } // load_c2r_shared_and_pad
 
@@ -944,19 +842,22 @@ struct io
 
 
   static inline __device__ void store_c2r_reduced(const complex_type* thread_data,
-                                                  scalar_type*       output)
+                                                  scalar_type*       output)                                                 
   {
-    // Finally we write out the first size_of<FFT>::values to global
-    const unsigned int stride = stride_size();
-    unsigned int       index  = threadIdx.x + (threadIdx.z*size_of<FFT>::value);
-    for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+    if (threadIdx.z == 0)
     {
-      if (index < size_of<FFT>::value)
+      // Finally we write out the first size_of<FFT>::values to global
+      const unsigned int stride = stride_size();
+      unsigned int       index  = threadIdx.x + (threadIdx.z*size_of<FFT>::value);
+      for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
       {
-        // transposed index.
-        output[index] =reinterpret_cast<const scalar_type*>(thread_data)[i];
+        if (index < size_of<FFT>::value)
+        {
+          // transposed index.
+          output[index] = reinterpret_cast<const scalar_type*>(thread_data)[i];
+        }
+        index += stride;
       }
-      index += stride;
     }
   } // store_c2r_reduced
 
@@ -1060,34 +961,28 @@ struct io_thread
      twiddle_in *= threadIdx.x; // twiddle factor arg now just needs to multiplied by K = (index + i) 
      for (unsigned int i = 0; i < size_of<FFT>::value; i++)
      {
-        #if FFT_STAGE > 1
-          SINCOS( twiddle_in * (index + i) ,&twiddle.y,&twiddle.x);
-          twiddle *= thread_data[i];
-          if (index + i < memory_limit) shared_output[index +  i] = twiddle;
-        #else
-        if (index + i < memory_limit) shared_output[index +  i] = thread_data[i];
-        #endif
+        SINCOS( twiddle_in * (index + i) ,&twiddle.y,&twiddle.x);
+        twiddle *= thread_data[i];
+        if (index + i < memory_limit) shared_output[index +  i] = twiddle;
      } 
      __syncthreads(); // make sure all the shared mem is initialized to the starting value. There should be no contention as every thread is working on its own block of memory. 
 
-    #if FFT_STAGE > 1
-      for (unsigned int sub_fft = 1; sub_fft < Q; sub_fft++)
+    for (unsigned int sub_fft = 1; sub_fft < Q; sub_fft++)
+    {
+      // wrap around, 0 --> 1, Q-1 --> 0 etc.
+      index = ((threadIdx.x + sub_fft) % Q) * size_of<FFT>::value;
+      for (unsigned int i = 0; i < FFT::elements_per_thread; i++)
       {
-        // wrap around, 0 --> 1, Q-1 --> 0 etc.
-        index = ((threadIdx.x + sub_fft) % Q) * size_of<FFT>::value;
-        for (unsigned int i = 0; i < FFT::elements_per_thread; i++)
+        SINCOS( twiddle_in * (index + i) ,&twiddle.y,&twiddle.x);
+        twiddle *= thread_data[i];
+        if (index + i < memory_limit) 
         {
-          SINCOS( twiddle_in * (index + i) ,&twiddle.y,&twiddle.x);
-          twiddle *= thread_data[i];
-          if (index + i < memory_limit) 
-          {
-            atomicAdd_block(&shared_output[index +  i].x, twiddle.x);
-            atomicAdd_block(&shared_output[index +  i].y, twiddle.y);
-          }
+          atomicAdd_block(&shared_output[index +  i].x, twiddle.x);
+          atomicAdd_block(&shared_output[index +  i].y, twiddle.y);
         }
       }
-      __syncthreads();
-    #endif
+    }
+    __syncthreads();
 
   }  // remap_decomposed_segments (r2c specialized with memory limit)                                              
 
@@ -1129,31 +1024,25 @@ struct io_thread
     twiddle_in *= threadIdx.x; // twiddle factor arg now just needs to multiplied by K = (index + i) 
     for (unsigned int i = 0; i < size_of<FFT>::value; i++)
     {
-      #if FFT_STAGE > 1
-        SINCOS( twiddle_in * (index + i) ,&twiddle.y,&twiddle.x);
-        twiddle *= thread_data[i];
-        shared_output[index +  i] = twiddle;
-      #else
-        shared_output[index +  i] = thread_data[i];
-      #endif
+      SINCOS( twiddle_in * (index + i) ,&twiddle.y,&twiddle.x);
+      twiddle *= thread_data[i];
+      shared_output[index +  i] = twiddle;
     }  
     __syncthreads(); // make sure all the shared mem is initialized to the starting value. There should be no contention as every thread is working on its own block of memory. 
 
-    #if FFT_STAGE > 1
-      for (unsigned int sub_fft = 1; sub_fft < Q; sub_fft++)
+    for (unsigned int sub_fft = 1; sub_fft < Q; sub_fft++)
+    {
+      // wrap around, 0 --> 1, Q-1 --> 0 etc.
+      index = ((threadIdx.x + sub_fft) % Q) * size_of<FFT>::value;
+      for (unsigned int i = 0; i < FFT::elements_per_thread; i++)
       {
-        // wrap around, 0 --> 1, Q-1 --> 0 etc.
-        index = ((threadIdx.x + sub_fft) % Q) * size_of<FFT>::value;
-        for (unsigned int i = 0; i < FFT::elements_per_thread; i++)
-        {
-          SINCOS( twiddle_in * (index + i) ,&twiddle.y,&twiddle.x);
-          twiddle *= thread_data[i];
-          atomicAdd_block(&shared_output[index +  i].x, twiddle.x);
-          atomicAdd_block(&shared_output[index +  i].y, twiddle.y);
-        }
+        SINCOS( twiddle_in * (index + i) ,&twiddle.y,&twiddle.x);
+        twiddle *= thread_data[i];
+        atomicAdd_block(&shared_output[index +  i].x, twiddle.x);
+        atomicAdd_block(&shared_output[index +  i].y, twiddle.y);
       }
-      __syncthreads();
-    #endif
+    }
+    __syncthreads();
   }  // remap_decomposed_segments (c2c specialized no explicit memory checks)  
 
  
@@ -1223,31 +1112,25 @@ struct io_thread
     twiddle_in *= threadIdx.x; // twiddle factor arg now just needs to multiplied by K = (index + i) 
     for (unsigned int i = 0; i < size_of<FFT>::value; i++)
     {
-      #if FFT_STAGE > 3
-        SINCOS( twiddle_in * (index + i) ,&twiddle.y,&twiddle.x);
-        shared_output[index +  i] = (twiddle.x*thread_data[i].x - twiddle.y*thread_data[i].y); // assuming the output is real, only the real parts add, so don't bother with the complex
-      #else
-        shared_output[index +  i] = thread_data[i].x;
-      #endif
+      SINCOS( twiddle_in * (index + i) ,&twiddle.y,&twiddle.x);
+      shared_output[index +  i] = (twiddle.x*thread_data[i].x - twiddle.y*thread_data[i].y); // assuming the output is real, only the real parts add, so don't bother with the complex
     }  
     __syncthreads(); // make sure all the shared mem is initialized to the starting value. There should be no contention as every thread is working on its own block of memory. 
 
-    #if FFT_STAGE > 3
-      for (unsigned int sub_fft = 1; sub_fft < Q; sub_fft++)
+    for (unsigned int sub_fft = 1; sub_fft < Q; sub_fft++)
+    {
+      // wrap around, 0 --> 1, Q-1 --> 0 etc.
+      index = ((threadIdx.x + sub_fft) % Q) * size_of<FFT>::value;
+
+      for (unsigned int i = 0; i < size_of<FFT>::value; i++)
       {
-        // wrap around, 0 --> 1, Q-1 --> 0 etc.
-        index = ((threadIdx.x + sub_fft) % Q) * size_of<FFT>::value;
+        // if (threadIdx.x == 32) printf("remap tid, subfft, q, index + i %i %i %i %i\n", threadIdx.x,sub_fft, Q, index+i);
 
-        for (unsigned int i = 0; i < size_of<FFT>::value; i++)
-        {
-          // if (threadIdx.x == 32) printf("remap tid, subfft, q, index + i %i %i %i %i\n", threadIdx.x,sub_fft, Q, index+i);
-
-        SINCOS( twiddle_in * (index + i) ,&twiddle.y,&twiddle.x);
-        atomicAdd_block(&shared_output[index +  i], twiddle.x*thread_data[i].x - twiddle.y*thread_data[i].y);
-        }
+      SINCOS( twiddle_in * (index + i) ,&twiddle.y,&twiddle.x);
+      atomicAdd_block(&shared_output[index +  i], twiddle.x*thread_data[i].x - twiddle.y*thread_data[i].y);
       }
-      __syncthreads();
-    #endif
+    }
+    __syncthreads();
   }  // remap_decomposed_segments (c2c specialized no explicit memory checks)  
 
   static inline __device__ void store_c2r(const scalar_type* shared_output,

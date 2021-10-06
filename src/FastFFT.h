@@ -6,9 +6,11 @@
 
 // For testing/debugging it is convenient to execute and have print functions for partial transforms.
 // These will go directly in the kernels and also in the helper Image.cuh definitions for PrintArray.
-// The number refers to the number of 1d FFTs performed, for a 2d the total is 4 for 3d it is 6.
-// All tests will be #if > , such that a value of 6 will ensure all steps performed through 3d.
-#define FFT_STAGE 6
+// The number refers to the number of 1d FFTs performed, 
+// Fwd 0, 1, 2, 3( none, x, z, original y)
+// 4 intermediate ops, like conj multiplication
+// Inv 5, 6, 7 ( original y, z, x)
+#define DEBUG_FFT_STAGE 0
 
 // #include "/groups/himesb/git/cufftdx/example/block_io.hpp"
 // #include "/groups/himesb/git/cufftdx/example/common.hpp"
@@ -210,8 +212,8 @@ public:
 
   short4 inline ReturnFwdInputDimensions() { return fwd_dims_in; }
   short4 inline ReturnFwdOutputDimensions() { return fwd_dims_out; }
-  short4 inline ReturnInvInputDimensions() { return fwd_dims_in; }
-  short4 inline ReturnInvOutputDimensions() { return fwd_dims_out; }
+  short4 inline ReturnInvInputDimensions() { return inv_dims_in; }
+  short4 inline ReturnInvOutputDimensions() { return inv_dims_out; }
 
   template<typename T, bool is_on_host = true>
   void SetToConstant(T* input_pointer, int N_values, const T& wanted_value)
