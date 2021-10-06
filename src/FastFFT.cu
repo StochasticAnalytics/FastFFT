@@ -2039,9 +2039,9 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
           is_in_buffer_memory = ! is_in_buffer_memory;
         #endif
 
-        // PrintState();
-        // PrintLaunchParameters(LP);
-        // exit(1);       
+        PrintState();
+        PrintLaunchParameters(LP);
+           
         break;
       }
       

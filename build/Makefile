@@ -32,39 +32,11 @@ TARGETS=test
 # Fwd 0, 1, 2, 3( none, x, z, original y)
 # 4 intermediate ops, like conj multiplication
 # Inv 5, 6, 7 ( original y, z, x)
-debug_stage=7
+debug_stage=1
 
 all:
 	$(NVCC) -dc $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DDEBUG_FFT_STAGE=${debug_stage} -o test.o -c ../cpp/test.cu
 	$(NVCC) $(NVCC_FLAGS) -o test.app test.o -lfftw3f -lcufft_static -lculibos -lcudart_static -lrt
 
 
-
-
-
-# all: $(objects)
-#     $(NVCC) $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) $(objects) -o app 
-
-# %.o: %.c
-#     $(NVCC) -x cu $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -lfftw3f -lcufft_static -lculibos -lcudart_static -lrt -dc $< -o $@
-
-# clean:
-#     rm -f *.o app
-
-# $(TARGETS): %: %.cu
-# 	$(NVCC) -o $@.app $< $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -lfftw3f -lcufft_static -lculibos -lcudart_static -lrt 
-
-
-# $(NVRTC_TARGETS): %: %.cu
-# 	$(NVCC) -o $@ $< $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) $(NVRTC_DEFINES) -lnvrtc -lcufft_static -lculibos -lcudart_static -lrt 
-
-# .PHONY: all clean
-
-# all: $(TARGETS) $(NVRTC_TARGETS)
-# 	$(echo $(NVRTC_TARGETS))
-
-# clean:
-# 	rm -f $(TARGETS) $(NVRTC_TARGETS)
-
-# .DEFAULT_GOAL := all
 

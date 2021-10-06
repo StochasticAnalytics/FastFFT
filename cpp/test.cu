@@ -328,7 +328,7 @@ void unit_impulse_test(std::vector<int>size, bool do_increase_size)
     FT.CopyDeviceToHost(host_output.real_values, false, false);
 
       #if DEBUG_FFT_STAGE == 0
-        PrintArray(host_output.real_values, dims_out.x, dims_out.y, dims_out.w);
+        PrintArray(host_output.real_values,  dims_in.x, dims_in.y, dims_in.w);
         MyTestPrintAndExit( "stage 0 " );
       #elif DEBUG_FFT_STAGE == 1
         // If we are doing a fwd increase, the data will have only been expanded along the (transposed) X dimension at this point
@@ -339,17 +339,13 @@ void unit_impulse_test(std::vector<int>size, bool do_increase_size)
         // Now the array is fully expanded to dims_out, but still transposed
         PrintArray(host_output.complex_values, dims_out.y, dims_out.w);
         MyTestPrintAndExit( "stage 3 " );
-      #elif DEBUG_FFT_STAGE > 7
-        // No debug, keep going
-      # else
-        MyTestPrintAndExit( " This block is only valid for DEBUG_FFT_STAGE == 0 || 1 || 3 " );
       #endif      
   }
   else
   {
     FT.CopyDeviceToHost(false, false, FT.ReturnInputMemorySize());
     #if DEBUG_FFT_STAGE == 0
-      PrintArray(host_input.real_values, dims_out.x, dims_out.y, dims_out.w);
+      PrintArray(host_input.real_values, dims_in.x, dims_in.y, dims_in.w);
       MyTestPrintAndExit( "stage 0 " );
     #elif DEBUG_FFT_STAGE == 1
       // If we are doing a fwd increase, the data will have only been expanded along the (transposed) X dimension at this point
@@ -359,11 +355,7 @@ void unit_impulse_test(std::vector<int>size, bool do_increase_size)
     #elif DEBUG_FFT_STAGE == 3
       // Now the array is fully expanded to dims_out, but still transposed
       PrintArray(host_input.complex_values, dims_out.y, dims_out.w);
-      MyTestPrintAndExit( "stage 2 " );
-    #elif DEBUG_FFT_STAGE > 7
-        // No debug, keep going
-    #else
-      MyTestPrintAndExit( " This block is only valid for DEBUG_FFT_STAGE == 0 || 1 || 3 " );
+      MyTestPrintAndExit( "stage 3 " );
     #endif   
   }
 
@@ -386,7 +378,7 @@ void unit_impulse_test(std::vector<int>size, bool do_increase_size)
 
   
   #if DEBUG_FFT_STAGE == 5
-    PrintArray(host_output.real_values, dims_out.x, dims_out.y, dims_out.w);
+    PrintArray(host_output.complex_values, dims_out.y, dims_out.w);
     MyTestPrintAndExit( "stage 5 " );
   #elif DEBUG_FFT_STAGE == 7
     PrintArray(host_output.real_values, dims_out.x, dims_out.y, dims_out.w);
@@ -565,8 +557,8 @@ void compare_libraries(std::vector<int>size, int size_change_type)
 
   
       // Place these values at the origin of the image and after convolution, should be at 0,0,0.
-      float testVal_1 = 1;//2.0f;
-      float testVal_2 = 1;//3.0f;
+      float testVal_1 = 2.0f;
+      float testVal_2 = 3.0f;
       FT_input.real_values[0] = testVal_1;
       cuFFT_input.real_values[0] = testVal_1;
       target_search_image.real_values[0] = testVal_2;//target_search_image.size.w*2*target_search_image.size.y/2 + target_search_image.size.x/2] = testVal_2;
@@ -649,28 +641,74 @@ void compare_libraries(std::vector<int>size, int size_change_type)
 
 
       
-      PrintArray(FT_input.real_values, fwd_dims_in.x, fwd_dims_in.y, fwd_dims_in.w);
+      // PrintArray(FT_input.real_values, fwd_dims_in.x, fwd_dims_in.y, fwd_dims_in.w);
       std::cout << std::endl;
       FastFFT::PrintVectorType(inv_dims_in);
       FastFFT::PrintVectorType(inv_dims_out);
       if (is_size_change_decrease)
       {
-        #if DEBUG_FFT_STAGE < 4
+        #if DEBUG_FFT_STAGE == 0
           // We have not decreased the size yet, for xcorr_fwd_none_inv_decrease
           FT.CopyDeviceToHost(false, false);
           PrintArray(FT_input.real_values, fwd_dims_in.x, fwd_dims_in.y, fwd_dims_in.w);
-          MyTestPrintAndExit("Pre 4");
-        #else
+          MyTestPrintAndExit(" Stage 0");
+        #elif DEBUG_FFT_STAGE == 1
+          // We have not decreased the size yet, for xcorr_fwd_none_inv_decrease
+          FT.CopyDeviceToHost(false, false);
+          PrintArray(FT_input.complex_values, fwd_dims_in.y, fwd_dims_out.w);
+          MyTestPrintAndExit(" Stage 1");
+        #elif DEBUG_FFT_STAGE == 3
+          // We have not decreased the size yet, for xcorr_fwd_none_inv_decrease
+          FT.CopyDeviceToHost(false, false);
+          PrintArray(FT_input.complex_values, fwd_dims_in.y, fwd_dims_out.w);
+          MyTestPrintAndExit(" Stage 3");
+        #elif DEBUG_FFT_STAGE == 4
+          // We have not decreased the size yet, for xcorr_fwd_none_inv_decrease
+          FT.CopyDeviceToHost(false, false);
+          PrintArray(FT_input.complex_values, fwd_dims_in.y, fwd_dims_out.w);
+          MyTestPrintAndExit(" Stage 4");
+        #elif DEBUG_FFT_STAGE == 5
+          // We have decreased the size along the transposed y-dimension
           FT.CopyDeviceToHost(FT_output.real_values,false, false);
-          PrintArray(FT_output.real_values, inv_dims_out.x, inv_dims_out.y, inv_dims_out.w);
-          MyTestPrintAndExit("Post 4");
-
+          PrintArray(FT_output.complex_values, inv_dims_out.y, inv_dims_in.w);
+          MyTestPrintAndExit(" Stage 5");
+        // #elif DEBUG_FFT_STAGE == 6
+        //   PrintArray(FT_output.real_values, inv_dims_out.x, inv_dims_out.y, inv_dims_out.w);
+        //   MyTestPrintAndExit(" Stage 6");
+        // #elif DEBUG_FFT_STAGE > 7
+        //   // Do nothing, we are doing all ops and not debugging.
+        #else
+          MyTestPrintAndExit("DEBUG_FFT_STAGE not recognized " + std::to_string(DEBUG_FFT_STAGE));
         #endif
-
       }
       else
       {
+        // the output is equal or > the input, so we can always copy there.
         FT.CopyDeviceToHost(FT_output.real_values,false, false);
+
+        #if DEBUG_FFT_STAGE == 0
+          PrintArray(FT_output.real_values, fwd_dims_in.x, fwd_dims_in.y, fwd_dims_in.w);
+          MyTestPrintAndExit(" Stage 0");
+        #elif DEBUG_FFT_STAGE == 1
+          PrintArray(FT_output.complex_values, fwd_dims_in.y, fwd_dims_out.w);
+          MyTestPrintAndExit(" Stage 1");
+        #elif DEBUG_FFT_STAGE == 3
+          PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.w);
+          MyTestPrintAndExit(" Stage 3");
+        #elif DEBUG_FFT_STAGE == 4
+          PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.w);
+          MyTestPrintAndExit(" Stage 4");
+        #elif DEBUG_FFT_STAGE == 5
+          PrintArray(FT_output.complex_values, inv_dims_out.y, inv_dims_out.w);
+          MyTestPrintAndExit(" Stage 5");
+        #elif DEBUG_FFT_STAGE == 7
+          PrintArray(FT_output.real_values, inv_dims_out.x, inv_dims_out.y, inv_dims_out.w);
+          MyTestPrintAndExit(" Stage 6");
+        #elif DEBUG_FFT_STAGE > 7
+          // Do nothing, we are doing all ops and not debugging.
+        #else
+          MyTestPrintAndExit("DEBUG_FFT_STAGE not recognized " + std::to_string(DEBUG_FFT_STAGE));
+        #endif
       }
       
       address = 0;
@@ -1014,8 +1052,8 @@ int main(int argc, char** argv)
     // exit(0);
 
 
-    const_image_test(test_size);
-    unit_impulse_test(test_size, true);
+    // const_image_test(test_size);
+    // unit_impulse_test(test_size, true);
     unit_impulse_test(test_size, false);
 
 
