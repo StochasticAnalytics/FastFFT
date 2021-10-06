@@ -16,6 +16,7 @@ CUFFTDX_INCLUDE_DIR=$(FastFFT_cufftdx_dir)/include
 $(info $$CUFFTDX_INCLUDE_DIR is [${CUFFTDX_INCLUDE_DIR}])
 
 
+
 CUDA_BIN_DIR=$(shell dirname `which $(NVCC)`)
 CUDA_INCLUDE_DIR=$(CUDA_BIN_DIR)/../include
 # NVRTC_DEFINES=-DCUDA_INCLUDE_DIR="\"$(CUDA_INCLUDE_DIR)\"" -DCUFFTDX_INCLUDE_DIRS="\"$(CUFFTDX_INCLUDE_DIR)\""
@@ -25,9 +26,18 @@ CUDA_INCLUDE_DIR=$(CUDA_BIN_DIR)/../include
 SRCS=test.cu
 TARGETS=test
 
+# For testing/debugging it is convenient to execute and have print functions for partial transforms.
+# These will go directly in the kernels and also in the helper Image.cuh definitions for PrintArray.
+# The number refers to the number of 1d FFTs performed, 
+# Fwd 0, 1, 2, 3( none, x, z, original y)
+# 4 intermediate ops, like conj multiplication
+# Inv 5, 6, 7 ( original y, z, x)
+debug_stage=7
+
 all:
-	$(NVCC) -dc $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -o test.o -c ../cpp/test.cu
-	$(NVCC) $(NVCC_FLAGS) -o test.app test.o -lfftw3f -lcufft_static -lculibos -lcudart_static -lrt 
+	$(NVCC) -dc $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DDEBUG_FFT_STAGE=${debug_stage} -o test.o -c ../cpp/test.cu
+	$(NVCC) $(NVCC_FLAGS) -o test.app test.o -lfftw3f -lcufft_static -lculibos -lcudart_static -lrt
+
 
 
 

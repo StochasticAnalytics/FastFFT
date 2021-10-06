@@ -157,10 +157,6 @@ void const_image_test(std::vector<int> size)
     #elif DEBUG_FFT_STAGE == 3
       PrintArray(host_output.complex_values, dims_in.y, dims_out.w);
       MyTestPrintAndExit( "stage 3 " );
-    #elif DEBUG_FFT_STAGE > 7
-      // No debug, keep going
-    # else
-      MyTestPrintAndExit( " This block is only valid for DEBUG_FFT_STAGE == 0 || 1 || 3 " );
     #endif   
     
 
@@ -174,10 +170,10 @@ void const_image_test(std::vector<int> size)
  
 
     #if DEBUG_FFT_STAGE == 4
-      PrintArray(host_output.real_values, dims_out.x, dims_out.y, dims_out.w);
+      PrintArray(host_output.complex_values, dims_out.y, dims_out.w);
       MyTestPrintAndExit( "stage 4 " );
     #elif DEBUG_FFT_STAGE == 5
-      PrintArray(host_output.real_values, dims_out.x, dims_out.y, dims_out.w);
+      PrintArray(host_output.complex_values, dims_out.y, dims_out.w);
       MyTestPrintAndExit( "stage 5 " );
     #elif DEBUG_FFT_STAGE == 7
       PrintArray(host_output.real_values, dims_out.x, dims_out.y, dims_out.w);

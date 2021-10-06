@@ -10,7 +10,7 @@
 // Fwd 0, 1, 2, 3( none, x, z, original y)
 // 4 intermediate ops, like conj multiplication
 // Inv 5, 6, 7 ( original y, z, x)
-#define DEBUG_FFT_STAGE 0
+// Defined in make by setting environmental variable  DEBUG_FFT_STAGE
 
 // #include "/groups/himesb/git/cufftdx/example/block_io.hpp"
 // #include "/groups/himesb/git/cufftdx/example/common.hpp"
