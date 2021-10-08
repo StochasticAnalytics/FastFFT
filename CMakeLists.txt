@@ -13,17 +13,17 @@ include(ProjectSetup)
 
 project(  FastFFT 
           VERSION 0.1 
-          LANGUAGES CXX CUDA
+          LANGUAGES CUDA CXX
 )
 
 include(InstallDeps)
-include(AddFlags)
+#include(AddFlags)
 include(CUDASetup)
 include(CheckLanguage)
 
 message(STATUS "Project source dir: ${PROJECT_SOURCE_DIR}")
 message(STATUS "CUDA_MIN_ARCH: ${CUDA_MIN_ARCH}")
-
+message(STATUS "CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS}")
 
 check_language(CUDA)
 
@@ -35,9 +35,29 @@ endforeach()
 
 find_package(OpenMP QUIET COMPONENTS CXX)
 
+
+message(STATUS "FastFFT_cufftdx_dir $ENV{FastFFT_cufftdx_dir}")
+include_directories($ENV{FastFFT_cufftdx_dir}/include)
+
+
+
+add_library(test_lib STATIC
+            ${PROJECT_SOURCE_DIR}/cpp/test.cu
+)
+set_target_properties( test_lib
+                       PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+set_target_properties(test_lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 add_executable(test
                ${PROJECT_SOURCE_DIR}/cpp/test.cu
 )
+set_property(TARGET test 
+             PROPERTY CUDA_SEPARABLE_COMPILATION ON)
+
+#set_target_properties(test PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+set_target_properties(test PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+set_target_properties(test_lib PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
 target_link_libraries(test PRIVATE
   fftw3f

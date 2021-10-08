@@ -139,6 +139,10 @@ foreach(incdir ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
     string(APPEND CMAKE_CUDA_FLAGS " -isystem \"${incdir}\"")
 endforeach()
 
+string(APPEND CMAKE_CUDA_FLAGS " -ccbin=icpc -t 4 --default-stream per-thread -m64 -O3 --use_fast_math --extra-device-vectorization -std=c++17 --cudart=static")
+string(APPEND CMAKE_CUDA_FLAGS " -Xptxas --warn-on-local-memory-usage,--warn-on-spills, --generate-line-info -Xcompiler=-std=c++17")
+string(APPEND CMAKE_CUDA_FLAGS " --expt-relaxed-constexpr -DCUFFTDX_DISABLE_RUNTIME_ASSERTS")
+string(APPEND CMAKE_CUDA_FLAGS " -I${FastFFT_cufftdx_dir}/include")
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

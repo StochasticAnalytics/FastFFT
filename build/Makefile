@@ -77,25 +77,6 @@ install/strip/fast: preinstall/fast
 	/groups/himesb/.pybind_fastfft/lib/python3.6/site-packages/cmake/data/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
 .PHONY : install/strip/fast
 
-# Special rule for the target edit_cache
-edit_cache:
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "No interactive CMake dialog available..."
-	/groups/himesb/.pybind_fastfft/lib/python3.6/site-packages/cmake/data/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
-.PHONY : edit_cache
-
-# Special rule for the target edit_cache
-edit_cache/fast: edit_cache
-.PHONY : edit_cache/fast
-
-# Special rule for the target list_install_components
-list_install_components:
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Available install components are: \"Unspecified\""
-.PHONY : list_install_components
-
-# Special rule for the target list_install_components
-list_install_components/fast: list_install_components
-.PHONY : list_install_components/fast
-
 # Special rule for the target install/local
 install/local: preinstall
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Installing only the local directory..."
@@ -107,6 +88,25 @@ install/local/fast: preinstall/fast
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Installing only the local directory..."
 	/groups/himesb/.pybind_fastfft/lib/python3.6/site-packages/cmake/data/bin/cmake -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
 .PHONY : install/local/fast
+
+# Special rule for the target list_install_components
+list_install_components:
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Available install components are: \"Unspecified\""
+.PHONY : list_install_components
+
+# Special rule for the target list_install_components
+list_install_components/fast: list_install_components
+.PHONY : list_install_components/fast
+
+# Special rule for the target edit_cache
+edit_cache:
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "No interactive CMake dialog available..."
+	/groups/himesb/.pybind_fastfft/lib/python3.6/site-packages/cmake/data/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
+.PHONY : edit_cache
+
+# Special rule for the target edit_cache
+edit_cache/fast: edit_cache
+.PHONY : edit_cache/fast
 
 # Special rule for the target rebuild_cache
 rebuild_cache:
@@ -174,12 +174,26 @@ test/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test.dir/build.make CMakeFiles/test.dir/build
 .PHONY : test/fast
 
+#=============================================================================
+# Target rules for targets named test_lib
+
+# Build rule for target.
+test_lib: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_lib
+.PHONY : test_lib
+
+# fast build rule for target.
+test_lib/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_lib.dir/build.make CMakeFiles/test_lib.dir/build
+.PHONY : test_lib/fast
+
 cpp/test.o: cpp/test.cu.o
 .PHONY : cpp/test.o
 
 # target to build an object file
 cpp/test.cu.o:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test.dir/build.make CMakeFiles/test.dir/cpp/test.cu.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_lib.dir/build.make CMakeFiles/test_lib.dir/cpp/test.cu.o
 .PHONY : cpp/test.cu.o
 
 cpp/test.i: cpp/test.cu.i
@@ -188,6 +202,7 @@ cpp/test.i: cpp/test.cu.i
 # target to preprocess a source file
 cpp/test.cu.i:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test.dir/build.make CMakeFiles/test.dir/cpp/test.cu.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_lib.dir/build.make CMakeFiles/test_lib.dir/cpp/test.cu.i
 .PHONY : cpp/test.cu.i
 
 cpp/test.s: cpp/test.cu.s
@@ -196,6 +211,7 @@ cpp/test.s: cpp/test.cu.s
 # target to generate assembly for a file
 cpp/test.cu.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test.dir/build.make CMakeFiles/test.dir/cpp/test.cu.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_lib.dir/build.make CMakeFiles/test_lib.dir/cpp/test.cu.s
 .PHONY : cpp/test.cu.s
 
 # Help Target
@@ -211,6 +227,7 @@ help:
 	@echo "... list_install_components"
 	@echo "... rebuild_cache"
 	@echo "... test"
+	@echo "... test_lib"
 	@echo "... cpp/test.o"
 	@echo "... cpp/test.i"
 	@echo "... cpp/test.s"
