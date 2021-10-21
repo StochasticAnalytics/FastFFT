@@ -435,8 +435,21 @@ void compare_libraries(std::vector<int>size, int size_change_type)
   short4 output_size;
   for (int iSize = 0; iSize < size.size() - 1 ; iSize++)
   {
-    int oSize = iSize + 1;
-    while (oSize < size.size())
+    int oSize;
+    int loop_size;
+    if (size_change_type > 0) 
+    {
+      oSize = iSize + 1;
+      loop_size = size.size();
+
+    }
+    else 
+    {
+      oSize = iSize;
+      loop_size = oSize + 1;
+    }
+
+    while (oSize < loop_size)
     {
 
       if (is_size_change_decrease)
@@ -921,6 +934,7 @@ void compare_libraries(std::vector<int>size, int size_change_type)
       std::cout << "Ratio cuFFT/FastFFT : " << cuFFT_output.elapsed_gpu_ms/FastFFT_time << std::endl;
 
       oSize++;
+      // We don't want to loop if the size is not actually changing.
       } // while loop over pad to size
   } // for loop over pad from size
 
@@ -1101,13 +1115,13 @@ int main(int argc, char** argv)
 
     int size_change_type = 0; // no change
 
-    // compare_libraries(test_size, size_change_type);
+    compare_libraries(test_size, size_change_type);
 
     // size_change_type = 1; // increase
     // compare_libraries(test_size, size_change_type);
 
-    size_change_type = -1; // decrease
-    compare_libraries(test_size, size_change_type);
+    // size_change_type = -1; // decrease
+    // compare_libraries(test_size, size_change_type);
 
 
   }
