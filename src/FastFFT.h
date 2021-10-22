@@ -351,7 +351,7 @@ private:
   enum KernelType { r2c_decomposed, // Thread based, full length.
                     r2c_decomposed_transposed, // Thread based, full length, transposed.
                     r2c_none, r2c_decrease, r2c_increase,
-                    c2c_fwd_none, c2c_fwd_decrease, c2c_fwd_increase,     
+                    c2c_fwd_none, c2c_fwd_decrease, c2c_fwd_increase, c2c_fwd_increase_Z,    
                     c2c_inv_none, c2c_inv_decrease, c2c_inv_increase,                       
                     c2c_decomposed,
                     c2r_decomposed, 
@@ -367,7 +367,7 @@ private:
         KernelName{ "r2c_decomposed", 
                     "r2c_decomposed_transposed", 
                     "r2c_none", "r2c_decrease", "r2c_increase",
-                    "c2c_fwd_none", "c2c_fwd_increase", "c2c_fwd_increase",
+                    "c2c_fwd_none", "c2c_fwd_increase", "c2c_fwd_increase", "c2c_fwd_increase_Z",
                     "c2c_inv_none", "c2c_inv_increase", "c2c_inv_increase",
                     "c2c_decomposed", 
                     "c2r_decomposed", 
@@ -430,7 +430,7 @@ private:
   {
       if (kernel_type == r2c_decomposed || kernel_type == r2c_decomposed_transposed ||
           kernel_type == r2c_none || kernel_type == r2c_decrease || kernel_type == r2c_increase ||
-          kernel_type == c2c_fwd_none || kernel_type == c2c_fwd_decrease || kernel_type == c2c_fwd_increase ||
+          kernel_type == c2c_fwd_none || kernel_type == c2c_fwd_decrease || kernel_type == c2c_fwd_increase || kernel_type == c2c_fwd_increase_Z ||
           kernel_type == xcorr_fwd_decrease_inv_none || kernel_type == xcorr_fwd_increase_inv_none)
 
     {

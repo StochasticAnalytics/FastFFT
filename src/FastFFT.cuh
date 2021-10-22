@@ -242,6 +242,13 @@ template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_C2C_NONE(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
 
+template<class FFT, class ComplexType = typename FFT::value_type>
+__launch_bounds__(FFT::max_threads_per_block) __global__
+void block_fft_kernel_C2C_STRIDED_Z(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+
+template<class FFT, class ComplexType = typename FFT::value_type>
+__launch_bounds__(FFT::max_threads_per_block) __global__
+void block_fft_kernel_C2C_INCREASE_Z(const ComplexType* __restrict__  input_values, ComplexType*  __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 /////////////
 // C2R 
 /////////////
@@ -392,6 +399,29 @@ struct io
     }
 
   } // load_shared
+
+  static inline __device__ void load_shared_Z(const complex_type* input,
+                                              complex_type*       shared_input,
+                                              complex_type*       thread_data,
+                                              float* 	            twiddle_factor_args,
+                                              float				        twiddle_in,
+                                              int*				        input_map,
+                                              int*				        output_map,
+                                              int				          Q,
+                                              const unsigned int  input_pitch_xy)
+  {
+    const unsigned int stride = stride_size();
+    unsigned int       index  =  threadIdx.x; // 1d index
+    for (unsigned int i = 0; i < FFT::elements_per_thread; i++)
+     {
+      input_map[i] = index;
+      output_map[i] = Q*index + (blockIdx.z * input_pitch_xy);
+      twiddle_factor_args[i] = twiddle_in * index;
+      thread_data[i] = input[index + (blockIdx.z * input_pitch_xy)];
+      shared_input[index] = thread_data[i];
+      index += stride;
+    }
+  } // load_shared                                             
 
   static inline __device__ void load_shared(const complex_type* input,
                                             complex_type*       shared_input,
