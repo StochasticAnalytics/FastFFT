@@ -1115,10 +1115,10 @@ int main(int argc, char** argv)
 
     int size_change_type = 0; // no change
 
-    compare_libraries(test_size, size_change_type);
-
-    // size_change_type = 1; // increase
     // compare_libraries(test_size, size_change_type);
+
+    size_change_type = 1; // increase
+    compare_libraries(test_size, size_change_type);
 
     // size_change_type = -1; // decrease
     // compare_libraries(test_size, size_change_type);
