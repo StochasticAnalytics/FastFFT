@@ -8,9 +8,9 @@
 
 
 // When defined Turns on synchronization based checking for all FFT kernels as well as cudaErr macros
-// #define HEAVYERRORCHECKING_FFT 
+#define HEAVYERRORCHECKING_FFT 
 // Various levels of debuging conditions and prints
-#define FFT_DEBUG_LEVEL 0
+#define FFT_DEBUG_LEVEL 4
 
 #if FFT_DEBUG_LEVEL < 1
 
@@ -118,7 +118,7 @@ namespace FastFFT {
   // Return the address of the 1D transform index 0
   static __device__ __forceinline__ unsigned int Return1DFFTAddress(unsigned int pixel_pitch)
   {
-    return pixel_pitch * ( blockIdx.y + blockIdx.z * pixel_pitch);
+    return pixel_pitch * ( blockIdx.y + blockIdx.z * gridDim.y);
   }
 
    // Return the address of the 1D transform index 0
@@ -126,6 +126,14 @@ namespace FastFFT {
    {
      return ( blockIdx.z * NX * NY);
    } 
+
+   // Return the address of the 1D transform index 0
+   static __device__ __forceinline__ unsigned int Return1DFFTAddress_Z(unsigned int NY)
+   {
+     return (blockIdx.z * NY) + blockIdx.y;
+   }
+
+  
 
   // Complex a * conj b multiplication
   template <typename ComplexType, typename ScalarType>
@@ -244,7 +252,7 @@ void block_fft_kernel_C2C_NONE(const ComplexType* __restrict__  input_values, Co
 
 template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2C_STRIDED_Z(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+void block_fft_kernel_C2C_NONE_Z(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, unsigned int NY_input, unsigned int NY_output, typename FFT::workspace_type workspace);
 
 template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
@@ -400,6 +408,21 @@ struct io
 
   } // load_shared
 
+    // expected to be in between R2C (so transposed) and C2C
+    static inline __device__ void load_Z(const complex_type* input,
+                                         complex_type*       thread_data,
+                                         const unsigned int  xy_plane_size)
+    {
+      const unsigned int stride = stride_size();
+      unsigned int       index  =  threadIdx.x; // 1d index
+      for (unsigned int i = 0; i < FFT::elements_per_thread; i++)
+      {
+        thread_data[i] = input[index * xy_plane_size];
+        index += stride;
+      }
+    } // load_shared_z                                           
+
+  // expected to be in between R2C (so transposed) and C2C
   static inline __device__ void load_shared_Z(const complex_type* input,
                                               complex_type*       shared_input,
                                               complex_type*       thread_data,
@@ -806,10 +829,22 @@ struct io
     unsigned int       index  = threadIdx.x;
     for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
     {
-
       output[index] = thread_data[i];
-
       index += stride;
+    }
+  } // store
+
+
+  static inline __device__ void store_Z(const complex_type* thread_data,
+                                        complex_type*       output,
+                                        const unsigned int  xy_plane_size) 
+  {
+    const unsigned int  stride = stride_size();
+    unsigned int       index  = threadIdx.x;
+    for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+    {
+        output[index * xy_plane_size] = thread_data[i];
+        index += stride;
     }
   } // store
 

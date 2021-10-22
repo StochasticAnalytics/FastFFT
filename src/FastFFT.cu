@@ -396,8 +396,11 @@ void FourierTransformer<ComputeType, InputType, OutputType>::FwdFFT(bool swap_re
       switch (fwd_size_change_type)
       {
         case no_change: {
-          // Not yet supported
-          MyFFTRunTimeAssertTrue(false, "3D FFT fwd no change not yet supported");
+          std::cout << "3d no change" << std::endl;
+          SetPrecisionAndExectutionMethod(r2c_none);
+          transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
+          SetPrecisionAndExectutionMethod(c2c_fwd_none_Z);
+          SetPrecisionAndExectutionMethod(c2c_fwd_none);
           break;
         }
         case increase: {
@@ -938,13 +941,13 @@ void block_fft_kernel_R2C_NONE(const ScalarType* __restrict__ input_values, Comp
 
   // No need to __syncthreads as each thread only accesses its own shared mem anyway
   // multiply Q*fwd_dims_out.w because x maps to y in the output transposed FFT
-  // io<FFT>::load_r2c(&input_values[Return1DFFTAddress(mem_offsets.physical_x_input)], thread_data);
-  io<FFT>::load_r2c(&input_values[blockIdx.y*mem_offsets.physical_x_input], thread_data);
+  io<FFT>::load_r2c(&input_values[Return1DFFTAddress(mem_offsets.physical_x_input)], thread_data);
+  // io<FFT>::load_r2c(&input_values[blockIdx.y*mem_offsets.physical_x_input], thread_data);
 
   // In the first FFT the modifying twiddle factor is 1 so the data are real
   FFT().execute(thread_data, shared_mem, workspace);
 
-  io<FFT>::store_r2c_transposed(thread_data, &output_values[ ReturnZplane(blockDim.y, mem_offsets.physical_x_output)], gridDim.y);
+  io<FFT>::store_r2c_transposed(thread_data, &output_values[ ReturnZplane(gridDim.y, mem_offsets.physical_x_output)], gridDim.y);
 
  
 } // end of block_fft_kernel_R2C_NONE
@@ -1179,7 +1182,7 @@ void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul_SwapRealSpaceQuadrants(c
 
 template<class FFT, class invFFT, class ComplexType>
 __global__
-void block_fft_kernel_C2C_FWD_NONE_INV_DECREASE_ConjMul( const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, 
+void _INV_DECREASE_ConjMul( const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, 
                                                 Offsets mem_offsets, float twiddle_in, int apparent_Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv)
 {
   
@@ -1230,7 +1233,7 @@ void block_fft_kernel_C2C_FWD_NONE_INV_DECREASE_ConjMul( const ComplexType* __re
     #endif
 
 
-} // end of block_fft_kernel_C2C_FWD_NONE_INV_DECREASE_ConjMul
+} // end of _INV_DECREASE_ConjMul
 
 // C2C
 
@@ -1456,9 +1459,24 @@ void thread_fft_kernel_C2C_decomposed(const ComplexType* __restrict__  input_val
 
 template<class FFT, class ComplexType>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2C_STRIDED_Z(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace)
+void block_fft_kernel_C2C_NONE_Z(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, unsigned int NY_input, unsigned int NY_output, typename FFT::workspace_type workspace)
 {
-  // Undefined
+
+  //	// Initialize the shared memory, assuming everyting matches the input data X size in
+   using complex_type = ComplexType;
+ 
+   extern __shared__  complex_type shared_mem[]; // Storage for the input data that is re-used each blcok
+ 
+   // Memory used by FFT
+   complex_type thread_data[FFT::storage_size];
+ 
+   // No need to __syncthreads as each thread only accesses its own shared mem anyway
+   io<FFT>::load_Z(&input_values[Return1DFFTAddress_Z(NY_input)],  thread_data, NY_input * mem_offsets.physical_x_input);
+ 
+   // Since the memory ops are super straightforward this is an okay compromise.
+   FFT().execute(thread_data, shared_mem, workspace);
+ 
+   io<FFT>::store_Z(thread_data ,&output_values[Return1DFFTAddress_Z(NY_output)], NY_output * mem_offsets.physical_x_output);
   
 }
 
@@ -1466,53 +1484,53 @@ template<class FFT, class ComplexType>
 __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_C2C_INCREASE_Z(const ComplexType* __restrict__  input_values, ComplexType*  __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace)
 {
-  //	// Initialize the shared memory, assuming everyting matches the input data X size in
-   using complex_type = ComplexType;
+  // //	// Initialize the shared memory, assuming everyting matches the input data X size in
+  //  using complex_type = ComplexType;
  
-   extern __shared__  complex_type shared_input_complex[]; // Storage for the input data that is re-used each blcok
-   complex_type* shared_mem = (complex_type*)&shared_input_complex[size_of<FFT>::value];
+  //  extern __shared__  complex_type shared_input_complex[]; // Storage for the input data that is re-used each blcok
+  //  complex_type* shared_mem = (complex_type*)&shared_input_complex[size_of<FFT>::value];
  
  
-   // Memory used by FFT
-   complex_type twiddle;
-   complex_type thread_data[FFT::storage_size];
+  //  // Memory used by FFT
+  //  complex_type twiddle;
+  //  complex_type thread_data[FFT::storage_size];
  
-   // To re-map the thread index to the data
-   int input_MAP[FFT::storage_size];
-   // To re-map the decomposed frequency to the full output frequency
-   int output_MAP[FFT::storage_size];
-   // For a given decomposed fragment
-   float twiddle_factor_args[FFT::storage_size];
+  //  // To re-map the thread index to the data
+  //  int input_MAP[FFT::storage_size];
+  //  // To re-map the decomposed frequency to the full output frequency
+  //  int output_MAP[FFT::storage_size];
+  //  // For a given decomposed fragment
+  //  float twiddle_factor_args[FFT::storage_size];
  
-   // mem_offsets.pixel_pitch_output is the number of elements nw * ny;
-   io<FFT>::load_shared_Z(&input_values[blockIdx.y*mem_offsets.pixel_pitch_input], shared_input_complex, thread_data, twiddle_factor_args, twiddle_in, input_MAP, output_MAP, Q, mem_offsets.pixel_pitch_output);
+  //  // mem_offsets.pixel_pitch_output is the number of elements nw * ny;
+  // //  io<FFT>::load_shared_Z(&input_values[blockIdx.y*mem_offsets.pixel_pitch_input], shared_input_complex, thread_data, twiddle_factor_args, twiddle_in, input_MAP, output_MAP, Q, mem_offsets.pixel_pitch_output);
  
-   // In the first FFT the modifying twiddle factor is 1 so the data are reeal
-   FFT().execute(thread_data, shared_mem, workspace);
+  //  // In the first FFT the modifying twiddle factor is 1 so the data are reeal
+  //  FFT().execute(thread_data, shared_mem, workspace);
  
-   // 
-   io<FFT>::store(thread_data, output_values, output_MAP);
+  //  // 
+  //  io<FFT>::store(thread_data, output_values, output_MAP);
  
-     // For the other fragments we need the initial twiddle
-   for (int sub_fft = 1; sub_fft < Q; sub_fft++)
-   {
+  //    // For the other fragments we need the initial twiddle
+  //  for (int sub_fft = 1; sub_fft < Q; sub_fft++)
+  //  {
  
-     io<FFT>::copy_from_shared(shared_input_complex, thread_data, input_MAP);
+  //    io<FFT>::copy_from_shared(shared_input_complex, thread_data, input_MAP);
  
-     for (int i = 0; i < FFT::elements_per_thread; i++)
-     {
-       // Pre shift with twiddle
-       __sincosf(twiddle_factor_args[i]*sub_fft,&twiddle.y,&twiddle.x);
-       thread_data[i] *= twiddle;
-         // increment the output map. Note this only works for the leading non-zero case
-       output_MAP[i]++;
-     }
+  //    for (int i = 0; i < FFT::elements_per_thread; i++)
+  //    {
+  //      // Pre shift with twiddle
+  //      __sincosf(twiddle_factor_args[i]*sub_fft,&twiddle.y,&twiddle.x);
+  //      thread_data[i] *= twiddle;
+  //        // increment the output map. Note this only works for the leading non-zero case
+  //      output_MAP[i]++;
+  //    }
  
-     FFT().execute(thread_data, shared_mem, workspace);
+  //    FFT().execute(thread_data, shared_mem, workspace);
  
-     io<FFT>::store(thread_data, output_values, output_MAP);
+  //    io<FFT>::store(thread_data, output_values, output_MAP);
  
-   }
+  //  }
  
 
   
@@ -2130,7 +2148,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         // cudaErr(cudaSetDevice(0));
         //  cudaErr(cudaFuncSetCacheConfig( (void*)block_fft_kernel_R2C_NONE<FFT,complex_type,scalar_type>,cudaFuncCachePreferShared ));
         //  cudaFuncSetSharedMemConfig ( (void*)block_fft_kernel_R2C_NONE<FFT,complex_type,scalar_type>, cudaSharedMemBankSizeEightByte );
-        
+
         #if DEBUG_FFT_STAGE > 0
           precheck
           block_fft_kernel_R2C_NONE<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
@@ -2208,10 +2226,39 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         #if DEBUG_FFT_STAGE > 2
           CheckSharedMemory(shared_memory, device_properties);
           cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_NONE<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
-    
+          std::cout << "in block_fft_kernel_C2C_NONE"      << std::endl;
+          PrintState();
+          PrintLaunchParameters(LP);
           precheck
           block_fft_kernel_C2C_NONE<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-          ( (complex_type*)d_ptr.momentum_space_buffer,  (complex_type*)d_ptr.momentum_space, LP.mem_offsets, workspace);
+          ( complex_input,  complex_output, LP.mem_offsets, workspace);
+          postcheck
+        #else
+          // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
+          is_in_buffer_memory = ! is_in_buffer_memory;
+        #endif
+
+        break;
+      }
+
+      case c2c_fwd_none_Z: {
+
+        using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>() + Type<fft_type::c2c>() ); 
+  
+        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_fwd_none_Z);
+
+        cudaError_t error_code = cudaSuccess;
+        auto workspace = make_workspace<FFT>(error_code);
+
+        int shared_memory = FFT::shared_memory_size;
+
+        #if DEBUG_FFT_STAGE > 1
+          CheckSharedMemory(shared_memory, device_properties);
+          cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_NONE_Z<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory)); 
+          PrintLaunchParameters(LP);  
+          precheck
+          block_fft_kernel_C2C_NONE_Z<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+          ( complex_input,  complex_output, LP.mem_offsets, fwd_dims_in.y, fwd_dims_out.y, workspace);
           postcheck
         #else
           // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
@@ -2554,22 +2601,22 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
           bool swap_real_space_quadrants = false;   
           if (swap_real_space_quadrants)
           {
-            // cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_FWD_NONE_INV_DECREASE_ConjMul_SwapRealSpaceQuadrants<FFT,invFFT, complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+            // cudaErr(cudaFuncSetAttribute((void*)_INV_DECREASE_ConjMul_SwapRealSpaceQuadrants<FFT,invFFT, complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
             MyFFTDebugAssertFalse(swap_real_space_quadrants, "Swap real space quadrants not yet implemented in xcorr_fwd_none_inv_decrease.");
 
             // precheck
-            // block_fft_kernel_C2C_FWD_NONE_INV_DECREASE_ConjMul_SwapRealSpaceQuadrants<FFT,invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+            // _INV_DECREASE_ConjMul_SwapRealSpaceQuadrants<FFT,invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
             // ( (complex_type *)d_ptr.image_to_search, complex_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace_fwd, workspace_inv);
             // postcheck
           }
           else
           {
-            cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_FWD_NONE_INV_DECREASE_ConjMul<FFT, invFFT, complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+            cudaErr(cudaFuncSetAttribute((void*)_INV_DECREASE_ConjMul<FFT, invFFT, complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
             // Right now, because of the n_threads == size_of<FFT> requirement, we are explicitly zero padding, so we need to send an "apparent Q" to know the input size.
             // Could send the actual size, but later when converting to use the transform decomp with different sized FFTs this will be a more direct conversion.
             int apparent_Q = size_of<FFT>::value / inv_dims_out.y;
             precheck
-            block_fft_kernel_C2C_FWD_NONE_INV_DECREASE_ConjMul<FFT, invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+            _INV_DECREASE_ConjMul<FFT, invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
             ( (complex_type *)d_ptr.image_to_search, complex_input, complex_output , LP.mem_offsets, LP.twiddle_in, apparent_Q, workspace_fwd, workspace_inv);
             postcheck
           }
@@ -2641,6 +2688,19 @@ void FourierTransformer<ComputeType, InputType, OutputType>::GetTransformSize(Ke
           }
           break; 
         }
+        case 3:  {
+          if (IsTransormAlongZ(kernel_type)) 
+          {
+            AssertDivisibleAndFactorOf2( std::max(fwd_dims_in.z, fwd_dims_out.z),  std::min(fwd_dims_in.z, fwd_dims_out.z) ); 
+          }
+          else
+          {
+            AssertDivisibleAndFactorOf2( std::max(fwd_dims_in.y, fwd_dims_out.y),  std::min(fwd_dims_in.y, fwd_dims_out.y) ); 
+          }
+          
+          break;
+        }
+
         default: { MyFFTDebugAssertTrue(false, "ERROR: Invalid transform dimension for c2c fwd type.\n"); }
       }
     }
@@ -2845,9 +2905,31 @@ LaunchParams FourierTransformer<ComputeType, InputType, OutputType>::SetLaunchPa
         break;
       }
       case 3: {
-        MyFFTDebugAssertTrue(false, "3D not yet implemented");
+        if (IsTransormAlongZ(kernel_type))
+        {
+          // When transforming along the Z-dimension, The Z grid dimensions for a 3d kernel are used to indicate the transposed x coordinate.
+          if ( IsForwardType(kernel_type) ) 
+          {
+            L.gridDims = dim3(1, fwd_dims_out.y, fwd_dims_out.w);
+          }
+          else
+          {
+            L.gridDims = dim3(1, inv_dims_out.y, inv_dims_out.w);
+          }
+        }
+        else
+        {
+          if ( IsForwardType(kernel_type) ) 
+          {
+            L.gridDims = dim3(1, fwd_dims_out.w, fwd_dims_out.z);
+          }
+          else
+          {
+            L.gridDims = dim3(1, inv_dims_out.w, inv_dims_out.z);
+          }
+        }          
         break;
-      }
+      } // 3 dimensional case
       default: {
         MyFFTDebugAssertTrue(false, "Unknown transform_dimension ( " + std::to_string(transform_dimension) + " )");
       }
