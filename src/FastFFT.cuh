@@ -122,9 +122,9 @@ namespace FastFFT {
   }
 
    // Return the address of the 1D transform index 0
-   static __device__ __forceinline__ unsigned int Return2DFFTAddress(unsigned int pixel_pitch)
+   static __device__ __forceinline__ unsigned int ReturnZplane(unsigned int NX, unsigned int NY)
    {
-     return ( blockIdx.y * blockIdx.z * pixel_pitch);
+     return ( blockIdx.z * NX * NY);
    } 
 
   // Complex a * conj b multiplication

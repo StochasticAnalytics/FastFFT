@@ -437,7 +437,7 @@ void compare_libraries(std::vector<int>size, int size_change_type)
   {
     int oSize;
     int loop_size;
-    if (size_change_type > 0) 
+    if (size_change_type != 0) 
     {
       oSize = iSize + 1;
       loop_size = size.size();
@@ -1117,11 +1117,11 @@ int main(int argc, char** argv)
 
     // compare_libraries(test_size, size_change_type);
 
-    size_change_type = 1; // increase
-    compare_libraries(test_size, size_change_type);
-
-    // size_change_type = -1; // decrease
+    // size_change_type = 1; // increase
     // compare_libraries(test_size, size_change_type);
+
+    size_change_type = -1; // decrease
+    compare_libraries(test_size, size_change_type);
 
 
   }
