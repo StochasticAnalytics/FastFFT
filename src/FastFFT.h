@@ -64,10 +64,10 @@ namespace FastFFT {
 
   typedef
 	struct __align__(8) _Offsets{
-    short shared_input;
-    short shared_output;
-    short pixel_pitch_input;
-    short pixel_pitch_output;
+    unsigned short shared_input;
+    unsigned short shared_output;
+    unsigned short physical_x_input;
+    unsigned short physical_x_output;
   } Offsets;
 
   typedef 
@@ -517,8 +517,8 @@ private:
     std::cout << "  Twiddle in: " << LP.twiddle_in << std::endl;
     std::cout << "  shared input: " << LP.mem_offsets.shared_input << std::endl;
     std::cout << "  shared output (memlimit in r2c): " << LP.mem_offsets.shared_output << std::endl;
-    std::cout << "  pixel pitch input: " << LP.mem_offsets.pixel_pitch_input << std::endl;
-    std::cout << "  pixel pitch output: " << LP.mem_offsets.pixel_pitch_output << std::endl;
+    std::cout << "  physical_x_input: " << LP.mem_offsets.physical_x_input << std::endl;
+    std::cout << "  physical_x_output: " << LP.mem_offsets.physical_x_output << std::endl;
 
   };
  

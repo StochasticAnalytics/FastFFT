@@ -8,7 +8,7 @@
 
 
 // When defined Turns on synchronization based checking for all FFT kernels as well as cudaErr macros
-//#define HEAVYERRORCHECKING_FFT 
+// #define HEAVYERRORCHECKING_FFT 
 // Various levels of debuging conditions and prints
 #define FFT_DEBUG_LEVEL 0
 
@@ -115,6 +115,18 @@ namespace FastFFT {
     return ( index % ubank_size ) + ( (index / ubank_size) * ubank_padded );
   }
 
+  // Return the address of the 1D transform index 0
+  static __device__ __forceinline__ unsigned int Return1DFFTAddress(unsigned int pixel_pitch)
+  {
+    return pixel_pitch * ( blockIdx.y + blockIdx.z * pixel_pitch);
+  }
+
+   // Return the address of the 1D transform index 0
+   static __device__ __forceinline__ unsigned int ReturnZplane(unsigned int NX, unsigned int NY)
+   {
+     return ( blockIdx.z * NX * NY);
+   } 
+
   // Complex a * conj b multiplication
   template <typename ComplexType, typename ScalarType>
   static __device__ __host__ inline auto ComplexConjMulAndScale(const ComplexType a, const ComplexType b, ScalarType s) -> decltype(b)
@@ -213,7 +225,7 @@ void block_fft_kernel_C2C_WithPadding_SwapRealSpaceQuadrants(const ComplexType* 
 template<class FFT, class invFFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul( const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, 
-                                                Offsets mem_offsets, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv);
+                                                Offsets mem_offsets, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv);
 
 template<class FFT, class invFFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
@@ -797,8 +809,8 @@ struct io
   } // store
 
   static inline __device__ void store_subset(const complex_type* thread_data,
-                                      complex_type*       output,
-                                      int*				        source_idx)                                    
+                                             complex_type*       output,
+                                             int*				        source_idx)                                    
   {
     const unsigned int  stride = stride_size();
     for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
@@ -984,7 +996,7 @@ struct io_thread
                                                           complex_type*       shared_output,
                                                           float               twiddle_in,
                                                           int                 Q,
-                                                          int                 memory_limit)  // mem_offsets.pixel_pitch_output
+                                                          int                 memory_limit)  
   {
      // Unroll the first loop and initialize the shared mem. 
      complex_type twiddle;
