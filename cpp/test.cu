@@ -193,14 +193,14 @@ void const_image_test(std::vector<int> size, bool do_3d = false)
  
 
     #if DEBUG_FFT_STAGE == 4
-      PrintArray(host_output.complex_values, dims_out.y, dims_out.z, dims_out.w);
+      PrintArray(host_output.complex_values, dims_out.y, dims_out.w, dims_out.z);
       MyTestPrintAndExit( "stage 4 " );
     #elif DEBUG_FFT_STAGE == 5
-      PrintArray(host_output.complex_values, dims_out.y, dims_out.z, dims_out.w);
+      PrintArray(host_output.complex_values, dims_out.y, dims_out.w, dims_out.z);
       MyTestPrintAndExit( "stage 5 " );
     #elif DEBUG_FFT_STAGE == 6
-      PrintArray(host_output.complex_values, dims_out.y, dims_out.z, dims_out.w);
-      MyTestPrintAndExit( "stage 5 " );      
+      PrintArray(host_output.complex_values, dims_out.y, dims_out.w, dims_out.z);
+      MyTestPrintAndExit( "stage 6 " );      
     #elif DEBUG_FFT_STAGE == 7
       PrintArray(host_output.real_values, dims_out.x, dims_out.y,dims_out.z, dims_out.w);
       MyTestPrintAndExit( "stage 7 " );

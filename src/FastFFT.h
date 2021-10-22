@@ -352,7 +352,7 @@ private:
                     r2c_decomposed_transposed, // Thread based, full length, transposed.
                     r2c_none, r2c_decrease, r2c_increase,
                     c2c_fwd_none, c2c_fwd_none_Z, c2c_fwd_decrease, c2c_fwd_increase, c2c_fwd_increase_Z,    
-                    c2c_inv_none, c2c_inv_decrease, c2c_inv_increase,                       
+                    c2c_inv_none, c2c_inv_none_Z, c2c_inv_decrease, c2c_inv_increase,                       
                     c2c_decomposed,
                     c2r_decomposed, 
                     c2r_decomposed_transposed, 
@@ -368,7 +368,7 @@ private:
                     "r2c_decomposed_transposed", 
                     "r2c_none", "r2c_decrease", "r2c_increase",
                     "c2c_fwd_none", "c2c_fwd_none_Z", "c2c_fwd_increase", "c2c_fwd_increase", "c2c_fwd_increase_Z",
-                    "c2c_inv_none", "c2c_inv_increase", "c2c_inv_increase",
+                    "c2c_inv_none","c2c_inv_none_Z", "c2c_inv_increase", "c2c_inv_increase",
                     "c2c_decomposed", 
                     "c2r_decomposed", 
                     "c2r_decomposed_transposed", 
@@ -392,7 +392,8 @@ private:
              kernel_type == c2c_fwd_none || c2c_fwd_none_Z || 
              kernel_type == c2c_fwd_decrease || 
              kernel_type == c2c_fwd_increase || kernel_type == c2c_fwd_increase_Z ||
-             kernel_type == c2c_inv_none || kernel_type == c2c_inv_decrease || kernel_type == c2c_inv_increase ||
+             kernel_type == c2c_inv_none || kernel_type == c2c_inv_none_Z ||
+             kernel_type == c2c_inv_decrease || kernel_type == c2c_inv_increase ||
              kernel_type == c2r_none || kernel_type == c2r_decrease || kernel_type == c2r_increase ||
              kernel_type == xcorr_fwd_increase_inv_none || kernel_type == xcorr_fwd_decrease_inv_none || kernel_type == xcorr_fwd_none_inv_decrease || kernel_type == xcorr_fwd_decrease_inv_decrease)
     { 
@@ -446,7 +447,8 @@ private:
 
   inline bool IsTransormAlongZ(KernelType kernel_type)
   {
-    if (kernel_type == c2c_fwd_none_Z || kernel_type == c2c_fwd_increase_Z)
+    if (kernel_type == c2c_fwd_none_Z || kernel_type == c2c_fwd_increase_Z ||
+        kernel_type == c2c_inv_none_Z )
     {
       return true;
     }

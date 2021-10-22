@@ -512,9 +512,32 @@ void FourierTransformer<ComputeType, InputType, OutputType>::InvFFT(bool transpo
       break; // case 2
     }
     case 3: {
-      // Not yet supported
-      MyFFTRunTimeAssertTrue(false, "3D FFT not yet supported");
-      break;
+      switch (inv_size_change_type) 
+      {
+        case no_change: {
+          std::cout << "3d inv no change" << std::endl;
+          SetPrecisionAndExectutionMethod(c2c_inv_none);
+          transform_stage_completed = TransformStageCompleted::inv; // technically not complete, needed for copy on validation of partial fft.
+          SetPrecisionAndExectutionMethod(c2c_inv_none_Z);
+          SetPrecisionAndExectutionMethod(c2r_none);
+          break;
+        }
+        case increase: {
+          SetPrecisionAndExectutionMethod(r2c_increase);
+          transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
+          SetPrecisionAndExectutionMethod(c2c_fwd_increase_Z);   
+          break;
+        }
+        case decrease: {
+          // Not yet supported
+          MyFFTRunTimeAssertTrue(false, "3D FFT inv no decrease not yet supported");
+          break;
+        }
+        default: {
+          MyFFTDebugAssertTrue(false, "Invalid dimension");
+          break;
+        }
+      }
     }
   }
 
@@ -2418,6 +2441,32 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         // do something
         break; 
       }
+      case c2c_inv_none_Z: {
+
+        using FFT = decltype( FFT_base_arch() + Direction<fft_direction::inverse>() + Type<fft_type::c2c>() ); 
+  
+        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_inv_none_Z);
+
+        cudaError_t error_code = cudaSuccess;
+        auto workspace = make_workspace<FFT>(error_code);
+
+        int shared_memory = FFT::shared_memory_size;
+
+        #if DEBUG_FFT_STAGE > 5
+          CheckSharedMemory(shared_memory, device_properties);
+          cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_NONE_Z<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory)); 
+          PrintLaunchParameters(LP);  
+          precheck
+          block_fft_kernel_C2C_NONE_Z<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+          ( complex_input,  complex_output, LP.mem_offsets, inv_dims_in.y, inv_dims_out.y, workspace);
+          postcheck
+        #else
+          // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
+          is_in_buffer_memory = ! is_in_buffer_memory;
+        #endif
+
+        break;
+      }
 
       case c2c_inv_decrease: {
 
@@ -2721,6 +2770,19 @@ void FourierTransformer<ComputeType, InputType, OutputType>::GetTransformSize(Ke
           }
           break; 
         }
+        case 3:  {
+          if (IsTransormAlongZ(kernel_type)) 
+          {
+            AssertDivisibleAndFactorOf2( std::max(inv_dims_in.z, inv_dims_out.z),  std::min(inv_dims_in.z, inv_dims_out.z) ); 
+          }
+          else
+          {
+            AssertDivisibleAndFactorOf2( std::max(inv_dims_in.y, inv_dims_out.y),  std::min(inv_dims_in.y, inv_dims_out.y) ); 
+          }
+          
+          break;
+        }
+
         default: { MyFFTDebugAssertTrue(false, "ERROR: Invalid transform dimension for c2c inverse type.\n"); }
       }
     }
