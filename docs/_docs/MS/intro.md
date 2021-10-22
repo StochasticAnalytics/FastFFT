@@ -120,21 +120,27 @@ By design, the cufft library from Nvidia returns an FFT in the natural order [TO
 
 | 2D input | 2x size |  4096 | cufft/FastFFT runtime (10k iterations) | 
 | --- | ---- | ---- | ---- |
+| 32 | 2.32 | 2.46 | |
 | 64 | 2.54 | 2.59 | |
-| 128 | 1.65 | 2.50 | |
-| 256 | 1.33 | 2.45 | | 
-| 512 | 1.88 | 2.29 | |
-| 1024 | 1.94 | 1.94 | | 
+| 128 | 2.25 | 2.52 | |
+| 256 | 1.57 | 2.45 | | 
+| 512 | 1.33 | 2.46 | |
+| 1024 | 1.85 | 2.25 | | 
+| 2048 | 1.95 | 1.95 ||
 
-##### Table 3: zero padded convolution of input size, where only 128 pixel sq. is needed for output
+##### Table 3: zero padded convolution of input size (top row), where only (bottom row) pixel sq. is needed for output
 
-| 2D input | 2D output | cufft/FastFFT runtime (10k iterations) | 
-| --- | ---- | ---- |
-| 256 | 128 | 1.62 |
-| 512 | 128 |1.30 | 
-| 1024 | 128 |1.06 | 
-| 2048 |128 | 1.75 | 
-| 4096 | 128 |2.11 | 
+| | 32   |64   | 128 | 256 | 512 | 1024| 2048| 4096|
+|---- | ----    | ---- |---- |---- |---- |---- |---- |---- |
+| 16 |               1.8   | 1.75| 1.88| 1.75|1.36 | 0.93| 1.7 | 2.01   | 
+| 32 |                  | 1.56| 1.87| 1.72|1.37 | 0.92| 1.69 | 2.00   | 
+| 64 |                  | | 1.82| 1.69|1.34 | 0.91| 1.68 | 1.99   | 
+| 128|                  | | | 1.65|1.31 | 0.89| 1.64 | 1.95   | 
+| 256|                  | | | |1.24 | 0.84| 1.57 | 1.91   | 
+| 512|                  | | | | | 0.98| 1.48 | 1.84   | 
+| 1024|                 | | | | | | 1.32 | 1.69   | 
+| 2048|                 | | | | | |  | 1.48   | 
+ 
 
 🍍 None of the kernels are even remotely optimized at this point, they have only been assembled and tested to pass expected behavior for FFTs of constant functions, unit impulse functions, and basic convolution ops.
 
