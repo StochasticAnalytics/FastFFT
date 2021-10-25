@@ -32,7 +32,6 @@ void PrintArray( float2* array, short NX, short NY, short NZ, int line_wrapping 
 
 void PrintArray(float* array, short NX, short NY, short NZ, short NW, int line_wrapping = 34)
 {
-  
   int n=0;
   for (int z = 0; z < NZ ; z ++)
   {
@@ -42,7 +41,7 @@ void PrintArray(float* array, short NX, short NY, short NZ, short NW, int line_w
       std::cout << x << "[ ";
       for (int y = 0; y < NY; y++)
       {  
-        std::cout << array[x + y*NW*2] <<  " ";
+        std::cout << array[x + (2*NW)*(y + z*NY)] <<  " ";
         n++;
         if (n == line_wrapping) {n = 0; std::cout << std::endl ;} // line wrapping
       }
@@ -69,15 +68,18 @@ void const_image_test(std::vector<int> size, bool do_3d = false)
 
     short4 input_size;
     short4 output_size;
+    long full_sum = long(size[n]);
     if (do_3d)
     {
       input_size = make_short4(size[n],size[n],size[n],0);
       output_size = make_short4(size[n],size[n],size[n],0);
+      full_sum =  full_sum*full_sum*full_sum*full_sum*full_sum*full_sum;
     }
     else
     {
       input_size = make_short4(size[n],size[n],1,0);
       output_size = make_short4(size[n],size[n],1,0);
+      full_sum = full_sum*full_sum*full_sum;
     }
 
 
@@ -133,7 +135,9 @@ void const_image_test(std::vector<int> size, bool do_3d = false)
     // ensures faster transfer. If false, it will be pinned for you.
     FT.SetInputPointer(host_output.real_values, false);
     sum = ReturnSumOfReal(host_output.real_values, dims_out);
-    if (sum != dims_out.x*dims_out.y*dims_out.z) {all_passed = false; init_passed[n] = false;}
+
+      if (sum != long(dims_in.x)*long(dims_in.y)*long(dims_in.z)) {all_passed = false; init_passed[n] = false;}
+    
     // MyFFTDebugAssertTestTrue( sum == dims_out.x*dims_out.y*dims_out.z,"Unit impulse Init ");
     
     // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
@@ -210,12 +214,12 @@ void const_image_test(std::vector<int> size, bool do_3d = false)
       MyTestPrintAndExit( " This block is only valid for DEBUG_FFT_STAGE == 4, 5, 7 " );
     #endif   
 
+
     // Assuming the outputs are always even dimensions, padding_jump_val is always 2.
     sum = ReturnSumOfReal(host_output.real_values, dims_out);
 
-
-    if (sum != powf(dims_in.x*dims_in.y*dims_in.z,2)) {all_passed = false; FastFFT_roundTrip_passed[n] = false;}
-    // MyFFTDebugAssertTestTrue( sum == powf(dims_in.x*dims_in.y*dims_in.z,2),"FastFFT constant image round trip failed for size");
+    if (sum != full_sum) {all_passed = false; FastFFT_roundTrip_passed[n] = false;}
+    MyFFTDebugAssertTestTrue( sum == full_sum,"FastFFT constant image round trip for size " + std::to_string(dims_in.x));
   } // loop over sizes
   
   if (all_passed)

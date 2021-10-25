@@ -709,13 +709,13 @@ struct io
 
   static inline __device__ void load_c2r_transposed(const complex_type* input,
                                                     complex_type*       thread_data,
-                                                    int        		      pixel_pitch) 
+                                                    unsigned int        pixel_pitch) 
   {
     const unsigned int stride = stride_size();
     unsigned int       index  =  threadIdx.x;
     for (unsigned int i = 0; i < FFT::elements_per_thread / 2; i++) 
     {
-      thread_data[i] = input[pixel_pitch*(int)index];
+      thread_data[i] = input[(pixel_pitch * index) + blockIdx.y];
       index += stride;
     }
     constexpr unsigned int threads_per_fft       = cufftdx::size_of<FFT>::value / FFT::elements_per_thread;
@@ -724,7 +724,7 @@ struct io
     constexpr unsigned int values_left_to_load = threads_per_fft == 1 ? 1 : (output_values_to_load % threads_per_fft);
     if (threadIdx.x < values_left_to_load) 
     {
-      thread_data[FFT::elements_per_thread / 2] = input[pixel_pitch*(int)index];
+      thread_data[FFT::elements_per_thread / 2] = input[(pixel_pitch * index) + blockIdx.y];
     }
   } // load_c2r_transposed
 

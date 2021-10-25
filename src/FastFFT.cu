@@ -1574,12 +1574,12 @@ void block_fft_kernel_C2R_NONE(const ComplexType* __restrict__  input_values, Sc
 
   complex_type thread_data[FFT::storage_size];
 
-  io<FFT>::load_c2r_transposed(&input_values[blockIdx.y + ReturnZplane(blockDim.y, mem_offsets.physical_x_input)], thread_data, gridDim.y);
+  io<FFT>::load_c2r_transposed(&input_values[ReturnZplane(gridDim.y, mem_offsets.physical_x_input)], thread_data, gridDim.y);
 
   // For loop zero the twiddles don't need to be computed
   FFT().execute(thread_data, shared_mem, workspace);
-
-  io<FFT>::store_c2r(thread_data, &output_values[Return1DFFTAddress(mem_offsets.physical_x_output)]);
+  
+  io<FFT>::store_c2r(thread_data, &output_values[Return1DFFTAddress(mem_offsets.physical_x_output)], size_of<FFT>::value);
 
 } // end of block_fft_kernel_C2R_NONE
 
@@ -1596,12 +1596,12 @@ void block_fft_kernel_C2R_DECREASE(const ComplexType*  __restrict__ input_values
   complex_type thread_data[FFT::storage_size];
 
 
-  io<FFT>::load_c2r_transposed(&input_values[blockIdx.y + ReturnZplane(blockDim.y, mem_offsets.physical_x_input)], thread_data, gridDim.y);
+  io<FFT>::load_c2r_transposed(&input_values[ReturnZplane(gridDim.y, mem_offsets.physical_x_input)], thread_data, gridDim.y);
   
   // For loop zero the twiddles don't need to be computed
   FFT().execute(thread_data, shared_mem, workspace);
 
-  io<FFT>::store_c2r(thread_data, &output_values[Return1DFFTAddress(mem_offsets.physical_x_output)], mem_offsets.physical_x_output);
+  io<FFT>::store_c2r(thread_data, &output_values[Return1DFFTAddress(mem_offsets.physical_x_output)], size_of<FFT>::value);
 
   // // Load transposed data into shared memory in natural order.
   // io<FFT>::load_c2r_shared_and_pad(&input_values[blockIdx.y], shared_mem, mem_offsets.physical_x_input);
@@ -1664,7 +1664,7 @@ void thread_fft_kernel_C2R_decomposed_transposed(const ComplexType*  __restrict_
   complex_type thread_data[FFT::storage_size];
  
 
-  io_thread<FFT>::load_c2r_transposed(&input_values[blockIdx.y + ReturnZplane(blockDim.y, mem_offsets.physical_x_input)], thread_data, Q, gridDim.y, mem_offsets.physical_x_input);
+  io_thread<FFT>::load_c2r_transposed(&input_values[ReturnZplane(blockDim.y, mem_offsets.physical_x_input)], thread_data, Q, gridDim.y, mem_offsets.physical_x_input);
 
   // We then have Q FFTs of size size_of<FFT>::value (P in the paper)
   FFT().execute(thread_data);
@@ -2249,9 +2249,6 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         #if DEBUG_FFT_STAGE > 2
           CheckSharedMemory(shared_memory, device_properties);
           cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_NONE<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
-          std::cout << "in block_fft_kernel_C2C_NONE"      << std::endl;
-          PrintState();
-          PrintLaunchParameters(LP);
           precheck
           block_fft_kernel_C2C_NONE<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
           ( complex_input,  complex_output, LP.mem_offsets, workspace);
@@ -2278,7 +2275,6 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         #if DEBUG_FFT_STAGE > 1
           CheckSharedMemory(shared_memory, device_properties);
           cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_NONE_Z<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory)); 
-          PrintLaunchParameters(LP);  
           precheck
           block_fft_kernel_C2C_NONE_Z<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
           ( complex_input,  complex_output, LP.mem_offsets, fwd_dims_in.y, fwd_dims_out.y, workspace);
@@ -2455,7 +2451,6 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         #if DEBUG_FFT_STAGE > 5
           CheckSharedMemory(shared_memory, device_properties);
           cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_NONE_Z<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory)); 
-          PrintLaunchParameters(LP);  
           precheck
           block_fft_kernel_C2C_NONE_Z<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
           ( complex_input,  complex_output, LP.mem_offsets, inv_dims_in.y, inv_dims_out.y, workspace);
