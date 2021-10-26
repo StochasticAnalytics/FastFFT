@@ -52,6 +52,30 @@ void PrintArray(float* array, short NX, short NY, short NZ, short NW, int line_w
   }
 };
 
+void PrintArray_XZ( float2* array, short NX, short NY, short NZ, int line_wrapping = 34)
+{
+    // COMPLEX TODO make these functions.
+    int n=0;
+    for (int x = 0; x < NX ; x ++)
+    {
+      for (int z = 0; z <  NZ ; z++)
+      {
+        
+        std::cout << z << "[ ";
+        for (int y = 0; y < NY; y++)
+        {  
+          std::cout << array[z + NZ*(y + x*NY)].x << "," << array[z + NZ*(y + x*NY)].y << " ";
+          n++;
+          if (n == line_wrapping) {n = 0; std::cout << std::endl ;} // line wrapping
+        }
+        std::cout << "] " << std::endl;
+        n = 0;
+      }
+      if (NZ > 0) std::cout << " ... ... ... " << x << " ... ... ..." << std::endl;
+    }
+
+};
+
 // The Fourier transform of a constant should be a unit impulse, and on back fft, without normalization, it should be a constant * N.
 // It is assumed the input/output have the same dimension (i.e. no padding)
 void const_image_test(std::vector<int> size, bool do_3d = false)
@@ -176,7 +200,8 @@ void const_image_test(std::vector<int> size, bool do_3d = false)
       PrintArray(host_output.real_values, dims_out.x, dims_in.y, dims_in.z, dims_out.w);
       MyTestPrintAndExit( "stage 0 " );
     #elif DEBUG_FFT_STAGE == 1
-      PrintArray(host_output.complex_values, dims_in.y, dims_out.w, dims_in.z);
+      if (do_3d) { std::cout << " in 3d print " << std::endl; PrintArray(host_output.complex_values, dims_in.z, dims_in.y, dims_out.w); }
+      else       PrintArray(host_output.complex_values, dims_in.y, dims_out.w, dims_in.z);
       MyTestPrintAndExit( "stage 1 " );
       #elif DEBUG_FFT_STAGE == 2
       PrintArray(host_output.complex_values, dims_in.y, dims_out.w, dims_out.z);
@@ -203,7 +228,8 @@ void const_image_test(std::vector<int> size, bool do_3d = false)
       PrintArray(host_output.complex_values, dims_out.y, dims_out.w, dims_out.z);
       MyTestPrintAndExit( "stage 5 " );
     #elif DEBUG_FFT_STAGE == 6
-      PrintArray(host_output.complex_values, dims_out.y, dims_out.w, dims_out.z);
+      if (do_3d) { std::cout << " in 3d print inv " << dims_out.w << "w" << std::endl; PrintArray(host_output.complex_values, dims_out.w, dims_out.y, dims_out.z); }
+      else PrintArray(host_output.complex_values, dims_out.y, dims_out.w, dims_out.z);
       MyTestPrintAndExit( "stage 6 " );      
     #elif DEBUG_FFT_STAGE == 7
       PrintArray(host_output.real_values, dims_out.x, dims_out.y,dims_out.z, dims_out.w);
