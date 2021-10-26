@@ -218,6 +218,50 @@ void Image<wanted_real_type, wanted_complex_type>::MakeCufftPlan()
     is_cufft_planned = true;
 }
 
+template < class wanted_real_type, class wanted_complex_type >
+void Image<wanted_real_type, wanted_complex_type>::MakeCufftPlan3d()
+{
+
+  // TODO for alternate precisions.
+
+  cufftCreate(&cuda_plan_forward);
+  cufftCreate(&cuda_plan_inverse);
+
+  cufftSetStream(cuda_plan_forward, cudaStreamPerThread);
+  cufftSetStream(cuda_plan_inverse, cudaStreamPerThread);
+
+  int rank = 3; int iBatch = 1;
+  long long int* fftDims = new long long int[rank];
+  long long int*inembed = new long long int[rank];
+  long long int*onembed = new long long int[rank];
+
+  fftDims[0] = size.z;
+  fftDims[1] = size.y;
+  fftDims[2] = size.x;
+
+  inembed[0] = size.z;
+  inembed[1] = size.y;
+  inembed[2] = size.w;
+
+  onembed[0] = size.z;
+  onembed[1] = size.y;
+  onembed[2] = size.w;
+
+
+  (cufftXtMakePlanMany(cuda_plan_forward, rank, fftDims,
+    NULL, NULL, NULL, CUDA_R_32F,
+    NULL, NULL, NULL, CUDA_C_32F, iBatch, &cuda_plan_worksize_forward, CUDA_C_32F));
+    (cufftXtMakePlanMany(cuda_plan_inverse, rank, fftDims,
+    NULL, NULL, NULL, CUDA_C_32F,
+    NULL, NULL, NULL, CUDA_R_32F, iBatch, &cuda_plan_worksize_inverse, CUDA_R_32F));
+
+    delete [] fftDims;
+    delete [] inembed;
+    delete [] onembed;
+
+    is_cufft_planned = true;
+}
+
 typedef struct _CB_realLoadAndClipInto_params
 {
   bool* mask;

@@ -239,7 +239,7 @@ void const_image_test(std::vector<int> size, bool do_3d = false)
   }
 }
 
-void unit_impulse_test(std::vector<int>size, bool do_increase_size)
+void unit_impulse_test(std::vector<int>size, bool do_3d, bool do_increase_size)
 {
 
   bool all_passed = true;
@@ -256,16 +256,33 @@ void unit_impulse_test(std::vector<int>size, bool do_increase_size)
     while (oSize < size.size())
     {
 
+
       // std::cout << std::endl << "Testing padding from  " << size[iSize] << " to " << size[oSize] << std::endl;
       if (do_increase_size)
       {
-        input_size  = make_short4(size[iSize],size[iSize],1,0);
-        output_size = make_short4(size[oSize],size[oSize],1,0);  
+        if (do_3d)
+        {
+          input_size  = make_short4(size[iSize],size[iSize],size[iSize],0);
+          output_size = make_short4(size[oSize],size[oSize],size[oSize],0);  
+        }
+        else
+        {
+          input_size  = make_short4(size[iSize],size[iSize],1,0);
+          output_size = make_short4(size[oSize],size[oSize],1,0);  
+        }
       }
       else
       {
-        output_size = make_short4(size[iSize],size[iSize],1,0);
-        input_size  = make_short4(size[oSize],size[oSize],1,0);  
+        if (do_3d)
+        { 
+          output_size = make_short4(size[iSize],size[iSize],size[iSize],0);
+          input_size  = make_short4(size[oSize],size[oSize],size[oSize],0);  
+        }
+        else
+        {
+          output_size = make_short4(size[iSize],size[iSize],1,0);
+          input_size  = make_short4(size[oSize],size[oSize],1,0);  
+        }
       }
 
 
@@ -465,7 +482,7 @@ void unit_impulse_test(std::vector<int>size, bool do_increase_size)
 
 }
 
-void compare_libraries(std::vector<int>size, int size_change_type)
+void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type)
 {
 
   bool skip_cufft_for_profiling = false;
@@ -474,10 +491,12 @@ void compare_libraries(std::vector<int>size, int size_change_type)
   bool is_size_change_decrease = false;
 
   if (size_change_type < 0) { is_size_change_decrease = true; }
+  int loop_limit = 1;
+  if (size_change_type == 0)  loop_limit = 0;
 
   short4 input_size;
   short4 output_size;
-  for (int iSize = 0; iSize < size.size() - 1 ; iSize++)
+  for (int iSize = 0; iSize < size.size() - loop_limit ; iSize++)
   {
     int oSize;
     int loop_size;
@@ -500,11 +519,22 @@ void compare_libraries(std::vector<int>size, int size_change_type)
       {
         output_size = make_short4(size[iSize],size[iSize],1,0);
         input_size  = make_short4(size[oSize],size[oSize],1,0);  
+        if (do_3d)
+        {
+          output_size.z = size[iSize];
+          input_size.z  = size[oSize];
+        }
+
       }
       else
       {
         input_size  = make_short4(size[iSize],size[iSize],1,0);
         output_size = make_short4(size[oSize],size[oSize],1,0);  
+        if (do_3d)
+        {
+          input_size.z  = size[iSize];
+          output_size.z = size[oSize];
+        }
 
       }
       std::cout << std::endl << "Testing padding from  " << input_size.x << " to " << output_size.x << std::endl;
@@ -681,9 +711,21 @@ void compare_libraries(std::vector<int>size, int size_change_type)
       }
 
 
-      cuFFT_output.create_timing_events(); 
-      cuFFT_input.MakeCufftPlan();
-      cuFFT_output.MakeCufftPlan();
+      cuFFT_output.create_timing_events();
+      if (do_3d)
+      {   
+        std::cout << "3D test " << std::endl;
+        cuFFT_input.MakeCufftPlan3d();
+        cuFFT_output.MakeCufftPlan3d();
+      } 
+      else
+      {
+        std::cout << "2D test " << std::endl;
+
+        cuFFT_input.MakeCufftPlan();
+        cuFFT_output.MakeCufftPlan();
+      }
+
 
 
       //////////////////////////////////////////
@@ -1158,8 +1200,8 @@ int main(int argc, char** argv)
 
     do_3d = false;
     const_image_test(test_size, do_3d);
-    unit_impulse_test(test_size, true);
-    unit_impulse_test(test_size_for_decrease, false);
+    unit_impulse_test(test_size, do_3d, true);
+    unit_impulse_test(test_size_for_decrease, do_3d, false);
 
 
   } // end of validation tests
@@ -1175,13 +1217,17 @@ int main(int argc, char** argv)
 
     int size_change_type = 0; // no change
 
-    // compare_libraries(test_size, size_change_type);
+    bool do_3d = true;
+    compare_libraries(test_size_3d, do_3d, size_change_type);
+
+    // do_3d = false;
+    // compare_libraries(test_size, do_3d, size_change_type);
 
     // size_change_type = 1; // increase
-    // compare_libraries(test_size, size_change_type);
+    // compare_libraries(test_size, do_3d, size_change_type);
 
-    size_change_type = -1; // decrease
-    compare_libraries(test_size, size_change_type);
+    // size_change_type = -1; // decrease
+    // compare_libraries(test_size, do_3d, size_change_type);
 
 
   }

@@ -74,6 +74,8 @@ class Image {
     inline void synchronize() { cudaEventSynchronize( stopEvent ); }
     inline void print_time(std::string msg) {  cudaEventElapsedTime( &elapsed_gpu_ms, startEvent, stopEvent ) ; std::cout << "Time on " << msg << " " << elapsed_gpu_ms << " ms" << std::endl; }
     void MakeCufftPlan();
+    void MakeCufftPlan3d();
+
     void SetClipIntoMask(short4 input_size, short4 output_size); bool is_set_clip_into_mask = false;
     void SetClipIntoCallback(cufftReal* image_to_insert, int image_to_insert_size_x, int image_to_insert_size_y,int image_to_insert_pitch);
     void SetComplexConjMultiplyAndLoadCallBack(cufftComplex* search_image_FT, cufftReal FT_normalization_factor);
