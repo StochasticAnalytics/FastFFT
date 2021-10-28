@@ -350,13 +350,14 @@ private:
 
   enum KernelType { r2c_decomposed, // Thread based, full length.
                     r2c_decomposed_transposed, // Thread based, full length, transposed.
-                    r2c_none, r2c_decrease, r2c_increase,
-                    c2c_fwd_none, c2c_fwd_decrease, c2c_fwd_increase,     
-                    c2c_inv_none, c2c_inv_decrease, c2c_inv_increase,                       
+                    r2c_none_XY, r2c_none_XZ,
+                    r2c_decrease, r2c_increase,
+                    c2c_fwd_none, c2c_fwd_none_Z, c2c_fwd_decrease, c2c_fwd_increase, c2c_fwd_increase_Z,    
+                    c2c_inv_none, c2c_inv_none_Z, c2c_inv_decrease, c2c_inv_increase,                       
                     c2c_decomposed,
                     c2r_decomposed, 
                     c2r_decomposed_transposed, 
-                    c2r_none, c2r_decrease, c2r_increase,
+                    c2r_none, c2r_none_XY, c2r_decrease, c2r_increase,
                     xcorr_fwd_increase_inv_none, //  (e.g. template matching)
                     xcorr_fwd_decrease_inv_none, // (e.g. Fourier cropping)
                     xcorr_fwd_none_inv_decrease, // (e.g. movie/particle translational search)
@@ -366,13 +367,14 @@ private:
   std::vector<std::string> 
         KernelName{ "r2c_decomposed", 
                     "r2c_decomposed_transposed", 
-                    "r2c_none", "r2c_decrease", "r2c_increase",
-                    "c2c_fwd_none", "c2c_fwd_increase", "c2c_fwd_increase",
-                    "c2c_inv_none", "c2c_inv_increase", "c2c_inv_increase",
+                    "r2c_none_XY", "r2c_none_XZ"
+                    "r2c_decrease", "r2c_increase",
+                    "c2c_fwd_none", "c2c_fwd_none_Z", "c2c_fwd_increase", "c2c_fwd_increase", "c2c_fwd_increase_Z",
+                    "c2c_inv_none", "c2c_inv_none_Z", "c2c_inv_increase", "c2c_inv_increase",
                     "c2c_decomposed", 
                     "c2r_decomposed", 
                     "c2r_decomposed_transposed", 
-                    "c2r_none", "c2r_decrease", "c2r_increase",
+                    "c2r_none", "c2r_none_XY", "c2r_decrease", "c2r_increase",
                     "xcorr_fwd_increase_inv_none", 
                     "xcorr_fwd_decrease_inv_none",
                     "xcorr_fwd_none_inv_decrease",
@@ -388,10 +390,14 @@ private:
       return true;
     }
 
-    else if (kernel_type == r2c_none || kernel_type == r2c_decrease || kernel_type == r2c_increase ||
-             kernel_type == c2c_fwd_none || kernel_type == c2c_fwd_decrease || kernel_type == c2c_fwd_increase ||
-             kernel_type == c2c_inv_none || kernel_type == c2c_inv_decrease || kernel_type == c2c_inv_increase ||
-             kernel_type == c2r_none || kernel_type == c2r_decrease || kernel_type == c2r_increase ||
+    else if (kernel_type == r2c_none_XY || kernel_type == r2c_none_XZ ||
+             kernel_type == r2c_decrease || kernel_type == r2c_increase ||
+             kernel_type == c2c_fwd_none || c2c_fwd_none_Z || 
+             kernel_type == c2c_fwd_decrease || 
+             kernel_type == c2c_fwd_increase || kernel_type == c2c_fwd_increase_Z ||
+             kernel_type == c2c_inv_none || kernel_type == c2c_inv_none_Z ||
+             kernel_type == c2c_inv_decrease || kernel_type == c2c_inv_increase ||
+             kernel_type == c2r_none || kernel_type == c2r_none_XY || kernel_type == c2r_decrease || kernel_type == c2r_increase ||
              kernel_type == xcorr_fwd_increase_inv_none || kernel_type == xcorr_fwd_decrease_inv_none || kernel_type == xcorr_fwd_none_inv_decrease || kernel_type == xcorr_fwd_decrease_inv_decrease)
     { 
       return false;
@@ -406,7 +412,8 @@ private:
   inline bool IsR2CType(KernelType kernel_type)
   {
      if (kernel_type == r2c_decomposed || kernel_type == r2c_decomposed_transposed ||
-         kernel_type == r2c_none || kernel_type == r2c_decrease || kernel_type == r2c_increase)
+         kernel_type == r2c_none_XY || kernel_type == r2c_none_XZ ||
+         kernel_type == r2c_decrease || kernel_type == r2c_increase)
     {
       return true;
     }   
@@ -417,7 +424,7 @@ private:
   inline bool IsC2RType(KernelType kernel_type)
   {
      if (kernel_type == c2r_decomposed || kernel_type == c2r_decomposed_transposed ||
-         kernel_type == c2r_none || kernel_type == c2r_decrease || kernel_type == c2r_increase)
+         kernel_type == c2r_none || kernel_type == c2r_none_XY || kernel_type == c2r_decrease || kernel_type == c2r_increase)
     {
       return true;
     }  
@@ -429,8 +436,11 @@ private:
   inline bool IsForwardType(KernelType kernel_type)
   {
       if (kernel_type == r2c_decomposed || kernel_type == r2c_decomposed_transposed ||
-          kernel_type == r2c_none || kernel_type == r2c_decrease || kernel_type == r2c_increase ||
-          kernel_type == c2c_fwd_none || kernel_type == c2c_fwd_decrease || kernel_type == c2c_fwd_increase ||
+          kernel_type == r2c_none_XY || kernel_type == r2c_none_XZ ||
+          kernel_type == r2c_decrease || kernel_type == r2c_increase ||
+          kernel_type == c2c_fwd_none || kernel_type == c2c_fwd_none_Z || 
+          kernel_type == c2c_fwd_decrease || 
+          kernel_type == c2c_fwd_increase || kernel_type == c2c_fwd_increase_Z ||
           kernel_type == xcorr_fwd_decrease_inv_none || kernel_type == xcorr_fwd_increase_inv_none)
 
     {
@@ -438,6 +448,16 @@ private:
     }      
     else return false; 
 
+  }
+
+  inline bool IsTransormAlongZ(KernelType kernel_type)
+  {
+    if (kernel_type == c2c_fwd_none_Z || kernel_type == c2c_fwd_increase_Z ||
+        kernel_type == c2c_inv_none_Z )
+    {
+      return true;
+    }
+    else return false;
   }
 
   inline void AssertDivisibleAndFactorOf2( int full_size_transform, int number_non_zero_inputs_or_outputs)

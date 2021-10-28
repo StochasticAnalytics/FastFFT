@@ -6,47 +6,79 @@
 #define MyTestPrintAndExit(...)	{std::cerr << __VA_ARGS__  << " From: " << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}
 
 
-void PrintArray( float2* array, short NX, short NY, int line_wrapping = 34)
+void PrintArray( float2* array, short NX, short NY, short NZ, int line_wrapping = 34)
 {
     // COMPLEX TODO make these functions.
-      int n=0;
+    int n=0;
+    for (int z = 0; z < NZ ; z ++)
+    {
+      for (int x = 0; x <  NX ; x++)
+      {
+        
+        std::cout << x << "[ ";
+        for (int y = 0; y < NY; y++)
+        {  
+          std::cout << array[x + NX*(y + z*NY)].x << "," << array[x + NX*(y + z*NY)].y << " ";
+          n++;
+          if (n == line_wrapping) {n = 0; std::cout << std::endl ;} // line wrapping
+        }
+        std::cout << "] " << std::endl;
+        n = 0;
+      }
+      if (NZ > 0) std::cout << " ... ... ... " << z << " ... ... ..." << std::endl;
+    }
+
+};
+
+void PrintArray(float* array, short NX, short NY, short NZ, short NW, int line_wrapping = 34)
+{
+  int n=0;
+  for (int z = 0; z < NZ ; z ++)
+  {
     for (int x = 0; x <  NX ; x++)
     {
-      
+
       std::cout << x << "[ ";
       for (int y = 0; y < NY; y++)
       {  
-        std::cout << array[x + y*NX].x << "," << array[x + y*NX].y << " ";
+        std::cout << array[x + (2*NW)*(y + z*NY)] <<  " ";
         n++;
         if (n == line_wrapping) {n = 0; std::cout << std::endl ;} // line wrapping
       }
       std::cout << "] " << std::endl;
       n = 0;
-    }
+    } 
+    if (NZ > 0) std::cout << " ... ... ... " << z << " ... ... ..." << std::endl;
+  }
 };
 
-void PrintArray(float* array, short NX, short NY, short NW, int line_wrapping = 34)
+void PrintArray_XZ( float2* array, short NX, short NY, short NZ, int line_wrapping = 34)
 {
-  
-  int n=0;
-  for (int x = 0; x <  NX ; x++)
-  {
-
-    std::cout << x << "[ ";
-    for (int y = 0; y < NY; y++)
-    {  
-      std::cout << array[x + y*NW*2] <<  " ";
-      n++;
-      if (n == line_wrapping) {n = 0; std::cout << std::endl ;} // line wrapping
+    // COMPLEX TODO make these functions.
+    int n=0;
+    for (int x = 0; x < NX ; x ++)
+    {
+      for (int z = 0; z <  NZ ; z++)
+      {
+        
+        std::cout << z << "[ ";
+        for (int y = 0; y < NY; y++)
+        {  
+          std::cout << array[z + NZ*(y + x*NY)].x << "," << array[z + NZ*(y + x*NY)].y << " ";
+          n++;
+          if (n == line_wrapping) {n = 0; std::cout << std::endl ;} // line wrapping
+        }
+        std::cout << "] " << std::endl;
+        n = 0;
+      }
+      if (NZ > 0) std::cout << " ... ... ... " << x << " ... ... ..." << std::endl;
     }
-    std::cout << "] " << std::endl;
-    n = 0;
-  } 
+
 };
 
 // The Fourier transform of a constant should be a unit impulse, and on back fft, without normalization, it should be a constant * N.
 // It is assumed the input/output have the same dimension (i.e. no padding)
-void const_image_test(std::vector<int> size)
+void const_image_test(std::vector<int> size, bool do_3d = false)
 {
 
   bool all_passed = true;
@@ -58,8 +90,22 @@ void const_image_test(std::vector<int> size)
   for (int n = 0; n < size.size() ; n++)
   {
 
-    short4 input_size = make_short4(size[n],size[n],1,0);
-    short4 output_size = make_short4(size[n],size[n],1,0);
+    short4 input_size;
+    short4 output_size;
+    long full_sum = long(size[n]);
+    if (do_3d)
+    {
+      input_size = make_short4(size[n],size[n],size[n],0);
+      output_size = make_short4(size[n],size[n],size[n],0);
+      full_sum =  full_sum*full_sum*full_sum*full_sum*full_sum*full_sum;
+    }
+    else
+    {
+      input_size = make_short4(size[n],size[n],1,0);
+      output_size = make_short4(size[n],size[n],1,0);
+      full_sum = full_sum*full_sum*full_sum;
+    }
+
 
     bool test_passed = true;
     long address = 0;
@@ -113,7 +159,9 @@ void const_image_test(std::vector<int> size)
     // ensures faster transfer. If false, it will be pinned for you.
     FT.SetInputPointer(host_output.real_values, false);
     sum = ReturnSumOfReal(host_output.real_values, dims_out);
-    if (sum != dims_out.x*dims_out.y*dims_out.z) {all_passed = false; init_passed[n] = false;}
+
+      if (sum != long(dims_in.x)*long(dims_in.y)*long(dims_in.z)) {all_passed = false; init_passed[n] = false;}
+    
     // MyFFTDebugAssertTestTrue( sum == dims_out.x*dims_out.y*dims_out.z,"Unit impulse Init ");
     
     // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
@@ -149,13 +197,17 @@ void const_image_test(std::vector<int> size)
 
 
     #if DEBUG_FFT_STAGE == 0
-      PrintArray(host_output.real_values, dims_out.x, dims_in.y, dims_out.w);
+      PrintArray(host_output.real_values, dims_out.x, dims_in.y, dims_in.z, dims_out.w);
       MyTestPrintAndExit( "stage 0 " );
     #elif DEBUG_FFT_STAGE == 1
-      PrintArray(host_output.complex_values, dims_in.y, dims_out.w);
+      if (do_3d) { std::cout << " in 3d print " << std::endl; PrintArray(host_output.complex_values, dims_in.z, dims_in.y, dims_out.w); }
+      else       PrintArray(host_output.complex_values, dims_in.y, dims_out.w, dims_in.z);
       MyTestPrintAndExit( "stage 1 " );
+      #elif DEBUG_FFT_STAGE == 2
+      PrintArray(host_output.complex_values, dims_in.y, dims_out.w, dims_out.z);
+      MyTestPrintAndExit( "stage 2 " );      
     #elif DEBUG_FFT_STAGE == 3
-      PrintArray(host_output.complex_values, dims_in.y, dims_out.w);
+      PrintArray(host_output.complex_values, dims_in.y, dims_out.w, dims_out.z);
       MyTestPrintAndExit( "stage 3 " );
     #endif   
     
@@ -170,13 +222,17 @@ void const_image_test(std::vector<int> size)
  
 
     #if DEBUG_FFT_STAGE == 4
-      PrintArray(host_output.complex_values, dims_out.y, dims_out.w);
+      PrintArray(host_output.complex_values, dims_out.y, dims_out.w, dims_out.z);
       MyTestPrintAndExit( "stage 4 " );
     #elif DEBUG_FFT_STAGE == 5
-      PrintArray(host_output.complex_values, dims_out.y, dims_out.w);
+      PrintArray(host_output.complex_values, dims_out.y, dims_out.w, dims_out.z);
       MyTestPrintAndExit( "stage 5 " );
+    #elif DEBUG_FFT_STAGE == 6
+      if (do_3d) { std::cout << " in 3d print inv " << dims_out.w << "w" << std::endl; PrintArray(host_output.complex_values, dims_out.w, dims_out.y, dims_out.z); }
+      else PrintArray(host_output.complex_values, dims_out.y, dims_out.w, dims_out.z);
+      MyTestPrintAndExit( "stage 6 " );      
     #elif DEBUG_FFT_STAGE == 7
-      PrintArray(host_output.real_values, dims_out.x, dims_out.y, dims_out.w);
+      PrintArray(host_output.real_values, dims_out.x, dims_out.y,dims_out.z, dims_out.w);
       MyTestPrintAndExit( "stage 7 " );
     #elif DEBUG_FFT_STAGE > 7
       // No debug, keep going
@@ -184,12 +240,12 @@ void const_image_test(std::vector<int> size)
       MyTestPrintAndExit( " This block is only valid for DEBUG_FFT_STAGE == 4, 5, 7 " );
     #endif   
 
+
     // Assuming the outputs are always even dimensions, padding_jump_val is always 2.
     sum = ReturnSumOfReal(host_output.real_values, dims_out);
 
-
-    if (sum != powf(dims_in.x*dims_in.y*dims_in.z,2)) {all_passed = false; FastFFT_roundTrip_passed[n] = false;}
-    // MyFFTDebugAssertTestTrue( sum == powf(dims_in.x*dims_in.y*dims_in.z,2),"FastFFT constant image round trip failed for size");
+    if (sum != full_sum) {all_passed = false; FastFFT_roundTrip_passed[n] = false;}
+    MyFFTDebugAssertTestTrue( sum == full_sum,"FastFFT constant image round trip for size " + std::to_string(dims_in.x));
   } // loop over sizes
   
   if (all_passed)
@@ -209,7 +265,7 @@ void const_image_test(std::vector<int> size)
   }
 }
 
-void unit_impulse_test(std::vector<int>size, bool do_increase_size)
+void unit_impulse_test(std::vector<int>size, bool do_3d, bool do_increase_size)
 {
 
   bool all_passed = true;
@@ -226,16 +282,33 @@ void unit_impulse_test(std::vector<int>size, bool do_increase_size)
     while (oSize < size.size())
     {
 
+
       // std::cout << std::endl << "Testing padding from  " << size[iSize] << " to " << size[oSize] << std::endl;
       if (do_increase_size)
       {
-        input_size  = make_short4(size[iSize],size[iSize],1,0);
-        output_size = make_short4(size[oSize],size[oSize],1,0);  
+        if (do_3d)
+        {
+          input_size  = make_short4(size[iSize],size[iSize],size[iSize],0);
+          output_size = make_short4(size[oSize],size[oSize],size[oSize],0);  
+        }
+        else
+        {
+          input_size  = make_short4(size[iSize],size[iSize],1,0);
+          output_size = make_short4(size[oSize],size[oSize],1,0);  
+        }
       }
       else
       {
-        output_size = make_short4(size[iSize],size[iSize],1,0);
-        input_size  = make_short4(size[oSize],size[oSize],1,0);  
+        if (do_3d)
+        { 
+          output_size = make_short4(size[iSize],size[iSize],size[iSize],0);
+          input_size  = make_short4(size[oSize],size[oSize],size[oSize],0);  
+        }
+        else
+        {
+          output_size = make_short4(size[iSize],size[iSize],1,0);
+          input_size  = make_short4(size[oSize],size[oSize],1,0);  
+        }
       }
 
 
@@ -328,16 +401,21 @@ void unit_impulse_test(std::vector<int>size, bool do_increase_size)
     FT.CopyDeviceToHost(host_output.real_values, false, false);
 
       #if DEBUG_FFT_STAGE == 0
-        PrintArray(host_output.real_values,  dims_in.x, dims_in.y, dims_in.w);
+        PrintArray(host_output.real_values,  dims_in.x, dims_in.y, dims_in.z, dims_in.w);
         MyTestPrintAndExit( "stage 0 " );
       #elif DEBUG_FFT_STAGE == 1
         // If we are doing a fwd increase, the data will have only been expanded along the (transposed) X dimension at this point
         // So the (apparent) X is dims_in.y not dims_out.y
-        PrintArray(host_output.complex_values, dims_in.y, dims_out.w);
+        PrintArray(host_output.complex_values, dims_in.y, dims_in.z, dims_out.w);
         MyTestPrintAndExit( "stage 1 " );
+      #elif DEBUG_FFT_STAGE == 2
+        // If we are doing a fwd increase, the data will have only been expanded along the (transposed) X dimension at this point
+        // So the (apparent) X is dims_in.y not dims_out.y
+        PrintArray(host_output.complex_values, dims_in.y, dims_out.z, dims_out.w);
+        MyTestPrintAndExit( "stage 2 " );
       #elif DEBUG_FFT_STAGE == 3
         // Now the array is fully expanded to dims_out, but still transposed
-        PrintArray(host_output.complex_values, dims_out.y, dims_out.w);
+        PrintArray(host_output.complex_values, dims_out.y, dims_out.z, dims_out.w);
         MyTestPrintAndExit( "stage 3 " );
       #endif    
       sum = ReturnSumOfComplexAmplitudes(host_output.complex_values, host_output.real_memory_allocated/2); 
@@ -347,16 +425,21 @@ void unit_impulse_test(std::vector<int>size, bool do_increase_size)
   {
     FT.CopyDeviceToHost(false, false, FT.ReturnInputMemorySize());
     #if DEBUG_FFT_STAGE == 0
-      PrintArray(host_input.real_values, dims_in.x, dims_in.y, dims_in.w);
+      PrintArray(host_input.real_values, dims_in.x, dims_in.y, dims_in.z, dims_in.w);
       MyTestPrintAndExit( "stage 0 " );
     #elif DEBUG_FFT_STAGE == 1
       // If we are doing a fwd increase, the data will have only been expanded along the (transposed) X dimension at this point
       // So the (apparent) X is dims_in.y not dims_out.y
-      PrintArray(host_input.complex_values, dims_in.y, dims_out.w);
+      PrintArray(host_input.complex_values, dims_in.y, dims_in.z, dims_out.w);
       MyTestPrintAndExit( "stage 1 " );
+    #elif DEBUG_FFT_STAGE == 2
+      // If we are doing a fwd increase, the data will have only been expanded along the (transposed) X dimension at this point
+      // So the (apparent) X is dims_in.y not dims_out.y
+      PrintArray(host_input.complex_values, dims_in.y, dims_out.z, dims_out.w);
+      MyTestPrintAndExit( "stage 2 " );      
     #elif DEBUG_FFT_STAGE == 3
       // Now the array is fully expanded to dims_out, but still transposed
-      PrintArray(host_input.complex_values, dims_out.y, dims_out.w);
+      PrintArray(host_input.complex_values, dims_out.y, dims_out.z, dims_out.w);
       MyTestPrintAndExit( "stage 3 " );
     #endif   
     sum = ReturnSumOfComplexAmplitudes(host_input.complex_values, host_input.real_memory_allocated/2); 
@@ -380,10 +463,14 @@ void unit_impulse_test(std::vector<int>size, bool do_increase_size)
 
   
   #if DEBUG_FFT_STAGE == 5
-    PrintArray(host_output.complex_values, dims_out.y, dims_out.w);
+    PrintArray(host_output.complex_values, dims_out.y, dims_out.z, dims_out.w);
     MyTestPrintAndExit( "stage 5 " );
+  #endif
+  #if DEBUG_FFT_STAGE == 6
+    PrintArray(host_output.complex_values, dims_out.y, dims_out.z, dims_out.w);
+    MyTestPrintAndExit( "stage 6 " );    
   #elif DEBUG_FFT_STAGE == 7
-    PrintArray(host_output.real_values, dims_out.x, dims_out.y, dims_out.w);
+    PrintArray(host_output.real_values, dims_out.x, dims_out.y, dims_out.z, dims_out.w);
     MyTestPrintAndExit( "stage 7 " );
   #elif DEBUG_FFT_STAGE > 7
     // No debug, keep going      
@@ -421,19 +508,22 @@ void unit_impulse_test(std::vector<int>size, bool do_increase_size)
 
 }
 
-void compare_libraries(std::vector<int>size, int size_change_type)
+void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type)
 {
 
   bool skip_cufft_for_profiling = false;
+  bool print_out_time = false;
   bool set_padding_callback = false; // the padding callback is slower than pasting in b/c the read size of the pointers is larger than the actual data. do not use.
   bool set_conjMult_callback = true;
   bool is_size_change_decrease = false;
 
   if (size_change_type < 0) { is_size_change_decrease = true; }
+  int loop_limit = 1;
+  if (size_change_type == 0)  loop_limit = 0;
 
   short4 input_size;
   short4 output_size;
-  for (int iSize = 0; iSize < size.size() - 1 ; iSize++)
+  for (int iSize = 0; iSize < size.size() - loop_limit ; iSize++)
   {
     int oSize;
     int loop_size;
@@ -456,14 +546,25 @@ void compare_libraries(std::vector<int>size, int size_change_type)
       {
         output_size = make_short4(size[iSize],size[iSize],1,0);
         input_size  = make_short4(size[oSize],size[oSize],1,0);  
+        if (do_3d)
+        {
+          output_size.z = size[iSize];
+          input_size.z  = size[oSize];
+        }
+
       }
       else
       {
         input_size  = make_short4(size[iSize],size[iSize],1,0);
         output_size = make_short4(size[oSize],size[oSize],1,0);  
+        if (do_3d)
+        {
+          input_size.z  = size[iSize];
+          output_size.z = size[oSize];
+        }
 
       }
-      std::cout << std::endl << "Testing padding from  " << input_size.x << " to " << output_size.x << std::endl;
+      if (print_out_time) {std::cout << std::endl << "Testing padding from  " << input_size.x << " to " << output_size.x << std::endl;}
 
 
 
@@ -624,22 +725,32 @@ void compare_libraries(std::vector<int>size, int size_change_type)
       {
         if (positive_control.real_values[address] == positive_control.size.x*positive_control.size.y*positive_control.size.z*testVal_1*testVal_2)
         {
-          std::cout << "Test passed for FFTW positive control.\n" << std::endl;
+          if (print_out_time)  {std::cout << "Test passed for FFTW positive control.\n" << std::endl;}
         }
         else
         {
-          std::cout << "Test failed for FFTW positive control. Value at zero is  " << positive_control.real_values[address] << std::endl;
+          if (print_out_time)  {std::cout<< "Test failed for FFTW positive control. Value at zero is  " << positive_control.real_values[address] << std::endl;}
         }
       }
       else
       {
-        std::cout << "Test failed for positive control, non-zero values found away from the origin." << std::endl;
+        if (print_out_time)  {std::cout<< "Test failed for positive control, non-zero values found away from the origin." << std::endl;}
       }
 
 
-      cuFFT_output.create_timing_events(); 
-      cuFFT_input.MakeCufftPlan();
-      cuFFT_output.MakeCufftPlan();
+      cuFFT_output.create_timing_events();
+      if (do_3d)
+      {   
+        cuFFT_output.MakeCufftPlan3d();
+      } 
+      else
+      {
+        if (print_out_time)  {std::cout<< "2D test " << std::endl;}
+
+        cuFFT_input.MakeCufftPlan();
+        cuFFT_output.MakeCufftPlan();
+      }
+
 
 
       //////////////////////////////////////////
@@ -662,26 +773,31 @@ void compare_libraries(std::vector<int>size, int size_change_type)
         FT.CopyDeviceToHost(false, false);
         #if DEBUG_FFT_STAGE == 0
 
-          PrintArray(FT_input.real_values, fwd_dims_in.x, fwd_dims_in.y, fwd_dims_in.w);
+          PrintArray(FT_input.real_values, fwd_dims_in.x, fwd_dims_in.y, fwd_dims_in.z, fwd_dims_in.w);
           MyTestPrintAndExit(" Stage 0");
         #elif DEBUG_FFT_STAGE == 1
 
-          PrintArray(FT_input.complex_values, fwd_dims_in.y, fwd_dims_out.w);
+          PrintArray(FT_input.complex_values, fwd_dims_in.y, fwd_dims_in.z, fwd_dims_out.w);
           MyTestPrintAndExit(" Stage 1");
+        #elif DEBUG_FFT_STAGE == 2
+          PrintArray(FT_input.complex_values, fwd_dims_in.y, fwd_dims_out.z, fwd_dims_out.w);
+          MyTestPrintAndExit(" Stage 2");          
         #elif DEBUG_FFT_STAGE == 3
 
-          PrintArray(FT_input.complex_values, fwd_dims_in.y, fwd_dims_out.w);
+          PrintArray(FT_input.complex_values, fwd_dims_in.y, fwd_dims_out.z, fwd_dims_out.w);
           MyTestPrintAndExit(" Stage 3");
         #elif DEBUG_FFT_STAGE == 4
         
-          PrintArray(FT_input.complex_values, fwd_dims_in.y, fwd_dims_out.w);
+          PrintArray(FT_input.complex_values, fwd_dims_in.y, fwd_dims_out.z,fwd_dims_out.w);
           MyTestPrintAndExit(" Stage 4");
         #elif DEBUG_FFT_STAGE == 5
-
-          PrintArray(FT_input.complex_values,inv_dims_out.y, inv_dims_in.w);
+          PrintArray(FT_input.complex_values,inv_dims_out.y, inv_dims_in.z, inv_dims_in.w);
           MyTestPrintAndExit(" Stage 5");
+        #elif DEBUG_FFT_STAGE == 6
+          PrintArray(FT_input.complex_values,inv_dims_out.y, inv_dims_out.z, inv_dims_in.w);
+          MyTestPrintAndExit(" Stage 6");          
         #elif DEBUG_FFT_STAGE == 7
-          PrintArray(FT_input.real_values,inv_dims_out.x, inv_dims_out.y, inv_dims_out.w);
+          PrintArray(FT_input.real_values,inv_dims_out.x, inv_dims_out.y, inv_dims_out.z, inv_dims_out.w);
           MyTestPrintAndExit(" Stage 7");
         #elif DEBUG_FFT_STAGE > 7
           // Do nothing, we are doing all ops and not debugging.
@@ -695,23 +811,29 @@ void compare_libraries(std::vector<int>size, int size_change_type)
         FT.CopyDeviceToHost(FT_output.real_values,false, false);
 
         #if DEBUG_FFT_STAGE == 0
-          PrintArray(FT_output.real_values, fwd_dims_in.x, fwd_dims_in.y, fwd_dims_in.w);
+          PrintArray(FT_output.real_values, fwd_dims_in.x, fwd_dims_in.y, fwd_dims_in.z, fwd_dims_in.w);
           MyTestPrintAndExit(" Stage 0");
         #elif DEBUG_FFT_STAGE == 1
-          PrintArray(FT_output.complex_values, fwd_dims_in.y, fwd_dims_out.w);
+          PrintArray(FT_output.complex_values, fwd_dims_in.y, fwd_dims_in.z, fwd_dims_out.w);
           MyTestPrintAndExit(" Stage 1");
+        #elif DEBUG_FFT_STAGE == 2
+          PrintArray(FT_output.complex_values, fwd_dims_in.y, fwd_dims_out.z, fwd_dims_out.w);
+          MyTestPrintAndExit(" Stage 2");          
         #elif DEBUG_FFT_STAGE == 3
-          PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.w);
+          PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.z, fwd_dims_out.w);
           MyTestPrintAndExit(" Stage 3");
         #elif DEBUG_FFT_STAGE == 4
-          PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.w);
+          PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.z, fwd_dims_out.w);
           MyTestPrintAndExit(" Stage 4");
         #elif DEBUG_FFT_STAGE == 5
-          PrintArray(FT_output.complex_values, inv_dims_out.y, inv_dims_out.w);
+          PrintArray(FT_output.complex_values, inv_dims_out.y, inv_dims_in.z, inv_dims_out.w);
           MyTestPrintAndExit(" Stage 5");
+        #elif DEBUG_FFT_STAGE == 6
+          PrintArray(FT_output.complex_values, inv_dims_out.y, inv_dims_out.z, inv_dims_out.w);
+          MyTestPrintAndExit(" Stage 6");          
         #elif DEBUG_FFT_STAGE == 7
-          PrintArray(FT_output.real_values, inv_dims_out.x, inv_dims_out.y, inv_dims_out.w);
-          MyTestPrintAndExit(" Stage 6");
+          PrintArray(FT_output.real_values, inv_dims_out.x, inv_dims_out.y, inv_dims_out.z,  inv_dims_out.w);
+          MyTestPrintAndExit(" Stage 7");
         #elif DEBUG_FFT_STAGE > 7
           // Do nothing, we are doing all ops and not debugging.
         #else
@@ -737,16 +859,16 @@ void compare_libraries(std::vector<int>size, int size_change_type)
         {
           if (FT_input.real_values[address] == FT_input.size.x*FT_input.size.y*FT_input.size.z*testVal_1*testVal_2)
           {
-            std::cout << "Test passed for FastFFT positive control.\n" << std::endl;
+            if (print_out_time)  {std::cout<< "Test passed for FastFFT positive control.\n" << std::endl;}
           }
           else
           {
-            std::cout << "Test failed for FastFFT positive control. Value at zero is  " << FT_input.real_values[address] << std::endl;
+            if (print_out_time)  {std::cout<< "Test failed for FastFFT positive control. Value at zero is  " << FT_input.real_values[address] << std::endl;}
           }
         }
         else
         {
-          std::cout << "Test failed for FastFFT control, non-zero values found away from the origin." << std::endl;
+          if (print_out_time)  {std::cout<< "Test failed for FastFFT control, non-zero values found away from the origin." << std::endl;}
         }
       }
       else
@@ -765,16 +887,16 @@ void compare_libraries(std::vector<int>size, int size_change_type)
         {
           if (FT_output.real_values[address] == FT_output.size.x*FT_output.size.y*FT_output.size.z*testVal_1*testVal_2)
           {
-            std::cout << "Test passed for FastFFT positive control.\n" << std::endl;
+            if (print_out_time)  {std::cout<< "Test passed for FastFFT positive control.\n" << std::endl;}
           }
           else
           {
-            std::cout << "Test failed for FastFFT positive control. Value at zero is  " << FT_output.real_values[address] << std::endl;
+            if (print_out_time)  {std::cout<< "Test failed for FastFFT positive control. Value at zero is  " << FT_output.real_values[address] << std::endl;}
           }
         }
         else
         {
-          std::cout << "Test failed for FastFFT control, non-zero values found away from the origin." << std::endl;
+          if (print_out_time)  {std::cout<< "Test failed for FastFFT control, non-zero values found away from the origin." << std::endl;}
         }
       }
 
@@ -783,7 +905,7 @@ void compare_libraries(std::vector<int>size, int size_change_type)
 
       #if DEBUG_FFT_STAGE == 0
 
-          PrintArray(FT_output.real_values, fwd_dims_in.x, fwd_dims_in.y, fwd_dims_in.w);
+          PrintArray(FT_output.real_values, fwd_dims_in.x, fwd_dims_in.y, fwd_dims_in.z, fwd_dims_in.w);
 
         MyTestPrintAndExit( "stage 0 " );
       #elif DEBUG_FFT_STAGE == 1
@@ -793,24 +915,24 @@ void compare_libraries(std::vector<int>size, int size_change_type)
         if (is_size_change_decrease) 
         {
           MyTestPrintAndExit( "stage 1 decrease" );
-          PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.w);
+          PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.z, fwd_dims_out.w);
         }
         else 
         {
           MyTestPrintAndExit( "stage 1 increase" );
-          PrintArray(FT_output.complex_values, fwd_dims_in.y, fwd_dims_out.w);
+          PrintArray(FT_output.complex_values, fwd_dims_in.y, fwd_dims_in.z, fwd_dims_out.w);
         }
 
       #elif DEBUG_FFT_STAGE == 2
         // Now the array is fully expanded to output_size, but still transposed
-        PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.w);
+        PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.z, fwd_dims_out.w);
         MyTestPrintAndExit( "stage 2 " );
 
       #elif DEBUG_FFT_STAGE == 3
-        PrintArray(FT_output.complex_values,inv_dims_out.y, inv_dims_out.w);
+        PrintArray(FT_output.complex_values,inv_dims_out.y, inv_dims_out.z, inv_dims_out.w);
         MyTestPrintAndExit( "stage 3 " );
       #elif DEBUG_FFT_STAGE == 4
-        PrintArray(FT_output.real_values, inv_dims_out.x, inv_dims_out.y, inv_dims_out.w);
+        PrintArray(FT_output.real_values, inv_dims_out.x, inv_dims_out.y, inv_dims_out.z, inv_dims_out.w);
         MyTestPrintAndExit( "stage 4 " );
       #elif DEBUG_FFT_STAGE > 7
         // This is the final stage, the data is fully expanded and transposed
@@ -836,7 +958,7 @@ void compare_libraries(std::vector<int>size, int size_change_type)
       }
       cuFFT_output.record_stop();
       cuFFT_output.synchronize();
-      cuFFT_output.print_time("FastFFT");
+      cuFFT_output.print_time("FastFFT", print_out_time);
       float FastFFT_time = cuFFT_output.elapsed_gpu_ms;
 
       if (set_padding_callback) 
@@ -928,9 +1050,9 @@ void compare_libraries(std::vector<int>size, int size_change_type)
         }
         cuFFT_output.record_stop();
         cuFFT_output.synchronize();
-        cuFFT_output.print_time("cuFFT");
+        cuFFT_output.print_time("cuFFT", print_out_time);
       } // end of if (! skip_cufft_for_profiling)
-      std::cout << "For size " << input_size.x << " to "<< output_size.x << ": " << std::endl;
+      std::cout << "For size " << input_size.x << " to "<< output_size.x << ": ";
       std::cout << "Ratio cuFFT/FastFFT : " << cuFFT_output.elapsed_gpu_ms/FastFFT_time << std::endl;
 
       oSize++;
@@ -1083,6 +1205,7 @@ int main(int argc, char** argv)
   short4 output_size;
 
   std::vector<int> test_size = { 16, 32, 64, 128, 256, 512, 1024, 2048, 4096};
+  std::vector<int> test_size_3d = { 16, 32, 64, 128, 256, 512};
 
   // The launch parameters fail for 4096 -> < 64 for r2c_decrease, not sure if it is the elements_per_thread or something else.
   // For now, just over-ride these small sizes
@@ -1096,10 +1219,15 @@ int main(int argc, char** argv)
     // run_oned(test_size);
     // exit(0);
 
+    bool do_3d = true;
 
-    const_image_test(test_size);
-    unit_impulse_test(test_size, true);
-    unit_impulse_test(test_size_for_decrease, false);
+    const_image_test(test_size_3d, do_3d);
+    exit(0);
+
+    do_3d = false;
+    const_image_test(test_size, do_3d);
+    unit_impulse_test(test_size, do_3d, true);
+    unit_impulse_test(test_size_for_decrease, do_3d, false);
 
 
   } // end of validation tests
@@ -1115,13 +1243,17 @@ int main(int argc, char** argv)
 
     int size_change_type = 0; // no change
 
-    // compare_libraries(test_size, size_change_type);
+    bool do_3d = true;
+    compare_libraries(test_size_3d, do_3d, size_change_type);
 
-    // size_change_type = 1; // increase
-    // compare_libraries(test_size, size_change_type);
+    do_3d = false;
+    compare_libraries(test_size, do_3d, size_change_type);
+
+    size_change_type = 1; // increase
+    compare_libraries(test_size, do_3d, size_change_type);
 
     size_change_type = -1; // decrease
-    compare_libraries(test_size, size_change_type);
+    compare_libraries(test_size, do_3d, size_change_type);
 
 
   }
