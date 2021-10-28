@@ -146,6 +146,29 @@ By design, the cufft library from Nvidia returns an FFT in the natural order [TO
 
 🍍 See note on previous table. The relative perf hit is not nearly as dramatic as in the previous table; however it is still about 10% which is a tough pill to swallow.
 
+##### Table 3: FFT/iFFT pairs
+
+
+| 3D cubic size | cufft/FastFFT runtime (10k iterations) |
+|----|----|
+| 16 | 0.99 |
+| 32 | 0.93 |
+| 64  |  0.55 |
+| 128 | 0.71 | 
+| 256 | 0.47 |
+| 512 | 0.23 |
+
+
+#### Table 4: Current 3D bottlenecks (C - coalesced mem access)
+| kernel | time (us) | Load | Store |
+|----|----|----|----|
+| R2C_NONE_XZ | 872 | C | N|
+| C2C_NONE_XYZ| 350 | C | N|
+| C2C_fwd_NONE | 226 | C | C|
+| C2C_inv_NONE | 229 | C | C|
+|C2C_NONE_XY | 2095 | N | N |
+|C2R_NONE | 231 | C | C |
+
 - Movie alignment expense (Pre/post process and alignment percentages.)
 
   :soon: 
