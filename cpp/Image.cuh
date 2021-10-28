@@ -72,7 +72,7 @@ class Image {
     inline void record_start() { cudaEventRecord( startEvent ); }
     inline void record_stop()  { cudaEventRecord( stopEvent ); }
     inline void synchronize() { cudaEventSynchronize( stopEvent ); }
-    inline void print_time(std::string msg) {  cudaEventElapsedTime( &elapsed_gpu_ms, startEvent, stopEvent ) ; std::cout << "Time on " << msg << " " << elapsed_gpu_ms << " ms" << std::endl; }
+    inline void print_time(std::string msg, bool print_out = true) {  cudaEventElapsedTime( &elapsed_gpu_ms, startEvent, stopEvent ) ; if (print_out) {std::cout << "Time on " << msg << " " << elapsed_gpu_ms << " ms" << std::endl;} }
     void MakeCufftPlan();
     void MakeCufftPlan3d();
 

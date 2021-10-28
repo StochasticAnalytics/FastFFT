@@ -512,6 +512,7 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type)
 {
 
   bool skip_cufft_for_profiling = false;
+  bool print_out_time = false;
   bool set_padding_callback = false; // the padding callback is slower than pasting in b/c the read size of the pointers is larger than the actual data. do not use.
   bool set_conjMult_callback = true;
   bool is_size_change_decrease = false;
@@ -563,7 +564,7 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type)
         }
 
       }
-      std::cout << std::endl << "Testing padding from  " << input_size.x << " to " << output_size.x << std::endl;
+      if (print_out_time) {std::cout << std::endl << "Testing padding from  " << input_size.x << " to " << output_size.x << std::endl;}
 
 
 
@@ -724,29 +725,27 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type)
       {
         if (positive_control.real_values[address] == positive_control.size.x*positive_control.size.y*positive_control.size.z*testVal_1*testVal_2)
         {
-          std::cout << "Test passed for FFTW positive control.\n" << std::endl;
+          if (print_out_time)  {std::cout << "Test passed for FFTW positive control.\n" << std::endl;}
         }
         else
         {
-          std::cout << "Test failed for FFTW positive control. Value at zero is  " << positive_control.real_values[address] << std::endl;
+          if (print_out_time)  {std::cout<< "Test failed for FFTW positive control. Value at zero is  " << positive_control.real_values[address] << std::endl;}
         }
       }
       else
       {
-        std::cout << "Test failed for positive control, non-zero values found away from the origin." << std::endl;
+        if (print_out_time)  {std::cout<< "Test failed for positive control, non-zero values found away from the origin." << std::endl;}
       }
 
 
       cuFFT_output.create_timing_events();
       if (do_3d)
       {   
-        std::cout << "3D test " << std::endl;
-        cuFFT_input.MakeCufftPlan3d();
         cuFFT_output.MakeCufftPlan3d();
       } 
       else
       {
-        std::cout << "2D test " << std::endl;
+        if (print_out_time)  {std::cout<< "2D test " << std::endl;}
 
         cuFFT_input.MakeCufftPlan();
         cuFFT_output.MakeCufftPlan();
@@ -860,16 +859,16 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type)
         {
           if (FT_input.real_values[address] == FT_input.size.x*FT_input.size.y*FT_input.size.z*testVal_1*testVal_2)
           {
-            std::cout << "Test passed for FastFFT positive control.\n" << std::endl;
+            if (print_out_time)  {std::cout<< "Test passed for FastFFT positive control.\n" << std::endl;}
           }
           else
           {
-            std::cout << "Test failed for FastFFT positive control. Value at zero is  " << FT_input.real_values[address] << std::endl;
+            if (print_out_time)  {std::cout<< "Test failed for FastFFT positive control. Value at zero is  " << FT_input.real_values[address] << std::endl;}
           }
         }
         else
         {
-          std::cout << "Test failed for FastFFT control, non-zero values found away from the origin." << std::endl;
+          if (print_out_time)  {std::cout<< "Test failed for FastFFT control, non-zero values found away from the origin." << std::endl;}
         }
       }
       else
@@ -888,16 +887,16 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type)
         {
           if (FT_output.real_values[address] == FT_output.size.x*FT_output.size.y*FT_output.size.z*testVal_1*testVal_2)
           {
-            std::cout << "Test passed for FastFFT positive control.\n" << std::endl;
+            if (print_out_time)  {std::cout<< "Test passed for FastFFT positive control.\n" << std::endl;}
           }
           else
           {
-            std::cout << "Test failed for FastFFT positive control. Value at zero is  " << FT_output.real_values[address] << std::endl;
+            if (print_out_time)  {std::cout<< "Test failed for FastFFT positive control. Value at zero is  " << FT_output.real_values[address] << std::endl;}
           }
         }
         else
         {
-          std::cout << "Test failed for FastFFT control, non-zero values found away from the origin." << std::endl;
+          if (print_out_time)  {std::cout<< "Test failed for FastFFT control, non-zero values found away from the origin." << std::endl;}
         }
       }
 
@@ -959,7 +958,7 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type)
       }
       cuFFT_output.record_stop();
       cuFFT_output.synchronize();
-      cuFFT_output.print_time("FastFFT");
+      cuFFT_output.print_time("FastFFT", print_out_time);
       float FastFFT_time = cuFFT_output.elapsed_gpu_ms;
 
       if (set_padding_callback) 
@@ -1051,9 +1050,9 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type)
         }
         cuFFT_output.record_stop();
         cuFFT_output.synchronize();
-        cuFFT_output.print_time("cuFFT");
+        cuFFT_output.print_time("cuFFT", print_out_time);
       } // end of if (! skip_cufft_for_profiling)
-      std::cout << "For size " << input_size.x << " to "<< output_size.x << ": " << std::endl;
+      std::cout << "For size " << input_size.x << " to "<< output_size.x << ": ";
       std::cout << "Ratio cuFFT/FastFFT : " << cuFFT_output.elapsed_gpu_ms/FastFFT_time << std::endl;
 
       oSize++;
@@ -1221,6 +1220,7 @@ int main(int argc, char** argv)
     // exit(0);
 
     bool do_3d = true;
+
     const_image_test(test_size_3d, do_3d);
     exit(0);
 
@@ -1246,14 +1246,14 @@ int main(int argc, char** argv)
     bool do_3d = true;
     compare_libraries(test_size_3d, do_3d, size_change_type);
 
-    // do_3d = false;
-    // compare_libraries(test_size, do_3d, size_change_type);
+    do_3d = false;
+    compare_libraries(test_size, do_3d, size_change_type);
 
-    // size_change_type = 1; // increase
-    // compare_libraries(test_size, do_3d, size_change_type);
+    size_change_type = 1; // increase
+    compare_libraries(test_size, do_3d, size_change_type);
 
-    // size_change_type = -1; // decrease
-    // compare_libraries(test_size, do_3d, size_change_type);
+    size_change_type = -1; // decrease
+    compare_libraries(test_size, do_3d, size_change_type);
 
 
   }
