@@ -96,7 +96,7 @@ void print_values_complex(float* input, std::string msg, int n_to_print)
 }
 
 // Return sum of real values
-float ReturnSumOfReal(float* input, short4 size)
+float ReturnSumOfReal(float* input, short4 size, bool print_val = false)
 {
   double temp_sum = 0;
   long address = 0;
@@ -107,6 +107,7 @@ float ReturnSumOfReal(float* input, short4 size)
     {
       for (int i = 0; i < size.x; i++)
       {
+
         temp_sum += double(input[address]);
         address++;
       }

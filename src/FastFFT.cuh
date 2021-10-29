@@ -102,6 +102,8 @@ namespace FastFFT {
     return ( (((int)coords.z*(int)img_dims.y + coords.y) * (int)img_dims.w * 2)  + (int)coords.x) ;
   }
 
+  static constexpr const int XZ_STRIDE = 4;
+
   static constexpr const int bank_size = 32;
   static constexpr const int bank_padded = bank_size + 1;
   static constexpr const unsigned int ubank_size = 32;
@@ -121,17 +123,24 @@ namespace FastFFT {
     return pixel_pitch * ( blockIdx.y + blockIdx.z * gridDim.y);
   }
 
-   // Return the address of the 1D transform index 0
-   static __device__ __forceinline__ unsigned int ReturnZplane(const unsigned int NX, const unsigned int NY)
-   {
-     return ( blockIdx.z * NX * NY);
-   } 
+  // Return the address of the 1D transform index 0. Right now testing for a stride of 2, but this could be modifiable if it works.
+  static __device__ __forceinline__ unsigned int Return1DFFTAddress_strided_Z(const unsigned int pixel_pitch)
+  {
+    // In the current condition, threadIdx.z is either 0 || 1, and gridDim.z = size_z / 2
+    return pixel_pitch * ( blockIdx.y + (XZ_STRIDE*blockIdx.z+threadIdx.z) * gridDim.y);
+  }
 
-   // Return the address of the 1D transform index 0
-   static __device__ __forceinline__ unsigned int Return1DFFTAddress_Z(const unsigned int NY)
-   {
-     return blockIdx.y + (blockIdx.z * NY);
-   }
+  // Return the address of the 1D transform index 0
+  static __device__ __forceinline__ unsigned int ReturnZplane(const unsigned int NX, const unsigned int NY)
+  {
+    return ( blockIdx.z * NX * NY);
+  } 
+
+  // Return the address of the 1D transform index 0
+  static __device__ __forceinline__ unsigned int Return1DFFTAddress_Z(const unsigned int NY)
+  {
+    return blockIdx.y + (blockIdx.z * NY);
+  }
 
   // Return the address of the 1D transform index 0
   static __device__ __forceinline__ unsigned int Return1DFFTColumn_XZ_transpose(const unsigned int NX)
@@ -144,6 +153,14 @@ namespace FastFFT {
   static __device__ __forceinline__ unsigned int Return1DFFTAddress_XZ_transpose(const unsigned int X)
   {
     return blockIdx.z + gridDim.z * ( blockIdx.y + X * gridDim.y );
+  }
+
+  // Return the address of the 1D transform index 0
+  static __device__ __forceinline__ unsigned int Return1DFFTAddress_XZ_transpose_strided_Z(const unsigned int IDX)
+  {
+    // The stride is exactly 2 in this test case
+    // return (XZ_STRIDE*blockIdx.z + (X % XZ_STRIDE)) + (XZ_STRIDE*gridDim.z) * ( blockIdx.y + (X / XZ_STRIDE) * gridDim.y );
+    return ((IDX % XZ_STRIDE) + (blockIdx.z*XZ_STRIDE)) + (XZ_STRIDE*gridDim.z) * ( blockIdx.y + (IDX / XZ_STRIDE) * gridDim.y );
   }
 
   // Return the address of the 1D transform index 0
@@ -265,6 +282,11 @@ void block_fft_kernel_R2C_NONE_XY(const ScalarType*  __restrict__ input_values, 
 template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_R2C_NONE_XZ(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+
+// 2 ffts/block via threadIdx.x, notice launch bounds. Creates partial coalescing.
+template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
+__launch_bounds__(XZ_STRIDE*FFT::max_threads_per_block) __global__
+void block_fft_kernel_R2C_NONE_XZ_2(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
 
 template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
@@ -744,6 +766,26 @@ struct io
     }
   }
 
+  
+  static inline __device__ void store_r2c_transposed_xz_strided_Z(const complex_type* shared_mem,
+                                                                  complex_type*       output) 
+  {
+    const unsigned int stride = stride_size();
+    constexpr unsigned int output_values_to_store = (cufftdx::size_of<FFT>::value / 2) + 1;
+    unsigned int       index  = threadIdx.x + threadIdx.z * output_values_to_store ;
+    for (unsigned int i = 0; i < FFT::elements_per_thread / 2; i++) 
+    {
+
+      output[Return1DFFTAddress_XZ_transpose_strided_Z(index)] = shared_mem[index];
+      index += stride;
+    }
+    constexpr unsigned int threads_per_fft        = cufftdx::size_of<FFT>::value / FFT::elements_per_thread;
+    constexpr unsigned int values_left_to_store = threads_per_fft == 1 ? 1 : (output_values_to_store % threads_per_fft);
+    if (threadIdx.x < values_left_to_store)
+    {
+     output[Return1DFFTAddress_XZ_transpose_strided_Z(index)] = shared_mem[index];
+    }
+  }
   static inline __device__ void store_r2c_transposed_xy(const complex_type* thread_data,
                                                         complex_type*       output,
                                                         int                 pixel_pitch) 
