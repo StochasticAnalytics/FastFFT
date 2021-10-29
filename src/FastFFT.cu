@@ -1870,7 +1870,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetPrecisionAndExec
   }
   else
   {
-    using FFT = decltype(Block() + Precision<ComputeType>() + ElementsPerThread<elements_per_thread_complex>()  + FFTsPerBlock<1>());
+    using FFT = decltype( Block() + Precision<ComputeType>()  + FFTsPerBlock<1>() );
     SelectSizeAndType<FFT>(kernel_type, do_forward_transform);
   }
   
@@ -1900,56 +1900,62 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
     switch (transform_size.P)
     {
       case 16: {
+        elements_per_thread_complex = elements_per_thread_16;
         switch (device_properties.device_arch)
         {
-          case 700: { using FFT = decltype(FFT_base()  + Size<16>()  + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 750: { using FFT = decltype(FFT_base()  + Size<16>()  + SM<750>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 800: { using FFT = decltype(FFT_base()  + Size<16>()  + SM<800>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 700: { using FFT = decltype(FFT_base()  + Size<16>()  + SM<700>() + ElementsPerThread<elements_per_thread_16>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 750: { using FFT = decltype(FFT_base()  + Size<16>()  + SM<750>() + ElementsPerThread<elements_per_thread_16>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 800: { using FFT = decltype(FFT_base()  + Size<16>()  + SM<800>() + ElementsPerThread<elements_per_thread_16>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
         break; }
 
       case 32: {
+        elements_per_thread_complex = elements_per_thread_32;
         switch (device_properties.device_arch)
         {
-          case 700: { using FFT = decltype(FFT_base()  + Size<32>()  + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 750: { using FFT = decltype(FFT_base()  + Size<32>()  + SM<750>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 800: { using FFT = decltype(FFT_base()  + Size<32>()  + SM<800>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 700: { using FFT = decltype(FFT_base()  + Size<32>()  + SM<700>() + ElementsPerThread<elements_per_thread_32>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 750: { using FFT = decltype(FFT_base()  + Size<32>()  + SM<750>() + ElementsPerThread<elements_per_thread_32>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 800: { using FFT = decltype(FFT_base()  + Size<32>()  + SM<800>() + ElementsPerThread<elements_per_thread_32>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
         break; }
 
       case 64: {
+        elements_per_thread_complex = elements_per_thread_64;
         switch (device_properties.device_arch)
         {
-          case 700: { using FFT = decltype(FFT_base()  + Size<64>()  + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 750: { using FFT = decltype(FFT_base()  + Size<64>()  + SM<750>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 800: { using FFT = decltype(FFT_base()  + Size<64>()  + SM<800>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 700: { using FFT = decltype(FFT_base()  + Size<64>()  + SM<700>() + ElementsPerThread<elements_per_thread_64>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 750: { using FFT = decltype(FFT_base()  + Size<64>()  + SM<750>() + ElementsPerThread<elements_per_thread_64>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 800: { using FFT = decltype(FFT_base()  + Size<64>()  + SM<800>() + ElementsPerThread<elements_per_thread_64>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
         break; }
   
       case 128: {
+        elements_per_thread_complex = elements_per_thread_128;
         switch (device_properties.device_arch)
         {
-          case 700: { using FFT = decltype(FFT_base()  + Size<128>()  + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 750: { using FFT = decltype(FFT_base()  + Size<128>()  + SM<750>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 800: { using FFT = decltype(FFT_base()  + Size<128>()  + SM<800>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 700: { using FFT = decltype(FFT_base()  + Size<128>()  + SM<700>() + ElementsPerThread<elements_per_thread_128>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 750: { using FFT = decltype(FFT_base()  + Size<128>()  + SM<750>() + ElementsPerThread<elements_per_thread_128>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 800: { using FFT = decltype(FFT_base()  + Size<128>()  + SM<800>() + ElementsPerThread<elements_per_thread_128>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
         break; }
   
       case 256: {
+        elements_per_thread_complex = elements_per_thread_256;
         switch (device_properties.device_arch)
         {
-          case 700: { using FFT = decltype(FFT_base()  + Size<256>()  + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 750: { using FFT = decltype(FFT_base()  + Size<256>()  + SM<750>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 800: { using FFT = decltype(FFT_base()  + Size<256>()  + SM<800>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 700: { using FFT = decltype(FFT_base()  + Size<256>()  + SM<700>() + ElementsPerThread<elements_per_thread_256>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 750: { using FFT = decltype(FFT_base()  + Size<256>()  + SM<750>() + ElementsPerThread<elements_per_thread_256>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 800: { using FFT = decltype(FFT_base()  + Size<256>()  + SM<800>() + ElementsPerThread<elements_per_thread_256>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
         break; } 
   
       case 512: {
+        elements_per_thread_complex = elements_per_thread_512;
         switch (device_properties.device_arch)
         {
-          case 700: { using FFT = decltype(FFT_base()  + Size<512>()  + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 750: { using FFT = decltype(FFT_base()  + Size<512>()  + SM<750>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 800: { using FFT = decltype(FFT_base()  + Size<512>()  + SM<800>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 700: { using FFT = decltype(FFT_base()  + Size<512>()  + SM<700>() + ElementsPerThread<elements_per_thread_512>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 750: { using FFT = decltype(FFT_base()  + Size<512>()  + SM<750>() + ElementsPerThread<elements_per_thread_512>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 800: { using FFT = decltype(FFT_base()  + Size<512>()  + SM<800>() + ElementsPerThread<elements_per_thread_512>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
         break; } 
   
@@ -1963,11 +1969,12 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
       // break; } 
   
       case 1024: {
+        elements_per_thread_complex = elements_per_thread_1024;
         switch (device_properties.device_arch)
         {
-          case 700: { using FFT = decltype(FFT_base()  + Size<1024>()  + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 750: { using FFT = decltype(FFT_base()  + Size<1024>()  + SM<750>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 800: { using FFT = decltype(FFT_base()  + Size<1024>()  + SM<800>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 700: { using FFT = decltype(FFT_base()  + Size<1024>()  + SM<700>() + ElementsPerThread<elements_per_thread_1024>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 750: { using FFT = decltype(FFT_base()  + Size<1024>()  + SM<750>() + ElementsPerThread<elements_per_thread_1024>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 800: { using FFT = decltype(FFT_base()  + Size<1024>()  + SM<800>() + ElementsPerThread<elements_per_thread_1024>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
       break; } 
   
@@ -1981,29 +1988,32 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
       // break; }    
   
       case 2048: {
+        elements_per_thread_complex = elements_per_thread_2048;
         switch (device_properties.device_arch)
         {
-          case 700: { using FFT = decltype(FFT_base()  + Size<2048>()  + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 750: { using FFT = decltype(FFT_base()  + Size<2048>()  + SM<750>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 800: { using FFT = decltype(FFT_base()  + Size<2048>()  + SM<800>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 700: { using FFT = decltype(FFT_base()  + Size<2048>()  + SM<700>() + ElementsPerThread<elements_per_thread_2048>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 750: { using FFT = decltype(FFT_base()  + Size<2048>()  + SM<750>() + ElementsPerThread<elements_per_thread_2048>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 800: { using FFT = decltype(FFT_base()  + Size<2048>()  + SM<800>() + ElementsPerThread<elements_per_thread_2048>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
         break; } 
   
   
       case 4096: {
+        elements_per_thread_complex = elements_per_thread_4096;
         switch (device_properties.device_arch)
         {
-          case 700: { using FFT = decltype(FFT_base()  + Size<4096>()  + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 700: { using FFT = decltype(FFT_base()  + Size<4096>()  + SM<700>() + ElementsPerThread<elements_per_thread_4096>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           // case 750: { using FFT = decltype(FFT_base()  + Size<4096>()  + SM<750>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 800: { using FFT = decltype(FFT_base()  + Size<4096>()  + SM<800>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 800: { using FFT = decltype(FFT_base()  + Size<4096>()  + SM<800>() + ElementsPerThread<elements_per_thread_4096>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
         break; }  
   
       case 8192: {
+        elements_per_thread_complex = elements_per_thread_8192;
         switch (device_properties.device_arch)
         {
-          case 700: { using FFT = decltype(FFT_base()  + Size<8192>()  + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 800: { using FFT = decltype(FFT_base()  + Size<8192>()  + SM<800>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 700: { using FFT = decltype(FFT_base()  + Size<8192>()  + SM<700>() + ElementsPerThread<elements_per_thread_8192>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 800: { using FFT = decltype(FFT_base()  + Size<8192>()  + SM<800>() + ElementsPerThread<elements_per_thread_8192>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
         break; } 
 
@@ -2225,8 +2235,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
 
         using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() );  
         cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code);
-
+        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
         LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_none_XY);
 
         int shared_memory = FFT::shared_memory_size;
@@ -2255,8 +2264,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
 
         using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() );  
         cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code);
-
+        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
         LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_none_XZ);
 
         int shared_memory = FFT::shared_memory_size;
@@ -2266,6 +2274,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         // cudaErr(cudaSetDevice(0));
         //  cudaErr(cudaFuncSetCacheConfig( (void*)block_fft_kernel_R2C_NONE_XZ<FFT,complex_type,scalar_type>,cudaFuncCachePreferShared ));
         //  cudaFuncSetSharedMemConfig ( (void*)block_fft_kernel_R2C_NONE_XZ<FFT,complex_type,scalar_type>, cudaSharedMemBankSizeEightByte );
+
 
         #if DEBUG_FFT_STAGE > 0
           precheck
@@ -2285,8 +2294,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
 
         using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() );  
         cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code);
-
+        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
         LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_decrease);
 
         // the shared mem is mixed between storage, shuffling and FFT. For this kernel we need to add padding to avoid bank conlicts (N/32)
@@ -2309,8 +2317,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
       case r2c_increase: {
         using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() );  
         cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code);
-
+        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
         LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_increase);
 
         int shared_memory = LP.mem_offsets.shared_input*sizeof(scalar_type) + FFT::shared_memory_size;
@@ -2337,8 +2344,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_fwd_none);
 
         cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code);
-
+        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
         int shared_memory = FFT::shared_memory_size;
 
         #if DEBUG_FFT_STAGE > 2
@@ -2363,8 +2369,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_fwd_none_Z);
 
         cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code);
-
+        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
         int shared_memory = FFT::shared_memory_size;
 
         #if DEBUG_FFT_STAGE > 1
@@ -2386,8 +2391,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
 
         using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() );  
         cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code);
-
+        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
         LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_fwd_decrease);
 
         #if DEBUG_FFT_STAGE > 2
@@ -2416,8 +2420,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_fwd_increase);
         
         cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code);
-        
+        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;        
         // cudaErr(cudaFuncSetCacheConfig( (void*)block_fft_kernel_C2C_INCREASE<FFT,complex_type>,cudaFuncCachePreferShared ));
           // cudaFuncSetSharedMemConfig ( (void*)block_fft_kernel_C2C_INCREASE<FFT,complex_type>, cudaSharedMemBankSizeEightByte )
         #if DEBUG_FFT_STAGE > 2
@@ -2466,8 +2469,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_fwd_increase_Z);
         
         cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code);
-        
+        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;        
         // cudaErr(cudaFuncSetCacheConfig( (void*)block_fft_kernel_C2C_INCREASE<FFT,complex_type>,cudaFuncCachePreferShared ));
           // cudaFuncSetSharedMemConfig ( (void*)block_fft_kernel_C2C_INCREASE<FFT,complex_type>, cudaSharedMemBankSizeEightByte )
         #if DEBUG_FFT_STAGE > 2
@@ -2512,13 +2514,13 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_inv_none);
 
         cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code);
-        #if DEBUG_FFT_STAGE > 4
+        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;        
+        
           int shared_memory = FFT::shared_memory_size;
 
           CheckSharedMemory(shared_memory, device_properties);
           cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_NONE<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
-      
+        #if DEBUG_FFT_STAGE > 4  
           precheck
           block_fft_kernel_C2C_NONE<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
           ( complex_input, complex_output, LP.mem_offsets, workspace);
@@ -2539,8 +2541,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_inv_none_Z);
 
         cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code);
-
+        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
         int shared_memory = FFT::shared_memory_size;
         #if DEBUG_FFT_STAGE > 5
           CheckSharedMemory(shared_memory, device_properties);
@@ -2561,8 +2562,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
 
         using FFT = decltype( FFT_base_arch() + Direction<fft_direction::inverse>()+ Type<fft_type::c2c>() );  
         cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code);
-
+        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
         LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_inv_decrease);
 
         #if DEBUG_FFT_STAGE > 4
@@ -2604,8 +2604,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2r_none);
       
         cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code);
-        cudaErr(error_code);
+        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;        cudaErr(error_code);
 
         int shared_memory = FFT::shared_memory_size;
 
@@ -2630,8 +2629,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2r_none_XY);
       
         cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code);
-        cudaErr(error_code);
+        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;        cudaErr(error_code);
 
         int shared_memory = FFT::shared_memory_size;
 
@@ -2655,8 +2653,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2r_decrease);
       
         cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code);
-        cudaErr(error_code);
+        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;        cudaErr(error_code);
 
         int shared_memory = std::max( FFT::shared_memory_size * LP.gridDims.z , (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input/32) * (unsigned int)sizeof(complex_type));
 

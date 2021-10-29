@@ -214,8 +214,22 @@ void CheckSharedMemory(unsigned int& memory_requested, DeviceProps& dp) {
 using namespace cufftdx;
 
 // TODO this probably needs to depend on the size of the xform, at least small vs large.
-constexpr const int elements_per_thread_real = 8;
-constexpr const int elements_per_thread_complex = 8;
+constexpr const int elements_per_thread_16   = 4;
+constexpr const int elements_per_thread_32   = 8;
+constexpr const int elements_per_thread_64   = 8;
+constexpr const int elements_per_thread_128  = 8;
+constexpr const int elements_per_thread_256  = 8;
+constexpr const int elements_per_thread_512  = 8;
+constexpr const int elements_per_thread_1024 = 8;
+constexpr const int elements_per_thread_2048 = 8;
+constexpr const int elements_per_thread_4096 = 8;
+constexpr const int elements_per_thread_8192 = 16;
+
+
+
+
+
+
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
