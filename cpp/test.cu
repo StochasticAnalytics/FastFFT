@@ -103,7 +103,7 @@ void const_image_test(std::vector<int> size, bool do_3d = false)
     {
       input_size = make_short4(size[n],size[n],1,0);
       output_size = make_short4(size[n],size[n],1,0);
-      full_sum = full_sum*full_sum*full_sum;
+      full_sum = full_sum*full_sum*full_sum*full_sum;
     }
 
 
@@ -243,9 +243,8 @@ void const_image_test(std::vector<int> size, bool do_3d = false)
 
     // Assuming the outputs are always even dimensions, padding_jump_val is always 2.
     sum = ReturnSumOfReal(host_output.real_values, dims_out);
-
     if (sum != full_sum) {all_passed = false; FastFFT_roundTrip_passed[n] = false;}
-    MyFFTDebugAssertTestTrue( sum == full_sum,"FastFFT constant image round trip for size " + std::to_string(dims_in.x));
+    // MyFFTDebugAssertTestTrue( sum == full_sum,"FastFFT constant image round trip for size " + std::to_string(dims_in.x));
   } // loop over sizes
   
   if (all_passed)
@@ -941,8 +940,18 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type)
       #endif   
 
 
+      int n_loops;
+      if (do_3d)
+      {
+        if (std::max(fwd_dims_in.x, fwd_dims_out.x) > 256) n_loops = 300;
+        else n_loops = 1000;
+      } 
+      else
+      {
+        if (std::max(fwd_dims_in.x, fwd_dims_out.x) > 1024) n_loops = 4000;
+        else n_loops = 10000;
+      }
 
-      const int n_loops = 3000;
       cuFFT_output.record_start();
       for (int i = 0; i < n_loops; ++i)
       {
@@ -1221,8 +1230,7 @@ int main(int argc, char** argv)
 
     bool do_3d = true;
 
-    const_image_test(test_size_3d, do_3d);
-    exit(0);
+    // const_image_test(test_size_3d, do_3d);
 
     do_3d = false;
     const_image_test(test_size, do_3d);

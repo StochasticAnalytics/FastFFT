@@ -311,6 +311,8 @@ private:
 
   int  transform_dimension; // 1,2,3d.
   FFT_Size transform_size; 
+  int elements_per_thread_complex; // Set depending on the kernel and size of the transform.
+  
   // FIXME this seems like a bad idea. Added due to conflicing labels in switch statements, even with explicitly scope. 
   enum  SizeChangeType : uint8_t { increase , decrease , no_change  }; // Assumed to be the same for all dimesnions. This may be relaxed later.
   std::vector<std::string> SizeChangeName { "increase", "decrease", "no_change" };

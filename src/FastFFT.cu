@@ -1870,9 +1870,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetPrecisionAndExec
   }
   else
   {
-    // using FFT = decltype(Block() + Precision<ComputeType>() + ElementsPerThread<elements_per_thread_complex>()  + FFTsPerBlock<1>());
     using FFT = decltype( Block() + Precision<ComputeType>()  + FFTsPerBlock<1>() );
-
     SelectSizeAndType<FFT>(kernel_type, do_forward_transform);
   }
   
@@ -1902,56 +1900,62 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
     switch (transform_size.P)
     {
       case 16: {
+        elements_per_thread_complex = elements_per_thread_16;
         switch (device_properties.device_arch)
         {
-          case 700: { using FFT = decltype(FFT_base()  + Size<16>()  + SM<700>() + ElementsPerThread<2>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 750: { using FFT = decltype(FFT_base()  + Size<16>()  + SM<750>() + ElementsPerThread<2>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 800: { using FFT = decltype(FFT_base()  + Size<16>()  + SM<800>() + ElementsPerThread<2>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 700: { using FFT = decltype(FFT_base()  + Size<16>()  + SM<700>() + ElementsPerThread<elements_per_thread_16>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 750: { using FFT = decltype(FFT_base()  + Size<16>()  + SM<750>() + ElementsPerThread<elements_per_thread_16>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 800: { using FFT = decltype(FFT_base()  + Size<16>()  + SM<800>() + ElementsPerThread<elements_per_thread_16>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
         break; }
 
       case 32: {
+        elements_per_thread_complex = elements_per_thread_32;
         switch (device_properties.device_arch)
         {
-          case 700: { using FFT = decltype(FFT_base()  + Size<32>()  + SM<700>() + ElementsPerThread<2>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 750: { using FFT = decltype(FFT_base()  + Size<32>()  + SM<750>() + ElementsPerThread<2>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 800: { using FFT = decltype(FFT_base()  + Size<32>()  + SM<800>() + ElementsPerThread<2>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 700: { using FFT = decltype(FFT_base()  + Size<32>()  + SM<700>() + ElementsPerThread<elements_per_thread_32>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 750: { using FFT = decltype(FFT_base()  + Size<32>()  + SM<750>() + ElementsPerThread<elements_per_thread_32>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 800: { using FFT = decltype(FFT_base()  + Size<32>()  + SM<800>() + ElementsPerThread<elements_per_thread_32>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
         break; }
 
       case 64: {
+        elements_per_thread_complex = elements_per_thread_64;
         switch (device_properties.device_arch)
         {
-          case 700: { using FFT = decltype(FFT_base()  + Size<64>()  + SM<700>() + ElementsPerThread<2>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 750: { using FFT = decltype(FFT_base()  + Size<64>()  + SM<750>() + ElementsPerThread<2>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 800: { using FFT = decltype(FFT_base()  + Size<64>()  + SM<800>() + ElementsPerThread<2>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 700: { using FFT = decltype(FFT_base()  + Size<64>()  + SM<700>() + ElementsPerThread<elements_per_thread_64>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 750: { using FFT = decltype(FFT_base()  + Size<64>()  + SM<750>() + ElementsPerThread<elements_per_thread_64>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 800: { using FFT = decltype(FFT_base()  + Size<64>()  + SM<800>() + ElementsPerThread<elements_per_thread_64>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
         break; }
   
       case 128: {
+        elements_per_thread_complex = elements_per_thread_128;
         switch (device_properties.device_arch)
         {
-          case 700: { using FFT = decltype(FFT_base()  + Size<128>()  + SM<700>() + ElementsPerThread<4>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 750: { using FFT = decltype(FFT_base()  + Size<128>()  + SM<750>() + ElementsPerThread<4>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 800: { using FFT = decltype(FFT_base()  + Size<128>()  + SM<800>() + ElementsPerThread<4>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 700: { using FFT = decltype(FFT_base()  + Size<128>()  + SM<700>() + ElementsPerThread<elements_per_thread_128>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 750: { using FFT = decltype(FFT_base()  + Size<128>()  + SM<750>() + ElementsPerThread<elements_per_thread_128>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 800: { using FFT = decltype(FFT_base()  + Size<128>()  + SM<800>() + ElementsPerThread<elements_per_thread_128>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
         break; }
   
       case 256: {
+        elements_per_thread_complex = elements_per_thread_256;
         switch (device_properties.device_arch)
         {
-          case 700: { using FFT = decltype(FFT_base()  + Size<256>()  + SM<700>() + ElementsPerThread<4>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 750: { using FFT = decltype(FFT_base()  + Size<256>()  + SM<750>() + ElementsPerThread<4>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 800: { using FFT = decltype(FFT_base()  + Size<256>()  + SM<800>() + ElementsPerThread<4>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 700: { using FFT = decltype(FFT_base()  + Size<256>()  + SM<700>() + ElementsPerThread<elements_per_thread_256>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 750: { using FFT = decltype(FFT_base()  + Size<256>()  + SM<750>() + ElementsPerThread<elements_per_thread_256>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 800: { using FFT = decltype(FFT_base()  + Size<256>()  + SM<800>() + ElementsPerThread<elements_per_thread_256>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
         break; } 
   
       case 512: {
+        elements_per_thread_complex = elements_per_thread_512;
         switch (device_properties.device_arch)
         {
-          case 700: { using FFT = decltype(FFT_base()  + Size<512>()  + SM<700>() + ElementsPerThread<4>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 750: { using FFT = decltype(FFT_base()  + Size<512>()  + SM<750>() + ElementsPerThread<4>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 800: { using FFT = decltype(FFT_base()  + Size<512>()  + SM<800>() + ElementsPerThread<4>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 700: { using FFT = decltype(FFT_base()  + Size<512>()  + SM<700>() + ElementsPerThread<elements_per_thread_512>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 750: { using FFT = decltype(FFT_base()  + Size<512>()  + SM<750>() + ElementsPerThread<elements_per_thread_512>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 800: { using FFT = decltype(FFT_base()  + Size<512>()  + SM<800>() + ElementsPerThread<elements_per_thread_512>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
         break; } 
   
@@ -1965,11 +1969,12 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
       // break; } 
   
       case 1024: {
+        elements_per_thread_complex = elements_per_thread_1024;
         switch (device_properties.device_arch)
         {
-          case 700: { using FFT = decltype(FFT_base()  + Size<1024>()  + SM<700>() + ElementsPerThread<8>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 750: { using FFT = decltype(FFT_base()  + Size<1024>()  + SM<750>() + ElementsPerThread<8>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 800: { using FFT = decltype(FFT_base()  + Size<1024>()  + SM<800>() + ElementsPerThread<8>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 700: { using FFT = decltype(FFT_base()  + Size<1024>()  + SM<700>() + ElementsPerThread<elements_per_thread_1024>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 750: { using FFT = decltype(FFT_base()  + Size<1024>()  + SM<750>() + ElementsPerThread<elements_per_thread_1024>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 800: { using FFT = decltype(FFT_base()  + Size<1024>()  + SM<800>() + ElementsPerThread<elements_per_thread_1024>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
       break; } 
   
@@ -1983,29 +1988,32 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
       // break; }    
   
       case 2048: {
+        elements_per_thread_complex = elements_per_thread_2048;
         switch (device_properties.device_arch)
         {
-          case 700: { using FFT = decltype(FFT_base()  + Size<2048>()  + SM<700>() + ElementsPerThread<8>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 750: { using FFT = decltype(FFT_base()  + Size<2048>()  + SM<750>() + ElementsPerThread<8>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 800: { using FFT = decltype(FFT_base()  + Size<2048>()  + SM<800>() + ElementsPerThread<8>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 700: { using FFT = decltype(FFT_base()  + Size<2048>()  + SM<700>() + ElementsPerThread<elements_per_thread_2048>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 750: { using FFT = decltype(FFT_base()  + Size<2048>()  + SM<750>() + ElementsPerThread<elements_per_thread_2048>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 800: { using FFT = decltype(FFT_base()  + Size<2048>()  + SM<800>() + ElementsPerThread<elements_per_thread_2048>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
         break; } 
   
   
       case 4096: {
+        elements_per_thread_complex = elements_per_thread_4096;
         switch (device_properties.device_arch)
         {
-          case 700: { using FFT = decltype(FFT_base()  + Size<4096>()  + SM<700>() + ElementsPerThread<8>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 700: { using FFT = decltype(FFT_base()  + Size<4096>()  + SM<700>() + ElementsPerThread<elements_per_thread_4096>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           // case 750: { using FFT = decltype(FFT_base()  + Size<4096>()  + SM<750>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 800: { using FFT = decltype(FFT_base()  + Size<4096>()  + SM<800>() + ElementsPerThread<8>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 800: { using FFT = decltype(FFT_base()  + Size<4096>()  + SM<800>() + ElementsPerThread<elements_per_thread_4096>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
         break; }  
   
       case 8192: {
+        elements_per_thread_complex = elements_per_thread_8192;
         switch (device_properties.device_arch)
         {
-          case 700: { using FFT = decltype(FFT_base()  + Size<8192>()  + SM<700>() + ElementsPerThread<8>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
-          case 800: { using FFT = decltype(FFT_base()  + Size<8192>()  + SM<800>() + ElementsPerThread<8>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 700: { using FFT = decltype(FFT_base()  + Size<8192>()  + SM<700>() + ElementsPerThread<elements_per_thread_8192>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 800: { using FFT = decltype(FFT_base()  + Size<8192>()  + SM<800>() + ElementsPerThread<elements_per_thread_8192>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
         break; } 
 
@@ -2266,6 +2274,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         // cudaErr(cudaSetDevice(0));
         //  cudaErr(cudaFuncSetCacheConfig( (void*)block_fft_kernel_R2C_NONE_XZ<FFT,complex_type,scalar_type>,cudaFuncCachePreferShared ));
         //  cudaFuncSetSharedMemConfig ( (void*)block_fft_kernel_R2C_NONE_XZ<FFT,complex_type,scalar_type>, cudaSharedMemBankSizeEightByte );
+
 
         #if DEBUG_FFT_STAGE > 0
           precheck
