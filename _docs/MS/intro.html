@@ -224,19 +224,26 @@
   </a>
   <ul class="nav section-nav flex-column">
    <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#the-discrete-fourier-trasnform">
-     The discrete Fourier Trasnform
+    <a class="reference internal nav-link" href="#background">
+     Background
     </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#the-fast-discrete-fourier-transform">
-     the fast (discrete) Fourier Transform
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#exploiting-zero-values">
-     exploiting zero values
-    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#the-discrete-fourier-trasnform">
+       The discrete Fourier Trasnform
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#the-fast-discrete-fourier-transform">
+       the fast (discrete) Fourier Transform
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#exploiting-zero-values">
+       exploiting zero values
+      </a>
+     </li>
+    </ul>
    </li>
   </ul>
  </li>
@@ -321,8 +328,8 @@
       </ul>
      </li>
      <li class="toc-h4 nav-item toc-entry">
-      <a class="reference internal nav-link" href="#table-4-current-3d-bottlenecks-c-coalesced-mem-access">
-       Table 4: Current 3D bottlenecks (C - coalesced mem access)
+      <a class="reference internal nav-link" href="#table-4-current-3d-bottlenecks-512-3-c-coalesced-mem-access">
+       Table 4: Current 3D bottlenecks 512^3 (C - coalesced mem access)
       </a>
      </li>
      <li class="toc-h4 nav-item toc-entry">
@@ -385,13 +392,15 @@
 <hr class="docutils" />
 <div class="section" id="abstract">
 <span id="ms-label"></span><h2>Abstract<a class="headerlink" href="#abstract" title="Permalink to this headline">¶</a></h2>
-<p>The Fast Fourier transform is one of the most widely used and heavily optimized algorithms in digital signal processing. cryo-EM makes heavy use of the FFT as it can accelerate convolution operations used for image alignment, and also in reconstruction algorithms that operate most accurately in Fourier space. FFT libraries like FFTW and cuFFT provide routines for highly-optimized general purpose multi-dimensional FFTs; however, they overlook several use-cases where only a subset of the input or output points are required. We show here algorithms based on transform decomposition are well suited to the memory hierarchy on moden GPUs, and can be implemented using the cufftdx header library to accelerate several important algorithms by factors of 3-10x over Nvidia’s cuFFT library. These include movie-frame alignment, image resampling via Fourier cropping, 2d and 3d template matching, and subtomogram averaging and alignment.</p>
+<p>The Fast Fourier transform is one of the most widely used and heavily optimized algorithms in digital signal processing. cryo-EM makes heavy use of the FFT as it can accelerate convolution operations used for image alignment, and also in reconstruction algorithms that operate most accurately in Fourier space. FFT libraries like FFTW and cuFFT provide routines for highly-optimized general purpose multi-dimensional FFTs; however, they overlook several use-cases where only a subset of the input or output points are required. We show here algorithms based on transform decomposition are well suited to the memory hierarchy on moden GPUs, and can be implemented using the cufftdx header library to accelerate several important algorithms by factors of 3-10x over Nvidia’s general purpose library cuFFT. These include movie-frame alignment, image resampling via Fourier cropping, 2d and 3d template matching, and subtomogram averaging and alignment.</p>
 </div>
 <div class="section" id="introduction">
 <h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h2>
-<p>The Discrete Fourier Transform (DFT) and linear filtering, <em>e.g.</em> convolution, are among the most common operations in digital signal processing. It is assumed that the reader has basic familiarity with Fourier Analysis and it’s applications in their respective fields; we will focus here on digital image processing for convenience. For a detailed introduction to the reader is referred to the free book by Smith <span id="id1">[<a class="reference internal" href="#id17">Smith, 2008</a>]</span>.</p>
+<p>The Discrete Fourier Transform (DFT) and linear filtering, <em>e.g.</em> convolution, are among the most common operations in digital signal processing. It is assumed that the reader has basic familiarity with Fourier Analysis and it’s applications in their respective fields; we will focus here on digital image processing for convenience. For a detailed introduction to the reader is referred to the free book by Smith <span id="id1">[<a class="reference internal" href="#id17">Smith, 2008</a>]</span>. There are many ways to implement the computation of the DFT, the most simple of which can be understood as a matrix multiplication, which scales as O(n^2). The FastFourier transform implements some level of recursion, as described below, which in turn reduces the number of operations needed to O(nlog(n)). This reduction in number of operations leads to both an increase in the speed, reduced roundoff error, as well as a reduced memory footprint. The goal of many popular FFT library’s is to provide optimal routines for FFT’s of any size that are also adapted to the vagarys of the specific computer hardware they are being run on ⚠️. For certain applications, particularly research that requires high performance computing resources, this generality is not strictly needed, and substantial financial and environmental resources could be minimized by using specialezed hardware or software. (Add something here about asics and fpgas ⚠️) By incorporating prior information about specific image processing algorithms, we present optimized two and three dimensional FFT routines that blah blah blahh⚠️.</p>
+<div class="section" id="background">
+<h3>Background<a class="headerlink" href="#background" title="Permalink to this headline">¶</a></h3>
 <div class="section" id="the-discrete-fourier-trasnform">
-<h3>The discrete Fourier Trasnform<a class="headerlink" href="#the-discrete-fourier-trasnform" title="Permalink to this headline">¶</a></h3>
+<h4>The discrete Fourier Trasnform<a class="headerlink" href="#the-discrete-fourier-trasnform" title="Permalink to this headline">¶</a></h4>
 <p>The discrete Fourier Transform (DFT) extends the operation of the Fourier Transform to a band-limited sequence of evenly spaced samples of a continous function. In one dimension, it is defined for a sequence of N samples <span class="math notranslate nohighlight">\(x(n)\)</span> as:</p>
 <div class="math notranslate nohighlight" id="equation-dft-equation">
 <span class="eqno">(1)<a class="headerlink" href="#equation-dft-equation" title="Permalink to this equation">¶</a></span>\[X(k) = \sum_{n=0}^{N-1} x(n) \exp\left( -2\pi i k n \right) \]</div>
@@ -409,7 +418,7 @@
 </ul>
 </div>
 <div class="section" id="the-fast-discrete-fourier-transform">
-<h3>the fast (discrete) Fourier Transform<a class="headerlink" href="#the-fast-discrete-fourier-transform" title="Permalink to this headline">¶</a></h3>
+<h4>the fast (discrete) Fourier Transform<a class="headerlink" href="#the-fast-discrete-fourier-transform" title="Permalink to this headline">¶</a></h4>
 <p>In looking at [⚠️ DFT equation above] it is clear that the DFT requires <span class="math notranslate nohighlight">\( O(N^2) \)</span>
 complex exponential function evaluations, multiplications, and additions. The fast Fourier Transform (FFT) reduces the compuational complexity to <span class="math notranslate nohighlight">\( O(Nlog_2{N}) \)</span>
 with the most efficient algorithm, the split-radix FFT requiring just <span class="math notranslate nohighlight">\( 4Nlog_2{N} - 6N  \)</span>. The Cooley-Tukey algorithm <span id="id2">[<a class="reference internal" href="#id16">Cooley and Tukey, 1965</a>]</span> was published little more than a decade after the first digitial computers became available. As is often the case in science, their discovery was really a re-discovery; the divide and conquer approach that underpins the FFT was already known to Gauss as early as 1805, predating Fourier’s work itself! <span id="id3">[<a class="reference internal" href="#id15">Heideman and Burrus, 1985</a>]</span></p>
@@ -423,7 +432,7 @@ algorithms.</p>
 <p>⚠️ Segue to include notes from FFTW - before last PP, something something FFTW is an example of dev since then - as those authors note, pruning something something, note on arithmetic vs caches (cite actual FFTW paper) something something.</p>
 </div>
 <div class="section" id="exploiting-zero-values">
-<h3>exploiting zero values<a class="headerlink" href="#exploiting-zero-values" title="Permalink to this headline">¶</a></h3>
+<h4>exploiting zero values<a class="headerlink" href="#exploiting-zero-values" title="Permalink to this headline">¶</a></h4>
 <ul class="simple">
 <li><p>Concept, reduce ops, but especially i/o</p></li>
 <li><p>Mention pruning</p></li>
@@ -437,6 +446,7 @@ algorithms.</p>
 </ul>
 </li>
 </ul>
+</div>
 </div>
 </div>
 <div class="section" id="theory">
@@ -666,74 +676,89 @@ algorithms.</p>
 <thead>
 <tr class="row-odd"><th class="head"><p>3D cubic size</p></th>
 <th class="head"><p>cufft/FastFFT runtime (10k iterations)</p></th>
+<th class="head"><p>With partial coalescing trick</p></th>
 </tr>
 </thead>
 <tbody>
 <tr class="row-even"><td><p>16</p></td>
 <td><p>0.99</p></td>
+<td><p>1.5</p></td>
 </tr>
 <tr class="row-odd"><td><p>32</p></td>
 <td><p>0.93</p></td>
+<td><p>1.0</p></td>
 </tr>
 <tr class="row-even"><td><p>64</p></td>
 <td><p>0.55</p></td>
+<td><p>0.78</p></td>
 </tr>
 <tr class="row-odd"><td><p>128</p></td>
 <td><p>0.71</p></td>
+<td><p>0.96*</p></td>
 </tr>
 <tr class="row-even"><td><p>256</p></td>
 <td><p>0.47</p></td>
+<td><p>0.99</p></td>
 </tr>
 <tr class="row-odd"><td><p>512</p></td>
 <td><p>0.23</p></td>
+<td><p>0.97</p></td>
 </tr>
 </tbody>
 </table>
+<ul class="simple">
+<li><p>This is with a partial coalesced stride of 8, while the others were best at 16. Along with Q I’ll make both of these parameters compile time template parameters rather than fixed constants.</p></li>
+</ul>
 </div>
 </div>
-<div class="section" id="table-4-current-3d-bottlenecks-c-coalesced-mem-access">
-<h4>Table 4: Current 3D bottlenecks (C - coalesced mem access)<a class="headerlink" href="#table-4-current-3d-bottlenecks-c-coalesced-mem-access" title="Permalink to this headline">¶</a></h4>
+<div class="section" id="table-4-current-3d-bottlenecks-512-3-c-coalesced-mem-access">
+<h4>Table 4: Current 3D bottlenecks 512^3 (C - coalesced mem access)<a class="headerlink" href="#table-4-current-3d-bottlenecks-512-3-c-coalesced-mem-access" title="Permalink to this headline">¶</a></h4>
 <table class="colwidths-auto table">
 <thead>
 <tr class="row-odd"><th class="head"><p>kernel</p></th>
-<th class="head"><p>time (us)</p></th>
+<th class="head"><p>time (ms)</p></th>
 <th class="head"><p>Load</p></th>
 <th class="head"><p>Store</p></th>
 </tr>
 </thead>
 <tbody>
 <tr class="row-even"><td><p>R2C_NONE_XZ</p></td>
-<td><p>872</p></td>
+<td><p>3.27</p></td>
 <td><p>C</p></td>
 <td><p>N</p></td>
 </tr>
 <tr class="row-odd"><td><p>C2C_NONE_XYZ</p></td>
-<td><p>350</p></td>
+<td><p>2.29</p></td>
 <td><p>C</p></td>
 <td><p>N</p></td>
 </tr>
 <tr class="row-even"><td><p>C2C_fwd_NONE</p></td>
-<td><p>226</p></td>
+<td><p>1.76</p></td>
 <td><p>C</p></td>
 <td><p>C</p></td>
 </tr>
-<tr class="row-odd"><td><p>C2C_inv_NONE</p></td>
-<td><p>229</p></td>
+<tr class="row-odd"><td><p>C2C_inv_NONE_YZ</p></td>
+<td><p>2.27</p></td>
 <td><p>C</p></td>
-<td><p>C</p></td>
-</tr>
-<tr class="row-even"><td><p>C2C_NONE_XY</p></td>
-<td><p>2095</p></td>
 <td><p>N</p></td>
+</tr>
+<tr class="row-even"><td><p>C2C_NONE_XYZ</p></td>
+<td><p>2.22</p></td>
+<td><p>C</p></td>
 <td><p>N</p></td>
 </tr>
 <tr class="row-odd"><td><p>C2R_NONE</p></td>
-<td><p>231</p></td>
+<td><p>1.8</p></td>
 <td><p>C</p></td>
 <td><p>C</p></td>
 </tr>
 </tbody>
 </table>
+<ul class="simple">
+<li><p>XZ -&gt; XZ axes transposed on write op</p></li>
+<li><p>XYZ -&gt; All axes permuted on write op</p></li>
+<li><p>YZ -&gt; YZ (physical XZ) axes transposed on write op</p></li>
+</ul>
 <ul>
 <li><p>Movie alignment expense (Pre/post process and alignment percentages.)</p>
 <p>:soon:</p>
