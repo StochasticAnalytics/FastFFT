@@ -242,14 +242,16 @@ void const_image_test(std::vector<int> size, bool do_3d = false)
 
 
     // Assuming the outputs are always even dimensions, padding_jump_val is always 2.
-    sum = ReturnSumOfReal(host_output.real_values, dims_out);
+    sum = ReturnSumOfReal(host_output.real_values, dims_out, true);
+
     if (sum != full_sum) {all_passed = false; FastFFT_roundTrip_passed[n] = false;}
-    // MyFFTDebugAssertTestTrue( sum == full_sum,"FastFFT constant image round trip for size " + std::to_string(dims_in.x));
+    MyFFTDebugAssertTestTrue( sum == full_sum,"FastFFT constant image round trip for size " + std::to_string(dims_in.x));
   } // loop over sizes
   
   if (all_passed)
   {
-    std::cout << "    All const_image tests passed!" << std::endl;
+    if (do_3d) std::cout << "    All 3d const_image tests passed!" << std::endl;
+    else std::cout << "    All 2d const_image tests passed!" << std::endl;
   }
   else  
   {
@@ -1215,6 +1217,7 @@ int main(int argc, char** argv)
 
   std::vector<int> test_size = { 16, 32, 64, 128, 256, 512, 1024, 2048, 4096};
   std::vector<int> test_size_3d = { 16, 32, 64, 128, 256, 512};
+  // std::vector<int> test_size_3d ={512};
 
   // The launch parameters fail for 4096 -> < 64 for r2c_decrease, not sure if it is the elements_per_thread or something else.
   // For now, just over-ride these small sizes
@@ -1230,7 +1233,7 @@ int main(int argc, char** argv)
 
     bool do_3d = true;
 
-    // const_image_test(test_size_3d, do_3d);
+    const_image_test(test_size_3d, do_3d);
 
     do_3d = false;
     const_image_test(test_size, do_3d);
@@ -1254,14 +1257,14 @@ int main(int argc, char** argv)
     bool do_3d = true;
     compare_libraries(test_size_3d, do_3d, size_change_type);
 
-    do_3d = false;
-    compare_libraries(test_size, do_3d, size_change_type);
+    // do_3d = false;
+    // compare_libraries(test_size, do_3d, size_change_type);
 
-    size_change_type = 1; // increase
-    compare_libraries(test_size, do_3d, size_change_type);
+    // size_change_type = 1; // increase
+    // compare_libraries(test_size, do_3d, size_change_type);
 
-    size_change_type = -1; // decrease
-    compare_libraries(test_size, do_3d, size_change_type);
+    // size_change_type = -1; // decrease
+    // compare_libraries(test_size, do_3d, size_change_type);
 
 
   }

@@ -349,13 +349,23 @@ private:
   void ValidateDimensions();
   void SetDimensions(DimensionCheckType check_op_type);
 
-
+  /*
+    IMPORTANT: if you add a kernel, you need to modify
+      1) enum KernelType
+      2) KernelName: this is positionally dependent on KernelType
+      3) If appropriate:
+        a) IsThreadType()
+        b) IsR2CType()
+        c) IsC2RType()
+        d) IsForwardType()
+        e) IsTransformAlongZ()
+  */
   enum KernelType { r2c_decomposed, // Thread based, full length.
                     r2c_decomposed_transposed, // Thread based, full length, transposed.
-                    r2c_none_XY, r2c_none_XZ,
+                    r2c_none_XY, r2c_none_XZ, r2c_none_XZ_2,
                     r2c_decrease, r2c_increase,
                     c2c_fwd_none, c2c_fwd_none_Z, c2c_fwd_decrease, c2c_fwd_increase, c2c_fwd_increase_Z,    
-                    c2c_inv_none, c2c_inv_none_Z, c2c_inv_decrease, c2c_inv_increase,                       
+                    c2c_inv_none, c2c_inv_none_YZ, c2c_inv_none_Z, c2c_inv_decrease, c2c_inv_increase,                       
                     c2c_decomposed,
                     c2r_decomposed, 
                     c2r_decomposed_transposed, 
@@ -369,10 +379,10 @@ private:
   std::vector<std::string> 
         KernelName{ "r2c_decomposed", 
                     "r2c_decomposed_transposed", 
-                    "r2c_none_XY", "r2c_none_XZ"
+                    "r2c_none_XY", "r2c_none_XZ", "r2c_none_XZ_2",
                     "r2c_decrease", "r2c_increase",
                     "c2c_fwd_none", "c2c_fwd_none_Z", "c2c_fwd_increase", "c2c_fwd_increase", "c2c_fwd_increase_Z",
-                    "c2c_inv_none", "c2c_inv_none_Z", "c2c_inv_increase", "c2c_inv_increase",
+                    "c2c_inv_none", "c2c_inv_none_YZ", "c2c_inv_none_Z", "c2c_inv_increase", "c2c_inv_increase",
                     "c2c_decomposed", 
                     "c2r_decomposed", 
                     "c2r_decomposed_transposed", 
@@ -392,12 +402,12 @@ private:
       return true;
     }
 
-    else if (kernel_type == r2c_none_XY || kernel_type == r2c_none_XZ ||
+    else if (kernel_type == r2c_none_XY || kernel_type == r2c_none_XZ || kernel_type == r2c_none_XZ_2 ||
              kernel_type == r2c_decrease || kernel_type == r2c_increase ||
              kernel_type == c2c_fwd_none || c2c_fwd_none_Z || 
              kernel_type == c2c_fwd_decrease || 
              kernel_type == c2c_fwd_increase || kernel_type == c2c_fwd_increase_Z ||
-             kernel_type == c2c_inv_none || kernel_type == c2c_inv_none_Z ||
+             kernel_type == c2c_inv_none || kernel_type == c2c_inv_none_YZ || kernel_type == c2c_inv_none_Z ||
              kernel_type == c2c_inv_decrease || kernel_type == c2c_inv_increase ||
              kernel_type == c2r_none || kernel_type == c2r_none_XY || kernel_type == c2r_decrease || kernel_type == c2r_increase ||
              kernel_type == xcorr_fwd_increase_inv_none || kernel_type == xcorr_fwd_decrease_inv_none || kernel_type == xcorr_fwd_none_inv_decrease || kernel_type == xcorr_fwd_decrease_inv_decrease)
@@ -414,7 +424,7 @@ private:
   inline bool IsR2CType(KernelType kernel_type)
   {
      if (kernel_type == r2c_decomposed || kernel_type == r2c_decomposed_transposed ||
-         kernel_type == r2c_none_XY || kernel_type == r2c_none_XZ ||
+         kernel_type == r2c_none_XY || kernel_type == r2c_none_XZ || kernel_type == r2c_none_XZ_2 ||
          kernel_type == r2c_decrease || kernel_type == r2c_increase)
     {
       return true;
@@ -438,7 +448,7 @@ private:
   inline bool IsForwardType(KernelType kernel_type)
   {
       if (kernel_type == r2c_decomposed || kernel_type == r2c_decomposed_transposed ||
-          kernel_type == r2c_none_XY || kernel_type == r2c_none_XZ ||
+          kernel_type == r2c_none_XY || kernel_type == r2c_none_XZ || kernel_type == r2c_none_XZ_2 ||
           kernel_type == r2c_decrease || kernel_type == r2c_increase ||
           kernel_type == c2c_fwd_none || kernel_type == c2c_fwd_none_Z || 
           kernel_type == c2c_fwd_decrease || 
