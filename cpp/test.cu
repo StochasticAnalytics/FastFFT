@@ -1216,8 +1216,8 @@ int main(int argc, char** argv)
   short4 output_size;
 
   std::vector<int> test_size = { 16, 32, 64, 128, 256, 512, 1024, 2048, 4096};
-  // std::vector<int> test_size_3d = { 16, 32, 64, 128, 256, 512};
-  std::vector<int> test_size_3d ={256};
+  std::vector<int> test_size_3d = { 16, 32, 64, 128, 256, 512};
+  // std::vector<int> test_size_3d ={512};
 
   // The launch parameters fail for 4096 -> < 64 for r2c_decrease, not sure if it is the elements_per_thread or something else.
   // For now, just over-ride these small sizes
