@@ -7,13 +7,14 @@
 (MS-label)=
 ## Abstract
 
-The Fast Fourier transform is one of the most widely used and heavily optimized algorithms in digital signal processing. cryo-EM makes heavy use of the FFT as it can accelerate convolution operations used for image alignment, and also in reconstruction algorithms that operate most accurately in Fourier space. FFT libraries like FFTW and cuFFT provide routines for highly-optimized general purpose multi-dimensional FFTs; however, they overlook several use-cases where only a subset of the input or output points are required. We show here algorithms based on transform decomposition are well suited to the memory hierarchy on moden GPUs, and can be implemented using the cufftdx header library to accelerate several important algorithms by factors of 3-10x over Nvidia’s cuFFT library. These include movie-frame alignment, image resampling via Fourier cropping, 2d and 3d template matching, and subtomogram averaging and alignment.
+The Fast Fourier transform is one of the most widely used and heavily optimized algorithms in digital signal processing. cryo-EM makes heavy use of the FFT as it can accelerate convolution operations used for image alignment, and also in reconstruction algorithms that operate most accurately in Fourier space. FFT libraries like FFTW and cuFFT provide routines for highly-optimized general purpose multi-dimensional FFTs; however, they overlook several use-cases where only a subset of the input or output points are required. We show here algorithms based on transform decomposition are well suited to the memory hierarchy on moden GPUs, and can be implemented using the cufftdx header library to accelerate several important algorithms by factors of 3-10x over Nvidia’s general purpose library cuFFT. These include movie-frame alignment, image resampling via Fourier cropping, 2d and 3d template matching, and subtomogram averaging and alignment.
 
 ## Introduction
 
 
-The Discrete Fourier Transform (DFT) and linear filtering, *e.g.* convolution, are among the most common operations in digital signal processing. It is assumed that the reader has basic familiarity with Fourier Analysis and it's applications in their respective fields; we will focus here on digital image processing for convenience. For a detailed introduction to the reader is referred to the free book by Smith {cite:p}`smith_mathematics_2008`. 
+The Discrete Fourier Transform (DFT) and linear filtering, *e.g.* convolution, are among the most common operations in digital signal processing. It is assumed that the reader has basic familiarity with Fourier Analysis and it's applications in their respective fields; we will focus here on digital image processing for convenience. For a detailed introduction to the reader is referred to the free book by Smith {cite:p}`smith_mathematics_2008`. There are many ways to implement the computation of the DFT, the most simple of which can be understood as a matrix multiplication, which scales as O(n^2). The FastFourier transform implements some level of recursion, as described below, which in turn reduces the number of operations needed to O(nlog(n)). This reduction in number of operations leads to both an increase in the speed, reduced roundoff error, as well as a reduced memory footprint. The goal of many popular FFT library's is to provide optimal routines for FFT's of any size that are also adapted to the vagarys of the specific computer hardware they are being run on ⚠️. For certain applications, particularly research that requires high performance computing resources, this generality is not strictly needed, and substantial financial and environmental resources could be minimized by using specialezed hardware or software. (Add something here about asics and fpgas ⚠️) By incorporating prior information about specific image processing algorithms, we present optimized two and three dimensional FFT routines that blah blah blahh⚠️.
 
+### Background
 
 #### The discrete Fourier Trasnform
 
@@ -149,25 +150,30 @@ By design, the cufft library from Nvidia returns an FFT in the natural order [TO
 ##### Table 3: FFT/iFFT pairs
 
 
-| 3D cubic size | cufft/FastFFT runtime (10k iterations) |
-|----|----|
-| 16 | 0.99 |
-| 32 | 0.93 |
-| 64  |  0.55 |
-| 128 | 0.71 | 
-| 256 | 0.47 |
-| 512 | 0.23 |
+| 3D cubic size | cufft/FastFFT runtime (10k iterations) | With partial coalescing trick
+|----|----| ----- | 
+| 16 | 0.99 | 1.5 |
+| 32 | 0.93 | 1.0 |
+| 64  |  0.55 | 0.78 |
+| 128 | 0.71 |  0.96* |
+| 256 | 0.47 | 0.99 |
+| 512 | 0.23 | 0.97 |
 
+* This is with a partial coalesced stride of 8, while the others were best at 16. Along with Q I'll make both of these parameters compile time template parameters rather than fixed constants.
 
-#### Table 4: Current 3D bottlenecks (C - coalesced mem access)
-| kernel | time (us) | Load | Store |
+#### Table 4: Current 3D bottlenecks 512^3 (C - coalesced mem access)
+| kernel | time (ms) | Load | Store | 
 |----|----|----|----|
-| R2C_NONE_XZ | 872 | C | N|
-| C2C_NONE_XYZ| 350 | C | N|
-| C2C_fwd_NONE | 226 | C | C|
-| C2C_inv_NONE | 229 | C | C|
-|C2C_NONE_XY | 2095 | N | N |
-|C2R_NONE | 231 | C | C |
+| R2C_NONE_XZ | 3.27 | C | N|
+| C2C_NONE_XYZ| 2.29 | C | N|
+| C2C_fwd_NONE | 1.76 | C | C|
+| C2C_inv_NONE_YZ | 2.27 | C | N|
+|C2C_NONE_XYZ | 2.22 | C | N |
+|C2R_NONE | 1.8 | C | C |
+
+* XZ -> XZ axes transposed on write op
+* XYZ -> All axes permuted on write op
+* YZ -> YZ (physical XZ) axes transposed on write op
 
 - Movie alignment expense (Pre/post process and alignment percentages.)
 
