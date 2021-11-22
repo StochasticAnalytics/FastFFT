@@ -262,6 +262,196 @@ void const_image_test(std::vector<int> size, bool do_3d = false)
   }
 }
 
+void random_image_test(std::vector<int> size, bool do_3d = false)
+{
+
+  bool all_passed = true;
+  std::vector<bool> init_passed(size.size(), true);
+  std::vector<bool> FFTW_passed(size.size(), true);
+  std::vector<bool> FastFFT_forward_passed(size.size(), true);
+  std::vector<bool> FastFFT_roundTrip_passed(size.size(), true);
+
+  for (int n = 0; n < size.size() ; n++)
+  {
+
+    short4 input_size;
+    short4 output_size;
+    long full_sum = long(size[n]);
+    if (do_3d)
+    {
+      input_size = make_short4(size[n],size[n],size[n],0);
+      output_size = make_short4(size[n],size[n],size[n],0);
+      full_sum =  full_sum*full_sum*full_sum*full_sum*full_sum*full_sum;
+    }
+    else
+    {
+      input_size = make_short4(size[n],size[n],1,0);
+      output_size = make_short4(size[n],size[n],1,0);
+      full_sum = full_sum*full_sum*full_sum*full_sum;
+    }
+
+
+    float sum;
+
+    Image< float, float2 > host_input(input_size);
+    Image< float, float2 > host_output(output_size);
+    Image< float, float2 > host_copy(output_size);
+    Image< float, float2 > device_output(output_size);
+
+
+      // Pointers to the arrays on the host -- maybe make this a struct of some sort? I'm sure there is a parallel in cuda, look into cuarray/texture code
+
+    // We just make one instance of the FourierTransformer class, with calc type float.
+    // For the time being input and output are also float. TODO calc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
+    FastFFT::FourierTransformer<float, float, float> FT;
+    
+    // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
+    FT.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, output_size.x,output_size.y,output_size.z, true, false, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+    FT.SetInverseFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true, FastFFT::FourierTransformer<float, float ,float>::OriginType::natural);
+
+      // The padding (dims.w) is calculated based on the setup
+    short4 dims_in = FT.ReturnFwdInputDimensions();
+    short4 dims_out = FT.ReturnFwdOutputDimensions();
+
+    // Determine how much memory we need, working with FFTW/CUDA style in place transform padding.
+    // Note: there is no reason we really need this, because the xforms will always be out of place. 
+    //       For now, this is just in place because all memory in cisTEM is allocated accordingly.
+    host_input.real_memory_allocated = FT.ReturnInputMemorySize();
+    host_output.real_memory_allocated = FT.ReturnInvOutputMemorySize();
+    host_copy.real_memory_allocated = FT.ReturnInvOutputMemorySize();
+
+
+    // On the device, we will always allocate enough memory for the larger of input/output including the buffer array.
+    // Minmize the number of calls to malloc which are slow and can lead to fragmentation.
+    device_output.real_memory_allocated = std::max(host_input.real_memory_allocated, host_output.real_memory_allocated);
+    
+    // In your own programs, you will be handling this memory allocation yourself. We'll just make something here.
+    // I think fftwf_malloc may potentially create a different alignment than new/delete, but kinda doubt it. For cisTEM consistency...
+    bool set_fftw_plan = true;
+    host_input.Allocate(set_fftw_plan);
+    host_output.Allocate(set_fftw_plan);
+    host_copy.Allocate(set_fftw_plan);
+
+      
+    // Set our input host memory to a constant. Then FFT[0] = host_input_memory_allocated
+    FT.SetToRandom<float>(host_output.real_values, host_output.real_memory_allocated, 0.0f, 1.0f);
+
+    
+    // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
+    // ensures faster transfer. If false, it will be pinned for you.
+    FT.SetInputPointer(host_output.real_values, false);
+
+    
+    // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
+    FT.CopyHostToDevice();
+    
+    #if DEBUG_FFT_STAGE > 0
+      host_output.FwdFFT();
+    #endif 
+
+    for (long i = 0; i < host_output.real_memory_allocated / 2; i++)
+    {
+      host_copy.complex_values[i] = host_output.complex_values[i];
+    }
+
+    // This method will call the regular FFT kernels given the input/output dimensions are equal when the class is instantiated.
+    bool swap_real_space_quadrants = false;
+    FT.FwdFFT(swap_real_space_quadrants);
+    
+    // in buffer, do not deallocate, do not unpin memory
+    FT.CopyDeviceToHost( false, false);
+    bool test_passed = true;
+
+
+    #if DEBUG_FFT_STAGE == 0
+      PrintArray(host_output.real_values, dims_out.x, dims_in.y, dims_in.z, dims_out.w);
+      PrintArray(host_copy.real_values, dims_out.x, dims_in.y, dims_in.z, dims_out.w);
+      MyTestPrintAndExit( "stage 0 " );
+    #elif DEBUG_FFT_STAGE == 1
+      std::cout << " For random_image_test partial transforms aren't supported, b/c we need to compare to the cpu output." << std::endl;
+      MyTestPrintAndExit( "stage 1 " );      
+    #elif DEBUG_FFT_STAGE == 2
+      std::cout << " For random_image_test partial transforms aren't supported, b/c we need to compare to the cpu output." << 
+      MyTestPrintAndExit( "stage 2 " );      
+    #elif DEBUG_FFT_STAGE == 3
+      PrintArray(host_output.complex_values, dims_in.y, dims_out.w, dims_out.z);
+      PrintArray(host_copy.complex_values, dims_in.y, dims_out.w, dims_out.z);
+      double distance = 0.0;
+      for (long index = 0; index < host_output.real_memory_allocated / 2; index++)
+      {
+        distance += sqrt( (host_output.complex_values[index].x - host_copy.complex_values[index].x) * (host_output.complex_values[index].x - host_copy.complex_values[index].x) +
+                          (host_output.complex_values[index].y - host_copy.complex_values[index].y) * (host_output.complex_values[index].y - host_copy.complex_values[index].y) );
+      }
+      distance /= (host_output.real_memory_allocated / 2);
+  
+      std::cout << "Distance between FastFFT and CPU: " << distance << std::endl;
+      MyTestPrintAndExit( "stage 3 " );
+    #endif   
+ 
+    // double distance = 0.0;
+    for (long index = 0; index < host_output.real_memory_allocated / 2; index++)
+    {
+      distance += sqrt( (host_output.complex_values[index].x - host_copy.complex_values[index].x) * (host_output.complex_values[index].x - host_copy.complex_values[index].x) +
+                        (host_output.complex_values[index].y - host_copy.complex_values[index].y) * (host_output.complex_values[index].y - host_copy.complex_values[index].y) );
+    }
+    distance /= (host_output.real_memory_allocated / 2);
+
+    std::cout << "Distance between FastFFT and CPU: " << distance << std::endl;
+    exit(0);
+    if (test_passed == false) {all_passed = false; FastFFT_forward_passed[n] = false;}
+    // MyFFTDebugAssertTestTrue( test_passed, "FastFFT unit impulse forward FFT");
+    FT.SetToConstant<float>(host_input.real_values, host_input.real_memory_allocated, 2.0f);
+    
+
+    FT.InvFFT();
+    FT.CopyDeviceToHost( true, true);
+ 
+
+    #if DEBUG_FFT_STAGE == 4
+      PrintArray(host_output.complex_values, dims_out.y, dims_out.w, dims_out.z);
+      MyTestPrintAndExit( "stage 4 " );
+    #elif DEBUG_FFT_STAGE == 5
+      PrintArray(host_output.complex_values, dims_out.y, dims_out.w, dims_out.z);
+      MyTestPrintAndExit( "stage 5 " );
+    #elif DEBUG_FFT_STAGE == 6
+      if (do_3d) { std::cout << " in 3d print inv " << dims_out.w << "w" << std::endl; PrintArray(host_output.complex_values, dims_out.w, dims_out.y, dims_out.z); }
+      else PrintArray(host_output.complex_values, dims_out.y, dims_out.w, dims_out.z);
+      MyTestPrintAndExit( "stage 6 " );      
+    #elif DEBUG_FFT_STAGE == 7
+      PrintArray(host_output.real_values, dims_out.x, dims_out.y,dims_out.z, dims_out.w);
+      MyTestPrintAndExit( "stage 7 " );
+    #elif DEBUG_FFT_STAGE > 7
+      // No debug, keep going
+    #else
+      MyTestPrintAndExit( " This block is only valid for DEBUG_FFT_STAGE == 4, 5, 7 " );
+    #endif   
+
+
+    // Assuming the outputs are always even dimensions, padding_jump_val is always 2.
+    sum = ReturnSumOfReal(host_output.real_values, dims_out, true);
+
+    if (sum != full_sum) {all_passed = false; FastFFT_roundTrip_passed[n] = false;}
+    MyFFTDebugAssertTestTrue( sum == full_sum,"FastFFT constant image round trip for size " + std::to_string(dims_in.x));
+  } // loop over sizes
+  
+  if (all_passed)
+  {
+    if (do_3d) std::cout << "    All 3d const_image tests passed!" << std::endl;
+    else std::cout << "    All 2d const_image tests passed!" << std::endl;
+  }
+  else  
+  {
+    for (int n = 0; n < size.size() ; n++)
+    {
+      if ( ! init_passed[n] ) std::cout << "    Initialization failed for size " << size[n] << std::endl;
+      if ( ! FFTW_passed[n] ) std::cout << "    FFTW failed for size " << size[n] << std::endl;
+      if ( ! FastFFT_forward_passed[n] ) std::cout << "    FastFFT failed for forward transform size " << size[n] << std::endl;
+      if ( ! FastFFT_roundTrip_passed[n] ) std::cout << "    FastFFT failed for roundtrip transform size " << size[n] << std::endl;
+
+    }
+  }
+}
+
 void unit_impulse_test(std::vector<int>size, bool do_3d, bool do_increase_size)
 {
 
@@ -1219,6 +1409,8 @@ int main(int argc, char** argv)
 
     bool do_3d = true;
 
+    random_image_test(test_size, false);
+
     const_image_test(test_size_3d, do_3d);
 
     do_3d = false;
@@ -1243,14 +1435,14 @@ int main(int argc, char** argv)
     bool do_3d = true;
     compare_libraries(test_size_3d, do_3d, size_change_type);
 
-    do_3d = false;
-    compare_libraries(test_size, do_3d, size_change_type);
+    // do_3d = false;
+    // compare_libraries(test_size, do_3d, size_change_type);
 
-    size_change_type = 1; // increase
-    compare_libraries(test_size, do_3d, size_change_type);
+    // size_change_type = 1; // increase
+    // compare_libraries(test_size, do_3d, size_change_type);
 
-    size_change_type = -1; // decrease
-    compare_libraries(test_size, do_3d, size_change_type);
+    // size_change_type = -1; // decrease
+    // compare_libraries(test_size, do_3d, size_change_type);
 
 
   }

@@ -3,6 +3,7 @@
 #ifndef fast_FFT_H_
 #define fast_FFT_H_
 
+#include <random>
 
 // For testing/debugging it is convenient to execute and have print functions for partial transforms.
 // These will go directly in the kernels and also in the helper Image.cuh definitions for PrintArray.
@@ -223,6 +224,27 @@ public:
       for (int i = 0; i < N_values; i++)
       {
         input_pointer[i] = wanted_value;
+      }
+    }
+    else
+    {
+      exit(-1);
+    }
+  }
+
+  template<typename T, bool is_on_host = true>
+  void SetToRandom(T* input_pointer, int N_values, const T& wanted_mean, const T& wanted_stddev)
+  {
+    std::random_device rd;
+		std::mt19937 rng(rd());
+    const uint64_t seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+    rng.seed(seed);
+
+    if (is_on_host) 
+    {
+      for (int i = 0; i < N_values; i++)
+      {
+        input_pointer[i] = std::normal_distribution<T>{wanted_mean, wanted_stddev}(rng);
       }
     }
     else
