@@ -1243,14 +1243,14 @@ int main(int argc, char** argv)
     bool do_3d = true;
     compare_libraries(test_size_3d, do_3d, size_change_type);
 
-    // do_3d = false;
-    // compare_libraries(test_size, do_3d, size_change_type);
+    do_3d = false;
+    compare_libraries(test_size, do_3d, size_change_type);
 
-    // size_change_type = 1; // increase
-    // compare_libraries(test_size, do_3d, size_change_type);
+    size_change_type = 1; // increase
+    compare_libraries(test_size, do_3d, size_change_type);
 
-    // size_change_type = -1; // decrease
-    // compare_libraries(test_size, do_3d, size_change_type);
+    size_change_type = -1; // decrease
+    compare_libraries(test_size, do_3d, size_change_type);
 
 
   }
