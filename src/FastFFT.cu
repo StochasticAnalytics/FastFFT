@@ -828,6 +828,11 @@ void FourierTransformer<ComputeType, InputType, OutputType>::ValidateDimensions(
   else 
   {
     transform_dimension = 3;
+    constexpr unsigned int max_3d_size = 512;
+    MyFFTRunTimeAssertFalse(fwd_dims_in.z > max_3d_size || fwd_dims_out.z > max_3d_size ||  inv_dims_in .z > max_3d_size || inv_dims_out.z > max_3d_size ||
+                            fwd_dims_in.y > max_3d_size || fwd_dims_out.y > max_3d_size ||  inv_dims_in .y > max_3d_size || inv_dims_out.y > max_3d_size ||
+                            fwd_dims_in.x > max_3d_size || fwd_dims_out.x > max_3d_size ||  inv_dims_in .x > max_3d_size || inv_dims_out.x > max_3d_size,
+                            "Error in validating the dimension: Currently all dimensions must be <= 512 for 3d transforms.");
   }
 
   is_size_validated = true;
@@ -2934,11 +2939,6 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
   
     }
   }
-
-
-    
-
-
 
   // 
 } // end set and launc kernel

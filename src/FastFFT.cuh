@@ -10,7 +10,7 @@
 // When defined Turns on synchronization based checking for all FFT kernels as well as cudaErr macros
 // #define HEAVYERRORCHECKING_FFT 
 // Various levels of debuging conditions and prints
-#define FFT_DEBUG_LEVEL 0 
+#define FFT_DEBUG_LEVEL 4
 
 #if FFT_DEBUG_LEVEL < 1
 
@@ -60,13 +60,15 @@
 #define MyFFTRunTimeAssertFalse(cond, msg, ...) {if ((cond) == true) { std::cerr << msg  << std::endl << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}}
 
 // Note we are using std::cerr b/c the wxWidgets apps running in cisTEM are capturing std::cout
+// If I leave cudaErr blank when HEAVYERRORCHECKING_FFT is not defined, I get some reports/warnings about unused or unreferenced variables. I suspect the performance hit is very small so just leave this on.
+// The real cost is in the synchronization of in pre/postcheck.
+#define cudaErr(error) { auto status = static_cast<cudaError_t>(error); if (status != cudaSuccess) { std::cerr << cudaGetErrorString(status) << " :-> "; MyFFTPrintWithDetails("");} };
+
 #ifndef HEAVYERRORCHECKING_FFT 
-#define postcheck
-#define cudaErr
-#define precheck
+#define postcheck 
+#define precheck 
 #else
 #define postcheck { cudaErr(cudaPeekAtLastError()); cudaError_t error = cudaStreamSynchronize(cudaStreamPerThread); cudaErr(error); };
-#define cudaErr(error) { auto status = static_cast<cudaError_t>(error); if (status != cudaSuccess) { std::cerr << cudaGetErrorString(status) << " :-> "; MyFFTPrintWithDetails("");} };
 #define precheck { cudaErr(cudaGetLastError()); }
 #endif
 
@@ -204,8 +206,8 @@ namespace FastFFT {
 
 // GetCudaDeviceArch from https://github.com/mnicely/cufft_examples/blob/master/Common/cuda_helper.h
 void GetCudaDeviceProps( DeviceProps& dp ) {
-  int major;
-  int minor;
+  int major = 0;
+  int minor = 0;
 
   cudaErr( cudaGetDevice( &dp.device_id ) );
   cudaErr( cudaDeviceGetAttribute( &major, cudaDevAttrComputeCapabilityMajor, dp.device_id ) );

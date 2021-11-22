@@ -531,6 +531,8 @@ private:
   template <class FFT_base>
   void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform);
 
+  template <class FFT_base>
+  void SelectSizeAndType_3d(KernelType kernel_type, bool do_forward_transform);
   // 3.
   // Third call, sets the input and output dimensions and type
   template <class FFT_base_arch, bool use_thread_method = false>

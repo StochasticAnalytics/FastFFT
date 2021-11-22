@@ -107,11 +107,7 @@ void const_image_test(std::vector<int> size, bool do_3d = false)
     }
 
 
-    bool test_passed = true;
-    long address = 0;
     float sum;
-    const float acceptable_epsilon = 1e-4;
-    float2 sum_complex;
 
     Image< float, float2 > host_input(input_size);
     Image< float, float2 > host_output(output_size);
@@ -169,7 +165,7 @@ void const_image_test(std::vector<int> size, bool do_3d = false)
       
     host_output.FwdFFT();
     
-    test_passed = true;
+    bool test_passed = true;
     for (long index = 1; index < host_output.real_memory_allocated/2; index++)
     {
       if (host_output.complex_values[index].x != 0.0f && host_output.complex_values[index].y != 0.0f) { std::cout << host_output.complex_values[index].x  << " " << host_output.complex_values[index].y << " " << std::endl; test_passed = false;}
@@ -313,11 +309,9 @@ void unit_impulse_test(std::vector<int>size, bool do_3d, bool do_increase_size)
       }
 
 
-  bool test_passed = true;
-  long address = 0;
+
 
   float sum;
-  float2 sum_complex;
 
   Image< float, float2 > host_input(input_size);
   Image< float, float2 > host_output(output_size);
@@ -396,7 +390,6 @@ void unit_impulse_test(std::vector<int>size, bool do_3d, bool do_increase_size)
   
   FT.FwdFFT(swap_real_space_quadrants);
 
-  int n=0;
   if (do_increase_size)
   {
     FT.CopyDeviceToHost(host_output.real_values, false, false);
@@ -514,7 +507,7 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type)
 
   bool skip_cufft_for_profiling = false;
   bool print_out_time = false;
-  bool set_padding_callback = false; // the padding callback is slower than pasting in b/c the read size of the pointers is larger than the actual data. do not use.
+  // bool set_padding_callback = false; // the padding callback is slower than pasting in b/c the read size of the pointers is larger than the actual data. do not use.
   bool set_conjMult_callback = true;
   bool is_size_change_decrease = false;
 
@@ -578,8 +571,7 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type)
       bool test_passed = true;
       long address = 0;
 
-      float sum;
-      float2 sum_complex;
+
 
       Image< float, float2 > FT_input(input_size);
       Image< float, float2 > FT_output(output_size);
@@ -972,14 +964,14 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type)
       cuFFT_output.print_time("FastFFT", print_out_time);
       float FastFFT_time = cuFFT_output.elapsed_gpu_ms;
 
-      if (set_padding_callback) 
-      {
-        precheck
-        cufftReal* overlap_pointer;
-        overlap_pointer = cuFFT.d_ptr.position_space;
-        cuFFT_output.SetClipIntoCallback(overlap_pointer, cuFFT_input.size.x, cuFFT_input.size.y, cuFFT_input.size.w*2);
-        postcheck
-      }
+      // if (set_padding_callback) 
+      // {
+      //   precheck
+      //   cufftReal* overlap_pointer;
+      //   overlap_pointer = cuFFT.d_ptr.position_space;
+      //   cuFFT_output.SetClipIntoCallback(overlap_pointer, cuFFT_input.size.x, cuFFT_input.size.y, cuFFT_input.size.w*2);
+      //   postcheck
+      // }
 
       if (set_conjMult_callback)
       {
@@ -1079,11 +1071,7 @@ void run_oned(std::vector<int> size)
   // Override the size to be one dimensional in x
   std::cout << "Running one-dimensional tests\n" << std::endl;
 
-  bool test_passed = true;
-  long address = 0;
 
-  float sum;
-  float2 sum_complex;
 
   for (int n : size)
   {
@@ -1211,9 +1199,7 @@ int main(int argc, char** argv)
     run_validation_tests = true;
     run_performance_tests = false;
   }
-  // Input and output dimensions, with simple checks. I'm sure there are better checks on argv.
-  short4 input_size;
-  short4 output_size;
+
 
   std::vector<int> test_size = { 16, 32, 64, 128, 256, 512, 1024, 2048, 4096};
   std::vector<int> test_size_3d = { 16, 32, 64, 128, 256, 512};
