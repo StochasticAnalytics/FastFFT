@@ -376,19 +376,12 @@ void random_image_test(std::vector<int> size, bool do_3d = false)
     #elif DEBUG_FFT_STAGE == 3
       PrintArray(host_output.complex_values, dims_in.y, dims_out.w, dims_out.z);
       PrintArray(host_copy.complex_values, dims_in.y, dims_out.w, dims_out.z);
-      double distance = 0.0;
-      for (long index = 0; index < host_output.real_memory_allocated / 2; index++)
-      {
-        distance += sqrt( (host_output.complex_values[index].x - host_copy.complex_values[index].x) * (host_output.complex_values[index].x - host_copy.complex_values[index].x) +
-                          (host_output.complex_values[index].y - host_copy.complex_values[index].y) * (host_output.complex_values[index].y - host_copy.complex_values[index].y) );
-      }
-      distance /= (host_output.real_memory_allocated / 2);
   
       std::cout << "Distance between FastFFT and CPU: " << distance << std::endl;
       MyTestPrintAndExit( "stage 3 " );
     #endif   
  
-    // double distance = 0.0;
+    double distance = 0.0;
     for (long index = 0; index < host_output.real_memory_allocated / 2; index++)
     {
       distance += sqrt( (host_output.complex_values[index].x - host_copy.complex_values[index].x) * (host_output.complex_values[index].x - host_copy.complex_values[index].x) +
