@@ -8,9 +8,11 @@
 
 
 // When defined Turns on synchronization based checking for all FFT kernels as well as cudaErr macros
-#define HEAVYERRORCHECKING_FFT 
+// Defined in the Makefile when DEBUG_STAGE is not equal 8 (the default, not partial transforms.)
+// #define HEAVYERRORCHECKING_FFT 
+
 // Various levels of debuging conditions and prints
-#define FFT_DEBUG_LEVEL 4
+// #define FFT_DEBUG_LEVEL 0
 
 #if FFT_DEBUG_LEVEL < 1
 

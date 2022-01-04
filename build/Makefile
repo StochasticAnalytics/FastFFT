@@ -26,13 +26,35 @@ CUDA_INCLUDE_DIR=$(CUDA_BIN_DIR)/../include
 SRCS=test.cu
 TARGETS=test
 
+# Debug level determines various asserts and print macros defined in FastFFT.cuh
+
+ifeq (${FFT_DEBUG_LEVEL},)
+debug_level=0
+$(info $$FFT_DEBUG_LEVEL is not defined, setting to 0)
+else
+debug_level=${FFT_DEBUG_LEVEL}
+$(info $$debug_level is  [${FFT_DEBUG_LEVEL}])
+endif
+NVCC_FLAGS+=-DFFT_DEBUG_LEVEL=${debug_level}
+
 # For testing/debugging it is convenient to execute and have print functions for partial transforms.
 # These will go directly in the kernels and also in the helper Image.cuh definitions for PrintArray.
 # The number refers to the number of 1d FFTs performed, 
 # Fwd 0, 1, 2, 3( none, x, z, original y)
 # 4 intermediate ops, like conj multiplication
 # Inv 5, 6, 7 ( original y, z, x)
-debug_stage=3
+
+ifeq (${DEBUG_STAGE},)
+debug_stage=8
+$(info $$DEBUG_STAGE is not defined, setting to 8)
+else
+debug_stage=${DEBUG_STAGE}
+$(info $$debug_stage is  [${DEBUG_STAGE}])
+endif
+
+ifneq (${debug_stage}, 8) 
+		NVCC_FLAGS+=-DHEAVYERRORCHECKING_FFT
+endif
 
 all:
 	$(NVCC) -dc $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DDEBUG_FFT_STAGE=${debug_stage} -o test.o -c ../cpp/test.cu
