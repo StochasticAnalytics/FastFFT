@@ -51,7 +51,7 @@
     <script async="async" src="_static/sphinx-thebe.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="FastFFT" href="_docs/MS/intro.html" />
+    <link rel="next" title="FastFFT" href="_docs/MS/manuscript.html" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="docsearch:language" content="en" />
     
@@ -92,16 +92,48 @@
  </span>
 </p>
 <ul class="nav bd-sidenav">
- <li class="toctree-l1 has-children">
-  <a class="reference internal" href="_docs/MS/intro.html">
+ <li class="toctree-l1">
+  <a class="reference internal" href="_docs/MS/manuscript.html">
    FastFFT
+  </a>
+ </li>
+</ul>
+<p class="caption">
+ <span class="caption-text">
+  Reference
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1 has-children">
+  <a class="reference internal" href="_docs/references/intro.html">
+   Reference Guide
   </a>
   <input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/>
   <label for="toctree-checkbox-1">
    <i class="fas fa-chevron-down">
    </i>
   </label>
-  <ul class="simple">
+  <ul>
+   <li class="toctree-l2">
+    <a class="reference internal" href="_docs/references/coordinate_conventions.html">
+     Coordinate System Conventions
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="_docs/references/naming_conventions.html">
+     Naming Conventions
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="_docs/references/coding_conventions.html">
+     Coding Conventions
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="_docs/references/development_tools.html">
+     Development Tools
+    </a>
+   </li>
   </ul>
  </li>
 </ul>
@@ -111,17 +143,10 @@
  </span>
 </p>
 <ul class="nav bd-sidenav">
- <li class="toctree-l1 has-children">
+ <li class="toctree-l1">
   <a class="reference internal" href="_appendix.html">
    Supress warnings - not intended for readers
   </a>
-  <input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/>
-  <label for="toctree-checkbox-2">
-   <i class="fas fa-chevron-down">
-   </i>
-  </label>
-  <ul class="simple">
-  </ul>
  </li>
 </ul>
 
@@ -251,8 +276,8 @@
 <p>hansen_dynamic-signaling-team_2010</p>
 <div class="section" id="goals">
 <h3>Goals:<a class="headerlink" href="#goals" title="Permalink to this headline">¶</a></h3>
-<p>This project aims to accelerate a specific subset of Fast Fourier Transforms (FFTs) especially important image processing, my particular flavor of which is  high-resolution phase-contrast cryo-Electron Microscopy. The gist is to take advantage of the cufftdx library from Nvidia, currently in early access, as well as algorithmic ideas from <em>Sorensen et. al</em> <span id="id1">[<a class="reference internal" href="_docs/MS/intro.html#id8">Sorensen and Burrus, 1993</a>]</span>. I became aware of <a class="reference external" href="https://github.com/DTolm/VkFFT">VkFFT</a> after I had finished my initial <a class="reference external" href="https://github.com/bHimes/cisTEM_downstream_bah/blob/DFT/src/gpu/DFTbyDecomposition.cu">proof of principle</a> experiments with cufftdx in Oct 2020. It may be entirely possible to do the same things using that library, though I haven’t had a chance to look through the source.</p>
-<p>An additional experiment tied to this project, is the development of the <a class="reference internal" href="_docs/MS/intro.html#ms-label"><span class="std std-ref"><strong>scientific manuscript</strong></span></a> “live” alongside the development of the code. While most of my projects are pretty safe from being scooped, this one is decidedly “scoopable” as it should have broad impact, and also shouldn’t be to hard to implement once the info is presented.</p>
+<p>This project aims to accelerate a specific subset of Fast Fourier Transforms (FFTs) especially important image processing, my particular flavor of which is  high-resolution phase-contrast cryo-Electron Microscopy. The gist is to take advantage of the cufftdx library from Nvidia, currently in early access, as well as algorithmic ideas from <em>Sorensen et. al</em> <span id="id1">[<a class="reference internal" href="_docs/MS/manuscript.html#id8">Sorensen and Burrus, 1993</a>]</span>. I became aware of <a class="reference external" href="https://github.com/DTolm/VkFFT">VkFFT</a> after I had finished my initial <a class="reference external" href="https://github.com/bHimes/cisTEM_downstream_bah/blob/DFT/src/gpu/DFTbyDecomposition.cu">proof of principle</a> experiments with cufftdx in Oct 2020. It may be entirely possible to do the same things using that library, though I haven’t had a chance to look through the source.</p>
+<p>An additional experiment tied to this project, is the development of the <a class="reference internal" href="_docs/MS/manuscript.html#ms-label"><span class="std std-ref"><strong>scientific manuscript</strong></span></a> “live” alongside the development of the code. While most of my projects are pretty safe from being scooped, this one is decidedly “scoopable” as it should have broad impact, and also shouldn’t be to hard to implement once the info is presented.</p>
 </div>
 <div class="section" id="design">
 <h3>Design:<a class="headerlink" href="#design" title="Permalink to this headline">¶</a></h3>
@@ -274,6 +299,8 @@
 <!-- TODO add the these templates in the FastFFT repo
 If you do not find the info you need, please request it via [How Do I ... request](https://github.com/bHimes/cisTEM_docs/issues/new?assignees=&labels=documentation&template=how-do-i-do----.md&title=)
 If you find a bug, like a broken link, please report it [using this form](https://github.com/bHimes/cisTEM_docs/issues/new?assignees=&labels=bug&template=bug_report.md&title=) -->
+</div>
+<div class="toctree-wrapper compound">
 </div>
 <div class="toctree-wrapper compound">
 </div>
@@ -311,7 +338,7 @@ If you find a bug, like a broken link, please report it [using this form](https:
 <div class='prev-next-bottom'>
     
      <div id="next">
-        <a class="right-next" href="_docs/MS/intro.html" title="next page">
+        <a class="right-next" href="_docs/MS/manuscript.html" title="next page">
             <div class="prevnext-info">
                 <p class="prevnext-label">next</p>
                 <p class="prevnext-title">FastFFT</p>

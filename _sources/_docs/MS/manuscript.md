@@ -19,47 +19,54 @@ The Discrete Fourier Transform (DFT) and linear filtering, *e.g.* convolution, a
 
 The Fourier Transform is a mathematical operation that converts an input function into a dual space; for example a function of time into a function of frequency. These dual spaces are sometimes referred to as position and momentum space, real and Fourier space, image space and k-space etc. Given that a "real-space" function can be complex valued, we will use the position and momentum space nomenclature to avoid ambiguity.
 
-creatinThe discrete Fourier Transform (DFT) extends the operation of the Fourier Transform to a band-limited sequence of evenly spaced samples of a continuous function. In one dimension, it is defined for a sequence of N samples $x(n)$ as:
+creatinThe discrete Fourier Transform (DFT) extends the operation of the Fourier Transform to a band-limited sequence of evenly spaced samples of a continuous function. In one dimension, it is defined for a sequence of N samples $x(n)$ as: Throughout the text we use lower/upper case to refer to position/momemtum space variables.
 
-```{math}
-: label : dft_equation
-X(k) = \sum_{n=0}^{N-1} x(n) \exp\left( -2\pi i k n \right) 
-```
+% This produces a labelled eqution in jupyter book that will at least render the math in vscode preview, just without the label.
+$$ X(k) = \sum_{n=0}^{N-1} x(n) \exp\left( -2\pi i k n \right) $$ (dft-1d-equation)
 
-$$ X(k) = \sum_{n=0}^{N-1} x(n) \exp\left( -2\pi i k n \right) $$
+The DFT is fully seperable when calculated with respect to a Cartesian coordintate system. For example, for an M x N array, the DFT is defined as:
 
-$$ X(k) = \sum_{n=0}^{N-1} x(n) \exp\left( -2\pi i k n \right) $$ (test-kabel)
+$$ X(k_m,k_n) = \sum_{m=0}^{M-1} \left[ \sum_{n=0}^{N-1} x(m,n) \exp\left( -2\pi i k_n n \right) \right] \exp\left( -2\pi i k_m m \right) $$ (dft-2d-equation)
+
+From this equation, it should be clear in the most simple case the 2D DFT can be calculated by first calculating the 1D FFT for each column and then each row, resulting in $ M \times N $ 1D DFTs. This seperability extends to higher dimensions, and is what permits us to exploit regions of the input that are known to be zero.
+
+In addition to being seperable, the DFT has several other important properties:
 
 
-
-
-- ⚠️ TODO: list properties (And brief example with a few citations, preferably specific to cryo-EM where each is capitalized on.)
+```{TODO} list properties (And brief example with a few citations, preferably specific to cryo-EM where each is capitalized on.)
 - linearity
-  - Parsevals
-  - Convolution theorem
-  - sinc interpolation
-  - Fourier Slice theorem
+- Parsevals
+- Convolution theorem
+- sinc interpolation
+- Fourier Slice theorem
+```
   
-#### the fast (discrete) Fourier Transform
+#### The Fast (Discrete) Fourier Transform
 
 In looking at [⚠️ DFT equation above] it is clear that the DFT requires $ O(N^2) $
  complex exponential function evaluations, multiplications, and additions. The fast Fourier Transform (FFT) reduces the compuational complexity to $ O(Nlog_2{N}) $
- with the most efficient algorithm, the split-radix FFT requiring just $ 4Nlog_2{N} - 6N  $. The Cooley-Tukey algorithm {cite:p}`cooley_algorithm_1965` was published little more than a decade after the first digitial computers became available. As is often the case in science, their discovery was really a re-discovery; the divide and conquer approach that underpins the FFT was already known to Gauss as early as 1805, predating Fourier's work itself! {cite:p}`heideman_gauss_1985` 
+ with the most efficient algorithm, the split-radix FFT requiring just $ 4Nlog_2{N} - 6N  $⚠️. The Cooley-Tukey algorithm {cite:p}`cooley_algorithm_1965` was published little more than a decade after the first digitial computers became available. As is often the case in science, their discovery was really a re-discovery; the divide and conquer approach that underpins the FFT was already known to Gauss as early as 1805, predating Fourier's work itself! {cite:p}`heideman_gauss_1985` 
 
+% This won't display properly in vscode preview, it is an inset block quote with offset author attribution.
  ```{epigraph}
+
 This story of the FFT can be used to give one incentive to investigate not
 only new and novel approaches, but to occasionally look over old papers and see the variety of tricks and clever ideas which were used when computing was, by itself, a laborious chore which gave clever people great incentive to develop efficient methods. Perhaps among the ideas discarded before the days of electronic computers, we may find more seeds of new
 algorithms.
 
 -- James W. Cooley {cite}`cooley_re-discovery_1987`
+
 ```
 
 This present work itself follows from this same spirit of re-discovery; presently with respect to ideas discarded before the days of efficient graphics processing units (GPUs), rather than electronic computers on a whole.
 
 ⚠️ Segue to include notes from FFTW - before last PP, something something FFTW is an example of dev since then - as those authors note, pruning something something, note on arithmetic vs caches (cite actual FFTW paper) something something.
 
-#### exploiting zero values
+#### Exploiting Zero Values (prior information)
 
+The simplest approach to avoiding redundant calculations and memory transfers in calculating a multi-dimensional FFT can be realized if the algorithm is made aware of null rows or columns.
+
+```{TODO} list properties (And brief example with a few citations, preferably specific to cryo-EM where each is capitalized on.)
 - Concept, reduce ops, but especially i/o
 - Mention pruning
 - Introduce transform decomposition (Sorensen)
@@ -68,6 +75,7 @@ This present work itself follows from this same spirit of re-discovery; presentl
   - 2D TM
   - 3D TM
   - Subtomogram averaging
+```
 
 
 ## Theory
@@ -121,43 +129,43 @@ By design, the cufft library from Nvidia returns an FFT in the natural order [TO
 
 :plus: Add in results for using the decomposition method for non-powers of two, more computation but fewer local memory accesses vs Bluesteins.
 
-#### Comparing 2D FFT based convolution 
+#### Comparing 2D FFT based convolution
 
-##### Table 2: zero padded convolution of 4096 pixel sq. image
+##### Table 2: cuFFT/FastFFT runtime for zero padded convolution
 
-| 2D input | 2x size |  4096 | cufft/FastFFT runtime (10k iterations) | 
-| --- | ---- | ---- | ---- |
-| 32 | 2.32 | 2.46 | |
-| 64 | 2.54 | 2.59 | |
-| 128 | 2.25 | 2.52 | |
-| 256 | 1.57 | 2.45 | | 
-| 512 | 1.33 | 2.46 | |
-| 1024 | 1.85 | 2.25 | | 
-| 2048 | 1.95 | 1.95 ||
 
-##### Table 3: zero padded convolution of input size (top row), where only (bottom row) pixel sq. is needed for output
+| 2D input | 2x size |  4096 |
+| --- | ---- | ---- |
+| 32 | 2.32 | 2.46 |
+| 64 | 2.54 | 2.59 |
+| 128 | 2.25 | 2.52 |
+| 256 | 1.57 | 2.45 |  
+| 512 | 1.33 | 2.46 |
+| 1024 | 1.85 | 2.25 |
+| 2048 | 1.95 | 1.95 |
+
+##### Table 3: cuFFT/FastFFT runtime zero padded convolution of input size (top row), where only (bottom row) pixel sq. is needed for output
 
 | | 32   |64   | 128 | 256 | 512 | 1024| 2048| 4096|
 |---- | ----    | ---- |---- |---- |---- |---- |---- |---- |
-| 16 |               1.8   | 1.75| 1.88| 1.75|1.36 | 0.93| 1.7 | 2.01   | 
-| 32 |                  | 1.56| 1.87| 1.72|1.37 | 0.92| 1.69 | 2.00   | 
-| 64 |                  | | 1.82| 1.69|1.34 | 0.91| 1.68 | 1.99   | 
-| 128|                  | | | 1.65|1.31 | 0.89| 1.64 | 1.95   | 
-| 256|                  | | | |1.24 | 0.84| 1.57 | 1.91   | 
-| 512|                  | | | | | 0.98| 1.48 | 1.84   | 
-| 1024|                 | | | | | | 1.32 | 1.69   | 
-| 2048|                 | | | | | |  | 1.48   | 
- 
+| 16 |               1.8   | 1.75| 1.88| 1.75|1.36 | 0.93| 1.7 | 2.01   |
+| 32 |                  | 1.56| 1.87| 1.72|1.37 | 0.92| 1.69 | 2.00   |
+| 64 |                  | | 1.82| 1.69|1.34 | 0.91| 1.68 | 1.99   |
+| 128|                  | | | 1.65|1.31 | 0.89| 1.64 | 1.95   |
+| 256|                  | | | |1.24 | 0.84| 1.57 | 1.91   |
+| 512|                  | | | | | 0.98| 1.48 | 1.84   |
+| 1024|                 | | | | | | 1.32 | 1.69   |
+| 2048|                 | | | | | |  | 1.48   |
 
-🍍 None of the kernels are even remotely optimized at this point, they have only been assembled and tested to pass expected behavior for FFTs of constant functions, unit impulse functions, and basic convolution ops.
+🍍 None of the kernels are optimized at this point, they have only been assembled and tested to pass expected behavior for FFTs of constant functions, unit impulse functions, and basic convolution ops.
 
 🍍 See note on previous table. The relative perf hit is not nearly as dramatic as in the previous table; however it is still about 10% which is a tough pill to swallow.
 
-##### Table 3: FFT/iFFT pairs
+##### Table 3: cuFFT/FastFFT runtime for FFT + iFFT pairs
 
 
 | 3D cubic size | cufft/FastFFT runtime (10k iterations) | With partial coalescing trick
-|----|----| ----- | 
+|----|----| ----- |
 | 16 | 0.99 | 1.5 |
 | 32 | 0.93 | 1.0 |
 | 64  |  0.55 | 0.78 |
@@ -168,7 +176,7 @@ By design, the cufft library from Nvidia returns an FFT in the natural order [TO
 * This is with a partial coalesced stride of 8, while the others were best at 16. Along with Q I'll make both of these parameters compile time template parameters rather than fixed constants.
 
 #### Table 4: Current 3D bottlenecks 512^3 (C - coalesced mem access)
-| kernel | time (ms) | Load | Store | 
+| kernel | time (ms) | Load | Store 
 |----|----|----|----|
 | R2C_NONE_XZ | 3.27 | C | N|
 | C2C_NONE_XYZ| 2.29 | C | N|

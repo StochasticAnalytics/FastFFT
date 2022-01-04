@@ -53,7 +53,7 @@
     <script async="async" src="../../_static/sphinx-thebe.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="&lt;no title&gt;" href="testfile.html" />
+    <link rel="next" title="Reference Guide" href="../references/intro.html" />
     <link rel="prev" title="Welcome to your source for info about FastFFT" href="../../intro.html" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="docsearch:language" content="en" />
@@ -95,16 +95,48 @@
  </span>
 </p>
 <ul class="current nav bd-sidenav">
- <li class="toctree-l1 current active has-children">
+ <li class="toctree-l1 current active">
   <a class="current reference internal" href="#">
    FastFFT
   </a>
-  <input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/>
+ </li>
+</ul>
+<p class="caption">
+ <span class="caption-text">
+  Reference
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1 has-children">
+  <a class="reference internal" href="../references/intro.html">
+   Reference Guide
+  </a>
+  <input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/>
   <label for="toctree-checkbox-1">
    <i class="fas fa-chevron-down">
    </i>
   </label>
-  <ul class="simple">
+  <ul>
+   <li class="toctree-l2">
+    <a class="reference internal" href="../references/coordinate_conventions.html">
+     Coordinate System Conventions
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="../references/naming_conventions.html">
+     Naming Conventions
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="../references/coding_conventions.html">
+     Coding Conventions
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="../references/development_tools.html">
+     Development Tools
+    </a>
+   </li>
   </ul>
  </li>
 </ul>
@@ -114,17 +146,10 @@
  </span>
 </p>
 <ul class="nav bd-sidenav">
- <li class="toctree-l1 has-children">
+ <li class="toctree-l1">
   <a class="reference internal" href="../../_appendix.html">
    Supress warnings - not intended for readers
   </a>
-  <input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/>
-  <label for="toctree-checkbox-2">
-   <i class="fas fa-chevron-down">
-   </i>
-  </label>
-  <ul class="simple">
-  </ul>
  </li>
 </ul>
 
@@ -167,7 +192,7 @@
         <!-- ipynb file if we had a myst markdown file -->
         
         <!-- Download raw file -->
-        <a class="dropdown-buttons" href="../../_sources/_docs/MS/intro.md"><button type="button"
+        <a class="dropdown-buttons" href="../../_sources/_docs/MS/manuscript.md"><button type="button"
                 class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
                 data-placement="left">.md</button></a>
         <!-- Download PDF via print -->
@@ -187,7 +212,7 @@
                 data-toggle="tooltip" data-placement="left" title="Source repository"><i
                     class="fab fa-github"></i>repository</button></a>
         <a class="issues-button"
-            href="https://github.com/bHimes/FastFFT/issues/new?title=Issue%20on%20page%20%2F_docs/MS/intro.html&body=Your%20issue%20content%20here."><button
+            href="https://github.com/bHimes/FastFFT/issues/new?title=Issue%20on%20page%20%2F_docs/MS/manuscript.html&body=Your%20issue%20content%20here."><button
                 type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip" data-placement="left"
                 title="Open an issue"><i class="fas fa-lightbulb"></i>open issue</button></a>
         
@@ -235,12 +260,12 @@
      </li>
      <li class="toc-h4 nav-item toc-entry">
       <a class="reference internal nav-link" href="#the-fast-discrete-fourier-transform">
-       the fast (discrete) Fourier Transform
+       The Fast (Discrete) Fourier Transform
       </a>
      </li>
      <li class="toc-h4 nav-item toc-entry">
-      <a class="reference internal nav-link" href="#exploiting-zero-values">
-       exploiting zero values
+      <a class="reference internal nav-link" href="#exploiting-zero-values-prior-information">
+       Exploiting Zero Values (prior information)
       </a>
      </li>
     </ul>
@@ -313,18 +338,18 @@
       </a>
       <ul class="nav section-nav flex-column">
        <li class="toc-h5 nav-item toc-entry">
-        <a class="reference internal nav-link" href="#table-2-zero-padded-convolution-of-4096-pixel-sq-image">
-         Table 2: zero padded convolution of 4096 pixel sq. image
+        <a class="reference internal nav-link" href="#table-2-cufft-fastfft-runtime-for-zero-padded-convolution">
+         Table 2: cuFFT/FastFFT runtime for zero padded convolution
         </a>
        </li>
        <li class="toc-h5 nav-item toc-entry">
-        <a class="reference internal nav-link" href="#table-3-zero-padded-convolution-of-input-size-top-row-where-only-bottom-row-pixel-sq-is-needed-for-output">
-         Table 3: zero padded convolution of input size (top row), where only (bottom row) pixel sq. is needed for output
+        <a class="reference internal nav-link" href="#table-3-cufft-fastfft-runtime-zero-padded-convolution-of-input-size-top-row-where-only-bottom-row-pixel-sq-is-needed-for-output">
+         Table 3: cuFFT/FastFFT runtime zero padded convolution of input size (top row), where only (bottom row) pixel sq. is needed for output
         </a>
        </li>
        <li class="toc-h5 nav-item toc-entry">
-        <a class="reference internal nav-link" href="#table-3-fft-ifft-pairs">
-         Table 3: FFT/iFFT pairs
+        <a class="reference internal nav-link" href="#table-3-cufft-fastfft-runtime-for-fft-ifft-pairs">
+         Table 3: cuFFT/FastFFT runtime for FFT + iFFT pairs
         </a>
        </li>
       </ul>
@@ -404,54 +429,33 @@
 <div class="section" id="the-discrete-fourier-transform">
 <h4>The discrete Fourier Transform<a class="headerlink" href="#the-discrete-fourier-transform" title="Permalink to this headline">¶</a></h4>
 <p>The Fourier Transform is a mathematical operation that converts an input function into a dual space; for example a function of time into a function of frequency. These dual spaces are sometimes referred to as position and momentum space, real and Fourier space, image space and k-space etc. Given that a “real-space” function can be complex valued, we will use the position and momentum space nomenclature to avoid ambiguity.</p>
-<p>creatinThe discrete Fourier Transform (DFT) extends the operation of the Fourier Transform to a band-limited sequence of evenly spaced samples of a continuous function. In one dimension, it is defined for a sequence of N samples <span class="math notranslate nohighlight">\(x(n)\)</span> as:</p>
-<div class="math notranslate nohighlight" id="equation-dft-equation">
-<span class="eqno">(1)<a class="headerlink" href="#equation-dft-equation" title="Permalink to this equation">¶</a></span>\[X(k) = \sum_{n=0}^{N-1} x(n) \exp\left( -2\pi i k n \right) \]</div>
-<div class="math notranslate nohighlight">
-\[ X(k) = \sum_{n=0}^{N-1} x(n) \exp\left( -2\pi i k n \right) \]</div>
-<div class="math notranslate nohighlight" id="equation-test-kabel">
-<span class="eqno">(2)<a class="headerlink" href="#equation-test-kabel" title="Permalink to this equation">¶</a></span>\[ X(k) = \sum_{n=0}^{N-1} x(n) \exp\left( -2\pi i k n \right) \]</div>
-<ul class="simple">
-<li><p>⚠️ TODO: list properties (And brief example with a few citations, preferably specific to cryo-EM where each is capitalized on.)</p></li>
-<li><p>linearity</p>
-<ul>
-<li><p>Parsevals</p></li>
-<li><p>Convolution theorem</p></li>
-<li><p>sinc interpolation</p></li>
-<li><p>Fourier Slice theorem</p></li>
-</ul>
-</li>
-</ul>
+<p>creatinThe discrete Fourier Transform (DFT) extends the operation of the Fourier Transform to a band-limited sequence of evenly spaced samples of a continuous function. In one dimension, it is defined for a sequence of N samples <span class="math notranslate nohighlight">\(x(n)\)</span> as: Throughout the text we use lower/upper case to refer to position/momemtum space variables.</p>
+<div class="math notranslate nohighlight" id="equation-dft-1d-equation">
+<span class="eqno">(1)<a class="headerlink" href="#equation-dft-1d-equation" title="Permalink to this equation">¶</a></span>\[ X(k) = \sum_{n=0}^{N-1} x(n) \exp\left( -2\pi i k n \right) \]</div>
+<p>The DFT is fully seperable when calculated with respect to a Cartesian coordintate system. For example, for an M x N array, the DFT is defined as:</p>
+<div class="math notranslate nohighlight" id="equation-dft-2d-equation">
+<span class="eqno">(2)<a class="headerlink" href="#equation-dft-2d-equation" title="Permalink to this equation">¶</a></span>\[ X(k_m,k_n) = \sum_{m=0}^{M-1} \left[ \sum_{n=0}^{N-1} x(m,n) \exp\left( -2\pi i k_n n \right) \right] \exp\left( -2\pi i k_m m \right) \]</div>
+<p>From this equation, it should be clear in the most simple case the 2D DFT can be calculated by first calculating the 1D FFT for each column and then each row, resulting in <span class="math notranslate nohighlight">\( M \times N \)</span> 1D DFTs. This seperability extends to higher dimensions, and is what permits us to exploit regions of the input that are known to be zero.</p>
+<p>In addition to being seperable, the DFT has several other important properties:</p>
 </div>
 <div class="section" id="the-fast-discrete-fourier-transform">
-<h4>the fast (discrete) Fourier Transform<a class="headerlink" href="#the-fast-discrete-fourier-transform" title="Permalink to this headline">¶</a></h4>
+<h4>The Fast (Discrete) Fourier Transform<a class="headerlink" href="#the-fast-discrete-fourier-transform" title="Permalink to this headline">¶</a></h4>
 <p>In looking at [⚠️ DFT equation above] it is clear that the DFT requires <span class="math notranslate nohighlight">\( O(N^2) \)</span>
 complex exponential function evaluations, multiplications, and additions. The fast Fourier Transform (FFT) reduces the compuational complexity to <span class="math notranslate nohighlight">\( O(Nlog_2{N}) \)</span>
-with the most efficient algorithm, the split-radix FFT requiring just <span class="math notranslate nohighlight">\( 4Nlog_2{N} - 6N  \)</span>. The Cooley-Tukey algorithm <span id="id2">[<a class="reference internal" href="#id16">Cooley and Tukey, 1965</a>]</span> was published little more than a decade after the first digitial computers became available. As is often the case in science, their discovery was really a re-discovery; the divide and conquer approach that underpins the FFT was already known to Gauss as early as 1805, predating Fourier’s work itself! <span id="id3">[<a class="reference internal" href="#id15">Heideman and Burrus, 1985</a>]</span></p>
+with the most efficient algorithm, the split-radix FFT requiring just <span class="math notranslate nohighlight">\( 4Nlog_2{N} - 6N  \)</span>⚠️. The Cooley-Tukey algorithm <span id="id2">[<a class="reference internal" href="#id16">Cooley and Tukey, 1965</a>]</span> was published little more than a decade after the first digitial computers became available. As is often the case in science, their discovery was really a re-discovery; the divide and conquer approach that underpins the FFT was already known to Gauss as early as 1805, predating Fourier’s work itself! <span id="id3">[<a class="reference internal" href="#id15">Heideman and Burrus, 1985</a>]</span></p>
 <blockquote class="epigraph">
 <div><p>This story of the FFT can be used to give one incentive to investigate not
 only new and novel approaches, but to occasionally look over old papers and see the variety of tricks and clever ideas which were used when computing was, by itself, a laborious chore which gave clever people great incentive to develop efficient methods. Perhaps among the ideas discarded before the days of electronic computers, we may find more seeds of new
 algorithms.</p>
-<p class="attribution">—James W. Cooley <span id="id4">[<a class="reference internal" href="#id11">Cooley, 1987</a>]</span></p>
+<p class="attribution">—James W. Cooley <span id="id4">[<a class="reference internal" href="#id11">Cooley, 1987</a>]</span>
+</p>
 </div></blockquote>
 <p>This present work itself follows from this same spirit of re-discovery; presently with respect to ideas discarded before the days of efficient graphics processing units (GPUs), rather than electronic computers on a whole.</p>
 <p>⚠️ Segue to include notes from FFTW - before last PP, something something FFTW is an example of dev since then - as those authors note, pruning something something, note on arithmetic vs caches (cite actual FFTW paper) something something.</p>
 </div>
-<div class="section" id="exploiting-zero-values">
-<h4>exploiting zero values<a class="headerlink" href="#exploiting-zero-values" title="Permalink to this headline">¶</a></h4>
-<ul class="simple">
-<li><p>Concept, reduce ops, but especially i/o</p></li>
-<li><p>Mention pruning</p></li>
-<li><p>Introduce transform decomposition (Sorensen)</p></li>
-<li><p>Pictorial explanation for the major benefactors, also list estimate of ops.</p>
-<ul>
-<li><p>Movie alignment</p></li>
-<li><p>2D TM</p></li>
-<li><p>3D TM</p></li>
-<li><p>Subtomogram averaging</p></li>
-</ul>
-</li>
-</ul>
+<div class="section" id="exploiting-zero-values-prior-information">
+<h4>Exploiting Zero Values (prior information)<a class="headerlink" href="#exploiting-zero-values-prior-information" title="Permalink to this headline">¶</a></h4>
+<p>The simplest approach to avoiding redundant calculations and memory transfers in calculating a multi-dimensional FFT can be realized if the algorithm is made aware of null rows or columns.</p>
 </div>
 </div>
 </div>
@@ -526,57 +530,49 @@ algorithms.</p>
 </div>
 <div class="section" id="comparing-2d-fft-based-convolution">
 <h4>Comparing 2D FFT based convolution<a class="headerlink" href="#comparing-2d-fft-based-convolution" title="Permalink to this headline">¶</a></h4>
-<div class="section" id="table-2-zero-padded-convolution-of-4096-pixel-sq-image">
-<h5>Table 2: zero padded convolution of 4096 pixel sq. image<a class="headerlink" href="#table-2-zero-padded-convolution-of-4096-pixel-sq-image" title="Permalink to this headline">¶</a></h5>
+<div class="section" id="table-2-cufft-fastfft-runtime-for-zero-padded-convolution">
+<h5>Table 2: cuFFT/FastFFT runtime for zero padded convolution<a class="headerlink" href="#table-2-cufft-fastfft-runtime-for-zero-padded-convolution" title="Permalink to this headline">¶</a></h5>
 <table class="colwidths-auto table">
 <thead>
 <tr class="row-odd"><th class="head"><p>2D input</p></th>
 <th class="head"><p>2x size</p></th>
 <th class="head"><p>4096</p></th>
-<th class="head"><p>cufft/FastFFT runtime (10k iterations)</p></th>
 </tr>
 </thead>
 <tbody>
 <tr class="row-even"><td><p>32</p></td>
 <td><p>2.32</p></td>
 <td><p>2.46</p></td>
-<td><p></p></td>
 </tr>
 <tr class="row-odd"><td><p>64</p></td>
 <td><p>2.54</p></td>
 <td><p>2.59</p></td>
-<td><p></p></td>
 </tr>
 <tr class="row-even"><td><p>128</p></td>
 <td><p>2.25</p></td>
 <td><p>2.52</p></td>
-<td><p></p></td>
 </tr>
 <tr class="row-odd"><td><p>256</p></td>
 <td><p>1.57</p></td>
 <td><p>2.45</p></td>
-<td><p></p></td>
 </tr>
 <tr class="row-even"><td><p>512</p></td>
 <td><p>1.33</p></td>
 <td><p>2.46</p></td>
-<td><p></p></td>
 </tr>
 <tr class="row-odd"><td><p>1024</p></td>
 <td><p>1.85</p></td>
 <td><p>2.25</p></td>
-<td><p></p></td>
 </tr>
 <tr class="row-even"><td><p>2048</p></td>
 <td><p>1.95</p></td>
 <td><p>1.95</p></td>
-<td><p></p></td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="section" id="table-3-zero-padded-convolution-of-input-size-top-row-where-only-bottom-row-pixel-sq-is-needed-for-output">
-<h5>Table 3: zero padded convolution of input size (top row), where only (bottom row) pixel sq. is needed for output<a class="headerlink" href="#table-3-zero-padded-convolution-of-input-size-top-row-where-only-bottom-row-pixel-sq-is-needed-for-output" title="Permalink to this headline">¶</a></h5>
+<div class="section" id="table-3-cufft-fastfft-runtime-zero-padded-convolution-of-input-size-top-row-where-only-bottom-row-pixel-sq-is-needed-for-output">
+<h5>Table 3: cuFFT/FastFFT runtime zero padded convolution of input size (top row), where only (bottom row) pixel sq. is needed for output<a class="headerlink" href="#table-3-cufft-fastfft-runtime-zero-padded-convolution-of-input-size-top-row-where-only-bottom-row-pixel-sq-is-needed-for-output" title="Permalink to this headline">¶</a></h5>
 <table class="colwidths-auto table">
 <thead>
 <tr class="row-odd"><th class="head"><p></p></th>
@@ -673,11 +669,11 @@ algorithms.</p>
 </tr>
 </tbody>
 </table>
-<p>🍍 None of the kernels are even remotely optimized at this point, they have only been assembled and tested to pass expected behavior for FFTs of constant functions, unit impulse functions, and basic convolution ops.</p>
+<p>🍍 None of the kernels are optimized at this point, they have only been assembled and tested to pass expected behavior for FFTs of constant functions, unit impulse functions, and basic convolution ops.</p>
 <p>🍍 See note on previous table. The relative perf hit is not nearly as dramatic as in the previous table; however it is still about 10% which is a tough pill to swallow.</p>
 </div>
-<div class="section" id="table-3-fft-ifft-pairs">
-<h5>Table 3: FFT/iFFT pairs<a class="headerlink" href="#table-3-fft-ifft-pairs" title="Permalink to this headline">¶</a></h5>
+<div class="section" id="table-3-cufft-fastfft-runtime-for-fft-ifft-pairs">
+<h5>Table 3: cuFFT/FastFFT runtime for FFT + iFFT pairs<a class="headerlink" href="#table-3-cufft-fastfft-runtime-for-fft-ifft-pairs" title="Permalink to this headline">¶</a></h5>
 <table class="colwidths-auto table">
 <thead>
 <tr class="row-odd"><th class="head"><p>3D cubic size</p></th>
@@ -821,8 +817,6 @@ algorithms.</p>
 </dl>
 </p>
 </div>
-<div class="toctree-wrapper compound">
-</div>
 </div>
 
     <script type="text/x-thebe-config">
@@ -864,10 +858,10 @@ algorithms.</p>
         </a>
     </div>
      <div id="next">
-        <a class="right-next" href="testfile.html" title="next page">
+        <a class="right-next" href="../references/intro.html" title="next page">
             <div class="prevnext-info">
                 <p class="prevnext-label">next</p>
-                <p class="prevnext-title">&lt;no title&gt;</p>
+                <p class="prevnext-title">Reference Guide</p>
             </div>
             <i class="prevnext-label fas fa-angle-right"></i>
         </a>
