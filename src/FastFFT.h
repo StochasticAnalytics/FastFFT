@@ -3,6 +3,7 @@
 #ifndef fast_FFT_H_
 #define fast_FFT_H_
 
+#include <random>
 
 // For testing/debugging it is convenient to execute and have print functions for partial transforms.
 // These will go directly in the kernels and also in the helper Image.cuh definitions for PrintArray.
@@ -231,6 +232,27 @@ public:
     }
   }
 
+  template<typename T, bool is_on_host = true>
+  void SetToRandom(T* input_pointer, int N_values, const T& wanted_mean, const T& wanted_stddev)
+  {
+    std::random_device rd;
+		std::mt19937 rng(rd());
+    const uint64_t seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+    rng.seed(seed);
+
+    if (is_on_host) 
+    {
+      for (int i = 0; i < N_values; i++)
+      {
+        input_pointer[i] = std::normal_distribution<T>{wanted_mean, wanted_stddev}(rng);
+      }
+    }
+    else
+    {
+      exit(-1);
+    }
+  }
+
   // Input is real or complex inferred from InputType
   DevicePointers<InputType*, ComputeType*> d_ptr;
 
@@ -362,10 +384,10 @@ private:
   */
   enum KernelType { r2c_decomposed, // Thread based, full length.
                     r2c_decomposed_transposed, // Thread based, full length, transposed.
-                    r2c_none_XY, r2c_none_XZ, r2c_none_XZ_2,
+                    r2c_none_XY, r2c_none_XZ, 
                     r2c_decrease, r2c_increase,
-                    c2c_fwd_none, c2c_fwd_none_Z, c2c_fwd_decrease, c2c_fwd_increase, c2c_fwd_increase_Z,    
-                    c2c_inv_none, c2c_inv_none_YZ, c2c_inv_none_Z, c2c_inv_decrease, c2c_inv_increase,                       
+                    c2c_fwd_none, c2c_fwd_none_Z, c2c_fwd_decrease, c2c_fwd_increase,
+                    c2c_inv_none, c2c_inv_none_XZ, c2c_inv_none_Z, c2c_inv_decrease, c2c_inv_increase,                       
                     c2c_decomposed,
                     c2r_decomposed, 
                     c2r_decomposed_transposed, 
@@ -379,10 +401,10 @@ private:
   std::vector<std::string> 
         KernelName{ "r2c_decomposed", 
                     "r2c_decomposed_transposed", 
-                    "r2c_none_XY", "r2c_none_XZ", "r2c_none_XZ_2",
+                    "r2c_none_XY", "r2c_none_XZ", 
                     "r2c_decrease", "r2c_increase",
-                    "c2c_fwd_none", "c2c_fwd_none_Z", "c2c_fwd_increase", "c2c_fwd_increase", "c2c_fwd_increase_Z",
-                    "c2c_inv_none", "c2c_inv_none_YZ", "c2c_inv_none_Z", "c2c_inv_increase", "c2c_inv_increase",
+                    "c2c_fwd_none", "c2c_fwd_none_Z", "c2c_fwd_increase", "c2c_fwd_increase", 
+                    "c2c_inv_none", "c2c_inv_none_XZ", "c2c_inv_none_Z", "c2c_inv_increase", "c2c_inv_increase",
                     "c2c_decomposed", 
                     "c2r_decomposed", 
                     "c2r_decomposed_transposed", 
@@ -402,12 +424,12 @@ private:
       return true;
     }
 
-    else if (kernel_type == r2c_none_XY || kernel_type == r2c_none_XZ || kernel_type == r2c_none_XZ_2 ||
+    else if (kernel_type == r2c_none_XY || kernel_type == r2c_none_XZ || 
              kernel_type == r2c_decrease || kernel_type == r2c_increase ||
              kernel_type == c2c_fwd_none || c2c_fwd_none_Z || 
              kernel_type == c2c_fwd_decrease || 
-             kernel_type == c2c_fwd_increase || kernel_type == c2c_fwd_increase_Z ||
-             kernel_type == c2c_inv_none || kernel_type == c2c_inv_none_YZ || kernel_type == c2c_inv_none_Z ||
+             kernel_type == c2c_fwd_increase || 
+             kernel_type == c2c_inv_none || kernel_type == c2c_inv_none_XZ || kernel_type == c2c_inv_none_Z ||
              kernel_type == c2c_inv_decrease || kernel_type == c2c_inv_increase ||
              kernel_type == c2r_none || kernel_type == c2r_none_XY || kernel_type == c2r_decrease || kernel_type == c2r_increase ||
              kernel_type == xcorr_fwd_increase_inv_none || kernel_type == xcorr_fwd_decrease_inv_none || kernel_type == xcorr_fwd_none_inv_decrease || kernel_type == xcorr_fwd_decrease_inv_decrease)
@@ -424,7 +446,7 @@ private:
   inline bool IsR2CType(KernelType kernel_type)
   {
      if (kernel_type == r2c_decomposed || kernel_type == r2c_decomposed_transposed ||
-         kernel_type == r2c_none_XY || kernel_type == r2c_none_XZ || kernel_type == r2c_none_XZ_2 ||
+         kernel_type == r2c_none_XY || kernel_type == r2c_none_XZ || 
          kernel_type == r2c_decrease || kernel_type == r2c_increase)
     {
       return true;
@@ -448,11 +470,11 @@ private:
   inline bool IsForwardType(KernelType kernel_type)
   {
       if (kernel_type == r2c_decomposed || kernel_type == r2c_decomposed_transposed ||
-          kernel_type == r2c_none_XY || kernel_type == r2c_none_XZ || kernel_type == r2c_none_XZ_2 ||
+          kernel_type == r2c_none_XY || kernel_type == r2c_none_XZ || 
           kernel_type == r2c_decrease || kernel_type == r2c_increase ||
           kernel_type == c2c_fwd_none || kernel_type == c2c_fwd_none_Z || 
           kernel_type == c2c_fwd_decrease || 
-          kernel_type == c2c_fwd_increase || kernel_type == c2c_fwd_increase_Z ||
+          kernel_type == c2c_fwd_increase || 
           kernel_type == xcorr_fwd_decrease_inv_none || kernel_type == xcorr_fwd_increase_inv_none)
 
     {
@@ -464,7 +486,7 @@ private:
 
   inline bool IsTransormAlongZ(KernelType kernel_type)
   {
-    if (kernel_type == c2c_fwd_none_Z || kernel_type == c2c_fwd_increase_Z ||
+    if (kernel_type == c2c_fwd_none_Z || 
         kernel_type == c2c_inv_none_Z )
     {
       return true;
@@ -531,6 +553,8 @@ private:
   template <class FFT_base>
   void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform);
 
+  template <class FFT_base>
+  void SelectSizeAndType_3d(KernelType kernel_type, bool do_forward_transform);
   // 3.
   // Third call, sets the input and output dimensions and type
   template <class FFT_base_arch, bool use_thread_method = false>

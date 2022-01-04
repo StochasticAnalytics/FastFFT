@@ -8,9 +8,9 @@
 
 
 // When defined Turns on synchronization based checking for all FFT kernels as well as cudaErr macros
-// #define HEAVYERRORCHECKING_FFT 
+#define HEAVYERRORCHECKING_FFT 
 // Various levels of debuging conditions and prints
-#define FFT_DEBUG_LEVEL 0 
+#define FFT_DEBUG_LEVEL 4
 
 #if FFT_DEBUG_LEVEL < 1
 
@@ -60,13 +60,15 @@
 #define MyFFTRunTimeAssertFalse(cond, msg, ...) {if ((cond) == true) { std::cerr << msg  << std::endl << " Failed Assert at "  << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}}
 
 // Note we are using std::cerr b/c the wxWidgets apps running in cisTEM are capturing std::cout
+// If I leave cudaErr blank when HEAVYERRORCHECKING_FFT is not defined, I get some reports/warnings about unused or unreferenced variables. I suspect the performance hit is very small so just leave this on.
+// The real cost is in the synchronization of in pre/postcheck.
+#define cudaErr(error) { auto status = static_cast<cudaError_t>(error); if (status != cudaSuccess) { std::cerr << cudaGetErrorString(status) << " :-> "; MyFFTPrintWithDetails("");} };
+
 #ifndef HEAVYERRORCHECKING_FFT 
-#define postcheck
-#define cudaErr
-#define precheck
+#define postcheck 
+#define precheck 
 #else
 #define postcheck { cudaErr(cudaPeekAtLastError()); cudaError_t error = cudaStreamSynchronize(cudaStreamPerThread); cudaErr(error); };
-#define cudaErr(error) { auto status = static_cast<cudaError_t>(error); if (status != cudaSuccess) { std::cerr << cudaGetErrorString(status) << " :-> "; MyFFTPrintWithDetails("");} };
 #define precheck { cudaErr(cudaGetLastError()); }
 #endif
 
@@ -204,8 +206,8 @@ namespace FastFFT {
 
 // GetCudaDeviceArch from https://github.com/mnicely/cufft_examples/blob/master/Common/cuda_helper.h
 void GetCudaDeviceProps( DeviceProps& dp ) {
-  int major;
-  int minor;
+  int major = 0;
+  int minor = 0;
 
   cudaErr( cudaGetDevice( &dp.device_id ) );
   cudaErr( cudaDeviceGetAttribute( &major, cudaDevAttrComputeCapabilityMajor, dp.device_id ) );
@@ -267,6 +269,10 @@ constexpr const int elements_per_thread_8192 = 16;
 ////////////////////////////////////////
 
 /* 
+
+transpose definitions in the kernel names refer to the physical axes in memory, which may not match the logical axes if following a previous transpose.
+    2 letters indicate a swap of the axes specified
+    3 letters indicate a permutation. E.g./ XZY, x -> Z, z -> Y, y -> X
 R2C and C2R kernels are named as:
 <cufftdx transform method>_fft_kernel_< fft type >_< size change >_< transpose axes >
 
@@ -274,8 +280,6 @@ C2C additionally specify direction and may specify an operation.
 <cufftdx transform method>_fft_kernel_< fft type >_< direction >_< size change >_< transpose axes >_< operation in between round trip kernels >
 
 */
-
-
 
 
 /////////////
@@ -287,14 +291,10 @@ template<class FFT, class ComplexType = typename FFT::value_type, class ScalarTy
 __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_R2C_NONE_XY(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
 
-template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
-__launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_R2C_NONE_XZ(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
-
 // 2 ffts/block via threadIdx.x, notice launch bounds. Creates partial coalescing.
 template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
 __launch_bounds__(XZ_STRIDE*FFT::max_threads_per_block) __global__
-void block_fft_kernel_R2C_NONE_XZ_2(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+void block_fft_kernel_R2C_NONE_XZ(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
 
 template<class FFT, class ComplexType = typename FFT::value_type, class ScalarType = typename ComplexType::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
@@ -344,19 +344,14 @@ void block_fft_kernel_C2C_NONE(const ComplexType* __restrict__  input_values, Co
 
 template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(XZ_STRIDE*FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2C_NONE_YZ(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+void block_fft_kernel_C2C_NONE_XZ(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
 
-template<class FFT, class ComplexType = typename FFT::value_type>
-__launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2C_XY(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
 
 template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(XZ_STRIDE*FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2C_NONE_XYZ(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+void block_fft_kernel_C2C_NONE_XZY(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
 
-template<class FFT, class ComplexType = typename FFT::value_type>
-__launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2C_INCREASE_Z(const ComplexType* __restrict__  input_values, ComplexType*  __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
+
 /////////////
 // C2R 
 /////////////

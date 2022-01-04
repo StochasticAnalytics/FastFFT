@@ -77,7 +77,7 @@ class Image {
     void MakeCufftPlan3d();
 
     void SetClipIntoMask(short4 input_size, short4 output_size); bool is_set_clip_into_mask = false;
-    void SetClipIntoCallback(cufftReal* image_to_insert, int image_to_insert_size_x, int image_to_insert_size_y,int image_to_insert_pitch);
+    // void SetClipIntoCallback(cufftReal* image_to_insert, int image_to_insert_size_x, int image_to_insert_size_y,int image_to_insert_pitch);
     void SetComplexConjMultiplyAndLoadCallBack(cufftComplex* search_image_FT, cufftReal FT_normalization_factor);
     void MultiplyConjugateImage( wanted_complex_type* other_image);
 
@@ -170,7 +170,6 @@ void ClipInto(const float* array_to_paste, float* array_to_paste_into, short4 si
 	int ii_logi;
 	int i;
 
-	double junk;
 
   short4 center_to_paste_into = make_short4(size_into.x/2, size_into.y/2, size_into.z/2, 0);
   short4 center_to_paste = make_short4(size_from.x/2, size_from.y/2, size_from.z/2, 0);

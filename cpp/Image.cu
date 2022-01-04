@@ -296,45 +296,45 @@ __device__ cufftCallbackLoadR d_realLoadAndClipInto = CB_realLoadAndClipInto;
 
 
 
-template < class wanted_real_type, class wanted_complex_type >
-void Image<wanted_real_type, wanted_complex_type>::SetClipIntoCallback(cufftReal* image_to_insert, int image_to_insert_size_x, int image_to_insert_size_y,int image_to_insert_pitch)
-{
+// template < class wanted_real_type, class wanted_complex_type >
+// void Image<wanted_real_type, wanted_complex_type>::SetClipIntoCallback(cufftReal* image_to_insert, int image_to_insert_size_x, int image_to_insert_size_y,int image_to_insert_pitch)
+// {
 
 
-  // // First make the mask
-  short4 wanted_size = make_short4(image_to_insert_size_x, image_to_insert_size_y, 1, image_to_insert_pitch);
-  SetClipIntoMask(wanted_size, size );
+//   // // First make the mask
+//   short4 wanted_size = make_short4(image_to_insert_size_x, image_to_insert_size_y, 1, image_to_insert_pitch);
+//   SetClipIntoMask(wanted_size, size );
 
-  if (!is_cufft_planned) {std::cout << "Cufft plan must be made before setting callback function." << std::endl; exit(-1);}
+//   if (!is_cufft_planned) {std::cout << "Cufft plan must be made before setting callback function." << std::endl; exit(-1);}
 
-  cufftCallbackLoadR h_realLoadAndClipInto;
-  CB_realLoadAndClipInto_params* d_params;
-  CB_realLoadAndClipInto_params h_params;
+//   cufftCallbackLoadR h_realLoadAndClipInto;
+//   CB_realLoadAndClipInto_params* d_params;
+//   CB_realLoadAndClipInto_params h_params;
 
-  precheck
-  h_params.target = (cufftReal *)image_to_insert;
-  h_params.mask = (bool*) clipIntoMask;
-  cudaErr(cudaMalloc((void **)&d_params,sizeof(CB_realLoadAndClipInto_params)));
-  postcheck
+//   precheck
+//   h_params.target = (cufftReal *)image_to_insert;
+//   h_params.mask = (bool*) clipIntoMask;
+//   cudaErr(cudaMalloc((void **)&d_params,sizeof(CB_realLoadAndClipInto_params)));
+//   postcheck
 
-  precheck
-  cudaErr(cudaMemcpyAsync(d_params, &h_params, sizeof(CB_realLoadAndClipInto_params), cudaMemcpyHostToDevice, cudaStreamPerThread));
-  postcheck
+//   precheck
+//   cudaErr(cudaMemcpyAsync(d_params, &h_params, sizeof(CB_realLoadAndClipInto_params), cudaMemcpyHostToDevice, cudaStreamPerThread));
+//   postcheck
 
-  precheck
-  cudaErr(cudaMemcpyFromSymbol(&h_realLoadAndClipInto,d_realLoadAndClipInto, sizeof(h_realLoadAndClipInto)));
-  postcheck
+//   precheck
+//   cudaErr(cudaMemcpyFromSymbol(&h_realLoadAndClipInto,d_realLoadAndClipInto, sizeof(h_realLoadAndClipInto)));
+//   postcheck
 
-  precheck
-  cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
-  postcheck
+//   precheck
+//   cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
+//   postcheck
 
-  precheck
-  cudaErr(cufftXtSetCallback(cuda_plan_forward, (void **)&h_realLoadAndClipInto, CUFFT_CB_LD_REAL, (void **)&d_params));
-  postcheck
+//   precheck
+//   cudaErr(cufftXtSetCallback(cuda_plan_forward, (void **)&h_realLoadAndClipInto, CUFFT_CB_LD_REAL, (void **)&d_params));
+//   postcheck
 
 
-}
+// }
 
 struct CB_complexConjMulLoad_params
 {

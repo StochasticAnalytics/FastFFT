@@ -1,58 +1,72 @@
 
 # FastFFT
 
-
 ---
 
 (MS-label)=
+
 ## Abstract
 
-The Fast Fourier transform is one of the most widely used and heavily optimized algorithms in digital signal processing. cryo-EM makes heavy use of the FFT as it can accelerate convolution operations used for image alignment, and also in reconstruction algorithms that operate most accurately in Fourier space. FFT libraries like FFTW and cuFFT provide routines for highly-optimized general purpose multi-dimensional FFTs; however, they overlook several use-cases where only a subset of the input or output points are required. We show here algorithms based on transform decomposition are well suited to the memory hierarchy on moden GPUs, and can be implemented using the cufftdx header library to accelerate several important algorithms by factors of 3-10x over Nvidia’s general purpose library cuFFT. These include movie-frame alignment, image resampling via Fourier cropping, 2d and 3d template matching, and subtomogram averaging and alignment.
+The Fast Fourier transform (FFT) is one of the most widely used and heavily optimized digital signal processing algorithms. Many of the image processing algorithms used in cryo-Electron Microscopy rely on the FFT to accelerate convolution operations central to image alignment and also in reconstruction algorithms that operate most accurately in Fourier space. FFT libraries like FFTW and cuFFT provide routines for highly-optimized general purpose multi-dimensional FFTs; however, they overlook several use-cases where only a subset of the input or output points are required. We demonstrate that algorithms based on the transform decomposition approach are well suited to the memory hierarchy of modern GPUs by implementing them in CUDA/C++ using the cufftdx header-only library. The results have practical implications, accelerating several key image processing algorithms by factors of 3-10x over those built using Nvidia’s general purpose FFT library cuFFT. These include movie-frame alignment, image resampling via Fourier cropping, 2d and 3d template matching, and subtomogram averaging and alignment.
 
 ## Introduction
 
-
-The Discrete Fourier Transform (DFT) and linear filtering, *e.g.* convolution, are among the most common operations in digital signal processing. It is assumed that the reader has basic familiarity with Fourier Analysis and it's applications in their respective fields; we will focus here on digital image processing for convenience. For a detailed introduction to the reader is referred to the free book by Smith {cite:p}`smith_mathematics_2008`. There are many ways to implement the computation of the DFT, the most simple of which can be understood as a matrix multiplication, which scales as O(n^2). The FastFourier transform implements some level of recursion, as described below, which in turn reduces the number of operations needed to O(nlog(n)). This reduction in number of operations leads to both an increase in the speed, reduced roundoff error, as well as a reduced memory footprint. The goal of many popular FFT library's is to provide optimal routines for FFT's of any size that are also adapted to the vagarys of the specific computer hardware they are being run on ⚠️. For certain applications, particularly research that requires high performance computing resources, this generality is not strictly needed, and substantial financial and environmental resources could be minimized by using specialezed hardware or software. (Add something here about asics and fpgas ⚠️) By incorporating prior information about specific image processing algorithms, we present optimized two and three dimensional FFT routines that blah blah blahh⚠️.
+The Discrete Fourier Transform (DFT) and linear filtering, *e.g.* convolution, are among the most common operations in digital signal processing. It is therefore assumed that the reader has a basic familiarity with Fourier Analysis and it's applications in their respective fields; we will focus here on digital image processing for convenience. For a detailed introduction to the reader is referred to the free book by Smith {cite:p}`smith_mathematics_2008`. There are many ways to implement the computation of the DFT, the most simple of which can be understood as a matrix multiplication, which scales in computational complexity as O(n^2). The Fast Fourier Transform (FFT) implements some level of recursion, as described below, which in turn reduces the computational complexity to O(nlog(n)). This reduction in number of operations leads to both an increase in the speed, reduced roundoff error, as well as a reduced memory footprint. The goal of many popular FFT library's is to provide optimal routines for FFT's of any size that are also adapted to the vagarys of the specific computer hardware they are being run on ⚠️. Most papers describing FFT algorithms focus on computational complexity from the perspective of the number of arithmetic operations  ⚠️, however, cache coherency and limited on chip memory ultimately reduce the efficiency of large FFTs (⚠️ TODO: Intro figure 1). For certain applications, particularly research that requires high performance computing resources, this generality is not strictly needed, and substantial financial and environmental resources could be minimized by using specialezed hardware or software. (Add something here about asics and fpgas ⚠️) By incorporating prior information about specific image processing algorithms, we present optimized two and three dimensional FFT routines that blah blah blahh⚠️.
 
 ### Background
 
-#### The discrete Fourier Trasnform
+#### The discrete Fourier Transform
 
-The discrete Fourier Transform (DFT) extends the operation of the Fourier Transform to a band-limited sequence of evenly spaced samples of a continous function. In one dimension, it is defined for a sequence of N samples $x(n)$ as:
+The Fourier Transform is a mathematical operation that converts an input function into a dual space; for example a function of time into a function of frequency. These dual spaces are sometimes referred to as position and momentum space, real and Fourier space, image space and k-space etc. Given that a "real-space" function can be complex valued, we will use the position and momentum space nomenclature to avoid ambiguity.
 
-```{math}
-: label : dft_equation
-X(k) = \sum_{n=0}^{N-1} x(n) \exp\left( -2\pi i k n \right) 
+creatinThe discrete Fourier Transform (DFT) extends the operation of the Fourier Transform to a band-limited sequence of evenly spaced samples of a continuous function. In one dimension, it is defined for a sequence of N samples $x(n)$ as: Throughout the text we use lower/upper case to refer to position/momemtum space variables.
+
+% This produces a labelled eqution in jupyter book that will at least render the math in vscode preview, just without the label.
+$$ X(k) = \sum_{n=0}^{N-1} x(n) \exp\left( -2\pi i k n \right) $$ (dft-1d-equation)
+
+The DFT is fully seperable when calculated with respect to a Cartesian coordintate system. For example, for an M x N array, the DFT is defined as:
+
+$$ X(k_m,k_n) = \sum_{m=0}^{M-1} \left[ \sum_{n=0}^{N-1} x(m,n) \exp\left( -2\pi i k_n n \right) \right] \exp\left( -2\pi i k_m m \right) $$ (dft-2d-equation)
+
+From this equation, it should be clear in the most simple case the 2D DFT can be calculated by first calculating the 1D FFT for each column and then each row, resulting in $ M \times N $ 1D DFTs. This seperability extends to higher dimensions, and is what permits us to exploit regions of the input that are known to be zero.
+
+In addition to being seperable, the DFT has several other important properties:
+
+
+```{TODO} list properties (And brief example with a few citations, preferably specific to cryo-EM where each is capitalized on.)
+- linearity
+- Parsevals
+- Convolution theorem
+- sinc interpolation
+- Fourier Slice theorem
 ```
-
-  - ⚠️ TODO: list properties (And brief example with a few citations, preferably specific to cryo-EM where each is capitalized on.)
-    - linearity
-    - Parsevals
-    - Convolution theorem
-    - sinc interpolation
-    - Fourier Slice theorem
-    - 
-
-#### the fast (discrete) Fourier Transform
+  
+#### The Fast (Discrete) Fourier Transform
 
 In looking at [⚠️ DFT equation above] it is clear that the DFT requires $ O(N^2) $
  complex exponential function evaluations, multiplications, and additions. The fast Fourier Transform (FFT) reduces the compuational complexity to $ O(Nlog_2{N}) $
- with the most efficient algorithm, the split-radix FFT requiring just $ 4Nlog_2{N} - 6N  $. The Cooley-Tukey algorithm {cite:p}`cooley_algorithm_1965` was published little more than a decade after the first digitial computers became available. As is often the case in science, their discovery was really a re-discovery; the divide and conquer approach that underpins the FFT was already known to Gauss as early as 1805, predating Fourier's work itself! {cite:p}`heideman_gauss_1985` 
+ with the most efficient algorithm, the split-radix FFT requiring just $ 4Nlog_2{N} - 6N  $⚠️. The Cooley-Tukey algorithm {cite:p}`cooley_algorithm_1965` was published little more than a decade after the first digitial computers became available. As is often the case in science, their discovery was really a re-discovery; the divide and conquer approach that underpins the FFT was already known to Gauss as early as 1805, predating Fourier's work itself! {cite:p}`heideman_gauss_1985` 
 
+% This won't display properly in vscode preview, it is an inset block quote with offset author attribution.
  ```{epigraph}
+
 This story of the FFT can be used to give one incentive to investigate not
 only new and novel approaches, but to occasionally look over old papers and see the variety of tricks and clever ideas which were used when computing was, by itself, a laborious chore which gave clever people great incentive to develop efficient methods. Perhaps among the ideas discarded before the days of electronic computers, we may find more seeds of new
 algorithms.
 
 -- James W. Cooley {cite}`cooley_re-discovery_1987`
+
 ```
 
 This present work itself follows from this same spirit of re-discovery; presently with respect to ideas discarded before the days of efficient graphics processing units (GPUs), rather than electronic computers on a whole.
 
 ⚠️ Segue to include notes from FFTW - before last PP, something something FFTW is an example of dev since then - as those authors note, pruning something something, note on arithmetic vs caches (cite actual FFTW paper) something something.
 
-#### exploiting zero values
+#### Exploiting Zero Values (prior information)
 
+The simplest approach to avoiding redundant calculations and memory transfers in calculating a multi-dimensional FFT can be realized if the algorithm is made aware of null rows or columns.
+
+```{TODO} list properties (And brief example with a few citations, preferably specific to cryo-EM where each is capitalized on.)
 - Concept, reduce ops, but especially i/o
 - Mention pruning
 - Introduce transform decomposition (Sorensen)
@@ -61,14 +75,14 @@ This present work itself follows from this same spirit of re-discovery; presentl
   - 2D TM
   - 3D TM
   - Subtomogram averaging
+```
 
 
 ## Theory
 
-#### The DFT and FFT
+### The DFT and FFT
 
 Fast Fourier Transform (FFT) is a mathematical operation that transforms a function $ X(n) $ from the real-valued plane into the complex-valued plane. The function $ f(x) $ is a function of $ x $ and is often a function of the real-valued signal $ x $ or a function of the complex-valued signal $ x + i\cdot y $. The FFT is an optimized algorithm for copying the discrete Fourier transform (DFT) defined as: 
-
 
 ( I think this paragraph is probably belonging in the introduction )
 
@@ -115,43 +129,43 @@ By design, the cufft library from Nvidia returns an FFT in the natural order [TO
 
 :plus: Add in results for using the decomposition method for non-powers of two, more computation but fewer local memory accesses vs Bluesteins.
 
-#### Comparing 2D FFT based convolution 
+#### Comparing 2D FFT based convolution
 
-##### Table 2: zero padded convolution of 4096 pixel sq. image
+##### Table 2: cuFFT/FastFFT runtime for zero padded convolution
 
-| 2D input | 2x size |  4096 | cufft/FastFFT runtime (10k iterations) | 
-| --- | ---- | ---- | ---- |
-| 32 | 2.32 | 2.46 | |
-| 64 | 2.54 | 2.59 | |
-| 128 | 2.25 | 2.52 | |
-| 256 | 1.57 | 2.45 | | 
-| 512 | 1.33 | 2.46 | |
-| 1024 | 1.85 | 2.25 | | 
-| 2048 | 1.95 | 1.95 ||
 
-##### Table 3: zero padded convolution of input size (top row), where only (bottom row) pixel sq. is needed for output
+| 2D input | 2x size |  4096 |
+| --- | ---- | ---- |
+| 32 | 2.32 | 2.46 |
+| 64 | 2.54 | 2.59 |
+| 128 | 2.25 | 2.52 |
+| 256 | 1.57 | 2.45 |  
+| 512 | 1.33 | 2.46 |
+| 1024 | 1.85 | 2.25 |
+| 2048 | 1.95 | 1.95 |
+
+##### Table 3: cuFFT/FastFFT runtime zero padded convolution of input size (top row), where only (bottom row) pixel sq. is needed for output
 
 | | 32   |64   | 128 | 256 | 512 | 1024| 2048| 4096|
 |---- | ----    | ---- |---- |---- |---- |---- |---- |---- |
-| 16 |               1.8   | 1.75| 1.88| 1.75|1.36 | 0.93| 1.7 | 2.01   | 
-| 32 |                  | 1.56| 1.87| 1.72|1.37 | 0.92| 1.69 | 2.00   | 
-| 64 |                  | | 1.82| 1.69|1.34 | 0.91| 1.68 | 1.99   | 
-| 128|                  | | | 1.65|1.31 | 0.89| 1.64 | 1.95   | 
-| 256|                  | | | |1.24 | 0.84| 1.57 | 1.91   | 
-| 512|                  | | | | | 0.98| 1.48 | 1.84   | 
-| 1024|                 | | | | | | 1.32 | 1.69   | 
-| 2048|                 | | | | | |  | 1.48   | 
- 
+| 16 |               1.8   | 1.75| 1.88| 1.75|1.36 | 0.93| 1.7 | 2.01   |
+| 32 |                  | 1.56| 1.87| 1.72|1.37 | 0.92| 1.69 | 2.00   |
+| 64 |                  | | 1.82| 1.69|1.34 | 0.91| 1.68 | 1.99   |
+| 128|                  | | | 1.65|1.31 | 0.89| 1.64 | 1.95   |
+| 256|                  | | | |1.24 | 0.84| 1.57 | 1.91   |
+| 512|                  | | | | | 0.98| 1.48 | 1.84   |
+| 1024|                 | | | | | | 1.32 | 1.69   |
+| 2048|                 | | | | | |  | 1.48   |
 
-🍍 None of the kernels are even remotely optimized at this point, they have only been assembled and tested to pass expected behavior for FFTs of constant functions, unit impulse functions, and basic convolution ops.
+🍍 None of the kernels are optimized at this point, they have only been assembled and tested to pass expected behavior for FFTs of constant functions, unit impulse functions, and basic convolution ops.
 
 🍍 See note on previous table. The relative perf hit is not nearly as dramatic as in the previous table; however it is still about 10% which is a tough pill to swallow.
 
-##### Table 3: FFT/iFFT pairs
+##### Table 3: cuFFT/FastFFT runtime for FFT + iFFT pairs
 
 
 | 3D cubic size | cufft/FastFFT runtime (10k iterations) | With partial coalescing trick
-|----|----| ----- | 
+|----|----| ----- |
 | 16 | 0.99 | 1.5 |
 | 32 | 0.93 | 1.0 |
 | 64  |  0.55 | 0.78 |
@@ -162,7 +176,7 @@ By design, the cufft library from Nvidia returns an FFT in the natural order [TO
 * This is with a partial coalesced stride of 8, while the others were best at 16. Along with Q I'll make both of these parameters compile time template parameters rather than fixed constants.
 
 #### Table 4: Current 3D bottlenecks 512^3 (C - coalesced mem access)
-| kernel | time (ms) | Load | Store | 
+| kernel | time (ms) | Load | Store 
 |----|----|----|----|
 | R2C_NONE_XZ | 3.27 | C | N|
 | C2C_NONE_XYZ| 2.29 | C | N|
