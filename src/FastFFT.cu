@@ -1896,6 +1896,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
       case 700: { using FFT = decltype(FFT_base() + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
       case 750: { using FFT = decltype(FFT_base() + SM<750>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
       case 800: { using FFT = decltype(FFT_base() + SM<800>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+      case 860: { using FFT = decltype(FFT_base() + SM<700>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
     }
   }
   else
@@ -1911,7 +1912,9 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
           case 700: { using FFT = decltype(FFT_base()  + Size<16>()  + SM<700>() + ElementsPerThread<elements_per_thread_16>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 750: { using FFT = decltype(FFT_base()  + Size<16>()  + SM<750>() + ElementsPerThread<elements_per_thread_16>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 800: { using FFT = decltype(FFT_base()  + Size<16>()  + SM<800>() + ElementsPerThread<elements_per_thread_16>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 860: { using FFT = decltype(FFT_base()  + Size<16>()  + SM<700>() + ElementsPerThread<elements_per_thread_16>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
+        
         break; }
 
       case 32: {
@@ -1921,6 +1924,8 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
           case 700: { using FFT = decltype(FFT_base()  + Size<32>()  + SM<700>() + ElementsPerThread<elements_per_thread_32>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 750: { using FFT = decltype(FFT_base()  + Size<32>()  + SM<750>() + ElementsPerThread<elements_per_thread_32>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 800: { using FFT = decltype(FFT_base()  + Size<32>()  + SM<800>() + ElementsPerThread<elements_per_thread_32>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 860: { using FFT = decltype(FFT_base()  + Size<32>()  + SM<700>() + ElementsPerThread<elements_per_thread_32>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+
         }
         break; }
 
@@ -1931,6 +1936,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
           case 700: { using FFT = decltype(FFT_base()  + Size<64>()  + SM<700>() + ElementsPerThread<elements_per_thread_64>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 750: { using FFT = decltype(FFT_base()  + Size<64>()  + SM<750>() + ElementsPerThread<elements_per_thread_64>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 800: { using FFT = decltype(FFT_base()  + Size<64>()  + SM<800>() + ElementsPerThread<elements_per_thread_64>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 860: { using FFT = decltype(FFT_base()  + Size<64>()  + SM<700>() + ElementsPerThread<elements_per_thread_64>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
         break; }
   
@@ -1941,6 +1947,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
           case 700: { using FFT = decltype(FFT_base()  + Size<128>()  + SM<700>() + ElementsPerThread<elements_per_thread_128>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 750: { using FFT = decltype(FFT_base()  + Size<128>()  + SM<750>() + ElementsPerThread<elements_per_thread_128>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 800: { using FFT = decltype(FFT_base()  + Size<128>()  + SM<800>() + ElementsPerThread<elements_per_thread_128>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 860: { using FFT = decltype(FFT_base()  + Size<128>()  + SM<700>() + ElementsPerThread<elements_per_thread_128>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
         break; }
   
@@ -1951,6 +1958,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
           case 700: { using FFT = decltype(FFT_base()  + Size<256>()  + SM<700>() + ElementsPerThread<elements_per_thread_256>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 750: { using FFT = decltype(FFT_base()  + Size<256>()  + SM<750>() + ElementsPerThread<elements_per_thread_256>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 800: { using FFT = decltype(FFT_base()  + Size<256>()  + SM<800>() + ElementsPerThread<elements_per_thread_256>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 860: { using FFT = decltype(FFT_base()  + Size<256>()  + SM<700>() + ElementsPerThread<elements_per_thread_256>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
         break; } 
   
@@ -1961,6 +1969,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
           case 700: { using FFT = decltype(FFT_base()  + Size<512>()  + SM<700>() + ElementsPerThread<elements_per_thread_512>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 750: { using FFT = decltype(FFT_base()  + Size<512>()  + SM<750>() + ElementsPerThread<elements_per_thread_512>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 800: { using FFT = decltype(FFT_base()  + Size<512>()  + SM<800>() + ElementsPerThread<elements_per_thread_512>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 860: { using FFT = decltype(FFT_base()  + Size<512>()  + SM<700>() + ElementsPerThread<elements_per_thread_512>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
         break; } 
   
@@ -1980,6 +1989,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
           case 700: { using FFT = decltype(FFT_base()  + Size<1024>()  + SM<700>() + ElementsPerThread<elements_per_thread_1024>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 750: { using FFT = decltype(FFT_base()  + Size<1024>()  + SM<750>() + ElementsPerThread<elements_per_thread_1024>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 800: { using FFT = decltype(FFT_base()  + Size<1024>()  + SM<800>() + ElementsPerThread<elements_per_thread_1024>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 860: { using FFT = decltype(FFT_base()  + Size<1024>()  + SM<700>() + ElementsPerThread<elements_per_thread_1024>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
       break; } 
   
@@ -1999,6 +2009,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
           case 700: { using FFT = decltype(FFT_base()  + Size<2048>()  + SM<700>() + ElementsPerThread<elements_per_thread_2048>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 750: { using FFT = decltype(FFT_base()  + Size<2048>()  + SM<750>() + ElementsPerThread<elements_per_thread_2048>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 800: { using FFT = decltype(FFT_base()  + Size<2048>()  + SM<800>() + ElementsPerThread<elements_per_thread_2048>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 860: { using FFT = decltype(FFT_base()  + Size<2048>()  + SM<700>() + ElementsPerThread<elements_per_thread_2048>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
         break; } 
   
@@ -2010,6 +2021,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
           case 700: { using FFT = decltype(FFT_base()  + Size<4096>()  + SM<700>() + ElementsPerThread<elements_per_thread_4096>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           // case 750: { using FFT = decltype(FFT_base()  + Size<4096>()  + SM<750>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 800: { using FFT = decltype(FFT_base()  + Size<4096>()  + SM<800>() + ElementsPerThread<elements_per_thread_4096>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 860: { using FFT = decltype(FFT_base()  + Size<4096>()  + SM<700>() + ElementsPerThread<elements_per_thread_4096>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
         break; }  
   
@@ -2019,6 +2031,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SelectSizeAndType(K
         {
           case 700: { using FFT = decltype(FFT_base()  + Size<8192>()  + SM<700>() + ElementsPerThread<elements_per_thread_8192>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
           case 800: { using FFT = decltype(FFT_base()  + Size<8192>()  + SM<800>() + ElementsPerThread<elements_per_thread_8192>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
+          case 860: { using FFT = decltype(FFT_base()  + Size<8192>()  + SM<700>() + ElementsPerThread<elements_per_thread_8192>());  SetAndLaunchKernel<FFT>(kernel_type, do_forward_transform); break;}
         }
         break; } 
 

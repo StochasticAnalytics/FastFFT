@@ -8,9 +8,11 @@
 
 
 // When defined Turns on synchronization based checking for all FFT kernels as well as cudaErr macros
-#define HEAVYERRORCHECKING_FFT 
+// Defined in the Makefile when DEBUG_STAGE is not equal 8 (the default, not partial transforms.)
+// #define HEAVYERRORCHECKING_FFT 
+
 // Various levels of debuging conditions and prints
-#define FFT_DEBUG_LEVEL 4
+// #define FFT_DEBUG_LEVEL 0
 
 #if FFT_DEBUG_LEVEL < 1
 
@@ -215,7 +217,7 @@ void GetCudaDeviceProps( DeviceProps& dp ) {
 
   dp.device_arch = major * 100 + minor * 10;
 
-  MyFFTRunTimeAssertTrue(dp.device_arch == 700 || dp.device_arch == 750 || dp.device_arch == 800, "FastFFT currently only supports compute capability [7.0, 7.5, 8.0].");
+  MyFFTRunTimeAssertTrue(dp.device_arch == 700 || dp.device_arch == 750 || dp.device_arch == 800 || dp.device_arch ==860,  "FastFFT currently only supports compute capability [7.0, 7.5, 8.0, 8.6].");
 
 
   cudaErr( cudaDeviceGetAttribute( &dp.max_shared_memory_per_block, cudaDevAttrMaxSharedMemoryPerBlock, dp.device_id ) );
