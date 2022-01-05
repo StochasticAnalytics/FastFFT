@@ -326,8 +326,8 @@
       </a>
       <ul class="nav section-nav flex-column">
        <li class="toc-h5 nav-item toc-entry">
-        <a class="reference internal nav-link" href="#table-1-fft-ifft-pairs">
-         Table 1: FFT/iFFT pairs
+        <a class="reference internal nav-link" href="#table-1-cufft-fastfft-runtime-fft-ifft-pairs">
+         Table 1: cufft/FastFFT runtime FFT -&gt; iFFT pairs
         </a>
        </li>
       </ul>
@@ -343,8 +343,13 @@
         </a>
        </li>
        <li class="toc-h5 nav-item toc-entry">
-        <a class="reference internal nav-link" href="#table-3-cufft-fastfft-runtime-zero-padded-convolution-of-input-size-top-row-where-only-bottom-row-pixel-sq-is-needed-for-output">
-         Table 3: cuFFT/FastFFT runtime zero padded convolution of input size (top row), where only (bottom row) pixel sq. is needed for output
+        <a class="reference internal nav-link" href="#table-3-cufft-fastfft-runtime-sm70-zero-padded-convolution-of-input-size-top-row-where-only-bottom-row-pixel-sq-is-needed-for-output">
+         Table 3: cuFFT/FastFFT runtime (sm70) zero padded convolution of input size (top row), where only (bottom row) pixel sq. is needed for output
+        </a>
+       </li>
+       <li class="toc-h5 nav-item toc-entry">
+        <a class="reference internal nav-link" href="#table-4-cufft-fastfft-runtime-sm86-hack-zero-padded-convolution-of-input-size-top-row-where-only-bottom-row-pixel-sq-is-needed-for-output">
+         Table 4: cuFFT/FastFFT runtime (sm86 hack) zero padded convolution of input size (top row), where only (bottom row) pixel sq. is needed for output
         </a>
        </li>
        <li class="toc-h5 nav-item toc-entry">
@@ -491,38 +496,47 @@ algorithms.</p>
 <div class="section" id="comparing-2d-ffts-using-cufftdx-w-o-reordering">
 <h4>Comparing 2D FFTs using cufftdx w/o reordering<a class="headerlink" href="#comparing-2d-ffts-using-cufftdx-w-o-reordering" title="Permalink to this headline">¶</a></h4>
 <p>By design, the cufft library from Nvidia returns an FFT in the natural order [TODO check term] which requires two transpose operations, which in many cases seem to be optimized to reduce global memory access via vector-radix transforms. This means that the numbers we compare here are not quite apples to apples, as the result from FastFFT is transposed in memory in the Fourier domain.</p>
-<div class="section" id="table-1-fft-ifft-pairs">
-<h5>Table 1: FFT/iFFT pairs<a class="headerlink" href="#table-1-fft-ifft-pairs" title="Permalink to this headline">¶</a></h5>
+<div class="section" id="table-1-cufft-fastfft-runtime-fft-ifft-pairs">
+<h5>Table 1: cufft/FastFFT runtime FFT -&gt; iFFT pairs<a class="headerlink" href="#table-1-cufft-fastfft-runtime-fft-ifft-pairs" title="Permalink to this headline">¶</a></h5>
 <table class="colwidths-auto table">
 <thead>
 <tr class="row-odd"><th class="head"><p>2D square size</p></th>
-<th class="head"><p>cufft/FastFFT runtime (10k iterations)</p></th>
+<th class="head"><p>sm70</p></th>
+<th class="head"><p>sm86 (hack)</p></th>
 </tr>
 </thead>
 <tbody>
 <tr class="row-even"><td><p>64</p></td>
 <td><p>1.23</p></td>
+<td><p>0.93</p></td>
 </tr>
 <tr class="row-odd"><td><p>128</p></td>
 <td><p>1.36</p></td>
+<td><p>1.00</p></td>
 </tr>
 <tr class="row-even"><td><p>256</p></td>
 <td><p>1.22</p></td>
+<td><p>1.08</p></td>
 </tr>
 <tr class="row-odd"><td><p>512</p></td>
 <td><p>0.92</p></td>
+<td><p>0.89</p></td>
 </tr>
 <tr class="row-even"><td><p>1024</p></td>
 <td><p>0.69</p></td>
+<td><p>0.67</p></td>
 </tr>
 <tr class="row-odd"><td><p>2048</p></td>
 <td><p>0.95</p></td>
+<td><p>0.96</p></td>
 </tr>
 <tr class="row-even"><td><p>4096</p></td>
 <td><p>1.10</p></td>
+<td><p>1.12</p></td>
 </tr>
 </tbody>
 </table>
+<p>🍍 The sm86 hack (v0.3.1) is going to be an underestimate.</p>
 <p>🍍 None of the kernels are even remotely optimized at this point, they have only been assembled and tested to pass expected behavior for FFTs of constant functions, unit impulse functions, and basic convolution ops.</p>
 <p>🍍 The relative decrease in performance on re-org seems to  be partially due to less optimization in the kernels at compile time (kernels themselves did not change) and given the trend with size, mainly due to overhead in launch? The question is whether the trade off in ease in reading the code is worth it.</p>
 <p>:plus: Add in results for using the decomposition method for non-powers of two, more computation but fewer local memory accesses vs Bluesteins.</p>
@@ -537,42 +551,66 @@ algorithms.</p>
 <tr class="row-odd"><th class="head"><p>2D input</p></th>
 <th class="head"><p>2x size</p></th>
 <th class="head"><p>4096</p></th>
+<th class="head"><p>&lt;- sm70 sm86 -&gt;</p></th>
+<th class="head"><p>2x size</p></th>
+<th class="head"><p>4096</p></th>
 </tr>
 </thead>
 <tbody>
 <tr class="row-even"><td><p>32</p></td>
 <td><p>2.32</p></td>
 <td><p>2.46</p></td>
+<td><p></p></td>
+<td><p>2.19</p></td>
+<td><p>2.64</p></td>
 </tr>
 <tr class="row-odd"><td><p>64</p></td>
 <td><p>2.54</p></td>
 <td><p>2.59</p></td>
+<td><p></p></td>
+<td><p>2.63</p></td>
+<td><p>2.72</p></td>
 </tr>
 <tr class="row-even"><td><p>128</p></td>
 <td><p>2.25</p></td>
 <td><p>2.52</p></td>
+<td><p></p></td>
+<td><p>2.34</p></td>
+<td><p>2.73</p></td>
 </tr>
 <tr class="row-odd"><td><p>256</p></td>
 <td><p>1.57</p></td>
 <td><p>2.45</p></td>
+<td><p></p></td>
+<td><p>1.62</p></td>
+<td><p>2.70</p></td>
 </tr>
 <tr class="row-even"><td><p>512</p></td>
 <td><p>1.33</p></td>
 <td><p>2.46</p></td>
+<td><p></p></td>
+<td><p>1.33</p></td>
+<td><p>2.62</p></td>
 </tr>
 <tr class="row-odd"><td><p>1024</p></td>
 <td><p>1.85</p></td>
 <td><p>2.25</p></td>
+<td><p></p></td>
+<td><p>1.79</p></td>
+<td><p>2.43</p></td>
 </tr>
 <tr class="row-even"><td><p>2048</p></td>
 <td><p>1.95</p></td>
 <td><p>1.95</p></td>
+<td><p></p></td>
+<td><p>2.10</p></td>
+<td><p>2.10</p></td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="section" id="table-3-cufft-fastfft-runtime-zero-padded-convolution-of-input-size-top-row-where-only-bottom-row-pixel-sq-is-needed-for-output">
-<h5>Table 3: cuFFT/FastFFT runtime zero padded convolution of input size (top row), where only (bottom row) pixel sq. is needed for output<a class="headerlink" href="#table-3-cufft-fastfft-runtime-zero-padded-convolution-of-input-size-top-row-where-only-bottom-row-pixel-sq-is-needed-for-output" title="Permalink to this headline">¶</a></h5>
+<div class="section" id="table-3-cufft-fastfft-runtime-sm70-zero-padded-convolution-of-input-size-top-row-where-only-bottom-row-pixel-sq-is-needed-for-output">
+<h5>Table 3: cuFFT/FastFFT runtime (sm70) zero padded convolution of input size (top row), where only (bottom row) pixel sq. is needed for output<a class="headerlink" href="#table-3-cufft-fastfft-runtime-sm70-zero-padded-convolution-of-input-size-top-row-where-only-bottom-row-pixel-sq-is-needed-for-output" title="Permalink to this headline">¶</a></h5>
 <table class="colwidths-auto table">
 <thead>
 <tr class="row-odd"><th class="head"><p></p></th>
@@ -669,6 +707,105 @@ algorithms.</p>
 </tr>
 </tbody>
 </table>
+</div>
+<div class="section" id="table-4-cufft-fastfft-runtime-sm86-hack-zero-padded-convolution-of-input-size-top-row-where-only-bottom-row-pixel-sq-is-needed-for-output">
+<h5>Table 4: cuFFT/FastFFT runtime (sm86 hack) zero padded convolution of input size (top row), where only (bottom row) pixel sq. is needed for output<a class="headerlink" href="#table-4-cufft-fastfft-runtime-sm86-hack-zero-padded-convolution-of-input-size-top-row-where-only-bottom-row-pixel-sq-is-needed-for-output" title="Permalink to this headline">¶</a></h5>
+<table class="colwidths-auto table">
+<thead>
+<tr class="row-odd"><th class="head"><p></p></th>
+<th class="head"><p>32</p></th>
+<th class="head"><p>64</p></th>
+<th class="head"><p>128</p></th>
+<th class="head"><p>256</p></th>
+<th class="head"><p>512</p></th>
+<th class="head"><p>1024</p></th>
+<th class="head"><p>2048</p></th>
+<th class="head"><p>4096</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>16</p></td>
+<td><p>1.49</p></td>
+<td><p>1.58</p></td>
+<td><p>1.92</p></td>
+<td><p>1.46</p></td>
+<td><p>1.34</p></td>
+<td><p>1.02</p></td>
+<td><p>1.75</p></td>
+<td><p>2.02</p></td>
+</tr>
+<tr class="row-odd"><td><p>32</p></td>
+<td><p></p></td>
+<td><p>1.50</p></td>
+<td><p>1.91</p></td>
+<td><p>1.45</p></td>
+<td><p>1.33</p></td>
+<td><p>1.02</p></td>
+<td><p>1.75</p></td>
+<td><p>2.02</p></td>
+</tr>
+<tr class="row-even"><td><p>64</p></td>
+<td><p></p></td>
+<td><p></p></td>
+<td><p>1.87</p></td>
+<td><p>1.42</p></td>
+<td><p>1.31</p></td>
+<td><p>1.01</p></td>
+<td><p>1.75</p></td>
+<td><p>2.02</p></td>
+</tr>
+<tr class="row-odd"><td><p>128</p></td>
+<td><p></p></td>
+<td><p></p></td>
+<td><p></p></td>
+<td><p>1.39</p></td>
+<td><p>1.27</p></td>
+<td><p>0.99</p></td>
+<td><p>1.71</p></td>
+<td><p>2.00</p></td>
+</tr>
+<tr class="row-even"><td><p>256</p></td>
+<td><p></p></td>
+<td><p></p></td>
+<td><p></p></td>
+<td><p></p></td>
+<td><p>1.21</p></td>
+<td><p>0.93</p></td>
+<td><p>1.64</p></td>
+<td><p>1.96</p></td>
+</tr>
+<tr class="row-odd"><td><p>512</p></td>
+<td><p></p></td>
+<td><p></p></td>
+<td><p></p></td>
+<td><p></p></td>
+<td><p></p></td>
+<td><p>0.86</p></td>
+<td><p>1.53</p></td>
+<td><p>1.89</p></td>
+</tr>
+<tr class="row-even"><td><p>1024</p></td>
+<td><p></p></td>
+<td><p></p></td>
+<td><p></p></td>
+<td><p></p></td>
+<td><p></p></td>
+<td><p></p></td>
+<td><p>1.35</p></td>
+<td><p>1.74</p></td>
+</tr>
+<tr class="row-odd"><td><p>2048</p></td>
+<td><p></p></td>
+<td><p></p></td>
+<td><p></p></td>
+<td><p></p></td>
+<td><p></p></td>
+<td><p></p></td>
+<td><p></p></td>
+<td><p>1.50</p></td>
+</tr>
+</tbody>
+</table>
 <p>🍍 None of the kernels are optimized at this point, they have only been assembled and tested to pass expected behavior for FFTs of constant functions, unit impulse functions, and basic convolution ops.</p>
 <p>🍍 See note on previous table. The relative perf hit is not nearly as dramatic as in the previous table; however it is still about 10% which is a tough pill to swallow.</p>
 </div>
@@ -677,34 +814,48 @@ algorithms.</p>
 <table class="colwidths-auto table">
 <thead>
 <tr class="row-odd"><th class="head"><p>3D cubic size</p></th>
-<th class="head"><p>cufft/FastFFT runtime (10k iterations)</p></th>
-<th class="head"><p>With partial coalescing trick</p></th>
+<th class="head"><p>Unbatched</p></th>
+<th class="head"><p>partial coalescing trick</p></th>
+<th class="head"><p>&lt;-sm70 sm86 (hack)-&gt;</p></th>
+<th class="head"><p>partial coalescing trick</p></th>
 </tr>
 </thead>
 <tbody>
 <tr class="row-even"><td><p>16</p></td>
 <td><p>0.99</p></td>
 <td><p>1.5</p></td>
+<td><p></p></td>
+<td><p>1.12</p></td>
 </tr>
 <tr class="row-odd"><td><p>32</p></td>
 <td><p>0.93</p></td>
 <td><p>1.0</p></td>
+<td><p></p></td>
+<td><p>1.08</p></td>
 </tr>
 <tr class="row-even"><td><p>64</p></td>
 <td><p>0.55</p></td>
 <td><p>0.78</p></td>
+<td><p></p></td>
+<td><p>0.84</p></td>
 </tr>
 <tr class="row-odd"><td><p>128</p></td>
 <td><p>0.71</p></td>
 <td><p>0.96*</p></td>
+<td><p></p></td>
+<td><p>0.93</p></td>
 </tr>
 <tr class="row-even"><td><p>256</p></td>
 <td><p>0.47</p></td>
 <td><p>0.99</p></td>
+<td><p></p></td>
+<td><p>1.03</p></td>
 </tr>
 <tr class="row-odd"><td><p>512</p></td>
 <td><p>0.23</p></td>
 <td><p>0.97</p></td>
+<td><p></p></td>
+<td><p>1.07</p></td>
 </tr>
 </tbody>
 </table>
