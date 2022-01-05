@@ -111,17 +111,19 @@ Working with a subset of input or output points for an FFT exposes several possi
 
 By design, the cufft library from Nvidia returns an FFT in the natural order [TODO check term] which requires two transpose operations, which in many cases seem to be optimized to reduce global memory access via vector-radix transforms. This means that the numbers we compare here are not quite apples to apples, as the result from FastFFT is transposed in memory in the Fourier domain.
 
-##### Table 1: FFT/iFFT pairs
+##### Table 1: cufft/FastFFT runtime FFT -> iFFT pairs
 
-| 2D square size | cufft/FastFFT runtime (10k iterations) |
-|----|----|
-| 64  |  1.23 |
-| 128 | 1.36 | 
-| 256 | 1.22 |
-| 512 | 0.92 |
-| 1024| 0.69 |
-| 2048| 0.95 |
-| 4096| 1.10 |
+| 2D square size | sm70 | sm86 (hack) |
+|----|----|----|
+| 64  |  1.23 | 0.93 |
+| 128 | 1.36 | 1.00 |
+| 256 | 1.22 | 1.08 |
+| 512 | 0.92 | 0.89 |
+| 1024| 0.69 | 0.67 |
+| 2048| 0.95 | 0.96 |
+| 4096| 1.10 | 1.12 |
+
+🍍 The sm86 hack (v0.3.1) is going to be an underestimate.
 
 🍍 None of the kernels are even remotely optimized at this point, they have only been assembled and tested to pass expected behavior for FFTs of constant functions, unit impulse functions, and basic convolution ops.
 
@@ -134,17 +136,17 @@ By design, the cufft library from Nvidia returns an FFT in the natural order [TO
 ##### Table 2: cuFFT/FastFFT runtime for zero padded convolution
 
 
-| 2D input | 2x size |  4096 |
-| --- | ---- | ---- |
-| 32 | 2.32 | 2.46 |
-| 64 | 2.54 | 2.59 |
-| 128 | 2.25 | 2.52 |
-| 256 | 1.57 | 2.45 |  
-| 512 | 1.33 | 2.46 |
-| 1024 | 1.85 | 2.25 |
-| 2048 | 1.95 | 1.95 |
+| 2D input | 2x size |  4096 | <- sm70 sm86 -> |2x size |  4096 |
+| --- | ---- | ---- | --- | ---- | ---- |
+| 32 | 2.32 | 2.46 | | 2.19 | 2.64 |
+| 64 | 2.54 | 2.59 | | 2.63 | 2.72 |
+| 128 | 2.25 | 2.52 | | 2.34 | 2.73 |
+| 256 | 1.57 | 2.45 |   | 1.62 | 2.70 |
+| 512 | 1.33 | 2.46 | | 1.33 | 2.62 |
+| 1024 | 1.85 | 2.25 | | 1.79 | 2.43 |
+| 2048 | 1.95 | 1.95 | | 2.10| 2.10|
 
-##### Table 3: cuFFT/FastFFT runtime zero padded convolution of input size (top row), where only (bottom row) pixel sq. is needed for output
+##### Table 3: cuFFT/FastFFT runtime (sm70) zero padded convolution of input size (top row), where only (bottom row) pixel sq. is needed for output
 
 | | 32   |64   | 128 | 256 | 512 | 1024| 2048| 4096|
 |---- | ----    | ---- |---- |---- |---- |---- |---- |---- |
@@ -157,6 +159,19 @@ By design, the cufft library from Nvidia returns an FFT in the natural order [TO
 | 1024|                 | | | | | | 1.32 | 1.69   |
 | 2048|                 | | | | | |  | 1.48   |
 
+##### Table 4: cuFFT/FastFFT runtime (sm86 hack) zero padded convolution of input size (top row), where only (bottom row) pixel sq. is needed for output
+
+| | 32   |64   | 128 | 256 | 512 | 1024| 2048| 4096|
+|---- | ----    | ---- |---- |---- |---- |---- |---- |---- |
+| 16 |               1.49   | 1.58| 1.92| 1.46|1.34 | 1.02| 1.75 | 2.02   |
+| 32 |                  | 1.50| 1.91| 1.45|1.33 | 1.02| 1.75 | 2.02   |
+| 64 |                  | | 1.87| 1.42|1.31 | 1.01| 1.75 | 2.02   |
+| 128|                  | | | 1.39|1.27 | 0.99| 1.71 | 2.00   |
+| 256|                  | | | |1.21 | 0.93| 1.64 | 1.96   |
+| 512|                  | | | | | 0.86| 1.53 | 1.89   |
+| 1024|                 | | | | | | 1.35 | 1.74   |
+| 2048|                 | | | | | |  | 1.50   |
+
 🍍 None of the kernels are optimized at this point, they have only been assembled and tested to pass expected behavior for FFTs of constant functions, unit impulse functions, and basic convolution ops.
 
 🍍 See note on previous table. The relative perf hit is not nearly as dramatic as in the previous table; however it is still about 10% which is a tough pill to swallow.
@@ -164,14 +179,14 @@ By design, the cufft library from Nvidia returns an FFT in the natural order [TO
 ##### Table 3: cuFFT/FastFFT runtime for FFT + iFFT pairs
 
 
-| 3D cubic size | cufft/FastFFT runtime (10k iterations) | With partial coalescing trick
-|----|----| ----- |
-| 16 | 0.99 | 1.5 |
-| 32 | 0.93 | 1.0 |
-| 64  |  0.55 | 0.78 |
-| 128 | 0.71 |  0.96* |
-| 256 | 0.47 | 0.99 |
-| 512 | 0.23 | 0.97 |
+| 3D cubic size | Unbatched |  partial coalescing trick | <-sm70 sm86 (hack)-> | partial coalescing trick |
+|----|----| ----- |----| ----- |
+| 16 | 0.99 | 1.5 || 1.12|
+| 32 | 0.93 | 1.0 || 1.08|
+| 64  |  0.55 | 0.78 || 0.84|
+| 128 | 0.71 |  0.96* ||0.93| 
+| 256 | 0.47 | 0.99 || 1.03 |
+| 512 | 0.23 | 0.97 || 1.07|
 
 * This is with a partial coalesced stride of 8, while the others were best at 16. Along with Q I'll make both of these parameters compile time template parameters rather than fixed constants.
 

@@ -217,7 +217,7 @@ void GetCudaDeviceProps( DeviceProps& dp ) {
 
   dp.device_arch = major * 100 + minor * 10;
 
-  MyFFTRunTimeAssertTrue(dp.device_arch == 700 || dp.device_arch == 750 || dp.device_arch == 800, "FastFFT currently only supports compute capability [7.0, 7.5, 8.0].");
+  MyFFTRunTimeAssertTrue(dp.device_arch == 700 || dp.device_arch == 750 || dp.device_arch == 800 || dp.device_arch ==860,  "FastFFT currently only supports compute capability [7.0, 7.5, 8.0, 8.6].");
 
 
   cudaErr( cudaDeviceGetAttribute( &dp.max_shared_memory_per_block, cudaDevAttrMaxSharedMemoryPerBlock, dp.device_id ) );

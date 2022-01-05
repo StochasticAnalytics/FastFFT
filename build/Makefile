@@ -1,7 +1,9 @@
 NVCC=nvcc
 
 NVCC_FLAGS=-ccbin=icpc -t 4 
-NVCC_FLAGS+=--gpu-architecture=sm_70 -gencode=arch=compute_70,code=compute_70 
+# NVCC_FLAGS+=--gpu-architecture=sm_70 -gencode=arch=compute_70,code=compute_70 
+NVCC_FLAGS+=--gpu-architecture=sm_86 -gencode=arch=compute_86,code=compute_86 
+
 # NVCC_FLAGS+= -gencode arch=compute_70, code=lto_70
 #-ptxas-options=-v
 #NVCC_FLAGS+=--gpu-architecture=sm_80 -gencode=arch=compute_86,code=compute_86 --generate-code arch=compute_70,code=sm_70 --generate-code arch=compute_75,code=sm_75 --generate-code arch=compute_80,code=sm_80
