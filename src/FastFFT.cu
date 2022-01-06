@@ -983,8 +983,7 @@ void block_fft_kernel_R2C_NONE_XY(const ScalarType* __restrict__ input_values, C
 
 template<class FFT, class ComplexType, class ScalarType>
 __launch_bounds__(XZ_STRIDE*FFT::max_threads_per_block) __global__
-void block_fft_kernel_R2C_NONE_XZ(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace)
-{
+void block_fft_kernel_R2C_NONE_XZ(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace) {
   // Initialize the shared memory, assuming everyting matches the input data X size in
   using complex_type = ComplexType;
   using scalar_type  = ScalarType;
@@ -1000,28 +999,10 @@ void block_fft_kernel_R2C_NONE_XZ(const ScalarType*  __restrict__ input_values, 
   FFT().execute(thread_data, &shared_mem[threadIdx.z * FFT::shared_memory_size/sizeof(complex_type)], workspace);
   __syncthreads();
 
-  // Now we need to transpose in shared mem, fix bank conflicts later. TODO
-  {
-    const unsigned int stride = io<FFT>::stride_size();
-    unsigned int       index  = threadIdx.x;
-    for (unsigned int i = 0; i < FFT::elements_per_thread / 2; i++) 
-    {
-      // return (XZ_STRIDE*blockIdx.z + threadIdx.z) + (XZ_STRIDE*gridDim.z) * ( blockIdx.y + X * gridDim.y );
-      // XZ_STRIDE == blockDim.z
-      shared_mem[threadIdx.z + index*XZ_STRIDE] = thread_data[i];
-      index += stride;
-    }
-    constexpr unsigned int threads_per_fft        = cufftdx::size_of<FFT>::value / FFT::elements_per_thread;
-    constexpr unsigned int output_values_to_store = (cufftdx::size_of<FFT>::value / 2) + 1;
-    constexpr unsigned int values_left_to_store = threads_per_fft == 1 ? 1 : (output_values_to_store % threads_per_fft);
-    if (threadIdx.x < values_left_to_store)
-    {
-      shared_mem[threadIdx.z + index*XZ_STRIDE] = thread_data[FFT::elements_per_thread / 2];
-    }
-  }
 
-  __syncthreads();
-
+  // synchronizing 
+  io<FFT>::transpose_in_shared_XZ(shared_mem, thread_data);
+  
   // Transpose XZ, so the proper Z dimension now comes from X
   io<FFT>::store_r2c_transposed_xz_strided_Z(shared_mem, output_values);
 
@@ -1029,8 +1010,7 @@ void block_fft_kernel_R2C_NONE_XZ(const ScalarType*  __restrict__ input_values, 
 
 template<class FFT, class ComplexType, class ScalarType>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-void block_fft_kernel_R2C_INCREASE_XY(const ScalarType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace)
-{
+void block_fft_kernel_R2C_INCREASE_XY(const ScalarType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace) {
   // Initialize the shared memory, assuming everyting matches the input data X size in
   using complex_type = ComplexType;
   using scalar_type  = ScalarType;
@@ -1062,12 +1042,9 @@ void block_fft_kernel_R2C_INCREASE_XY(const ScalarType* __restrict__  input_valu
 
 
   // For the other fragments we need the initial twiddle
-  for (int sub_fft = 1; sub_fft < Q-1; sub_fft++)
-  {
-
+  for (int sub_fft = 1; sub_fft < Q-1; sub_fft++) {
       io<FFT>::copy_from_shared(shared_input, thread_data, input_MAP);
-      for (int i = 0; i < FFT::elements_per_thread; i++)
-      {
+      for (int i = 0; i < FFT::elements_per_thread; i++) {
         // Pre shift with twiddle
         SINCOS(twiddle_factor_args[i]*sub_fft,&twiddle.y,&twiddle.x);
         thread_data[i] *= twiddle;
@@ -1083,8 +1060,83 @@ void block_fft_kernel_R2C_INCREASE_XY(const ScalarType* __restrict__  input_valu
 
   // For the last fragment we need to also do a bounds check.
   io<FFT>::copy_from_shared(shared_input, thread_data, input_MAP);
-  for (int i = 0; i < FFT::elements_per_thread; i++)
-  {
+  for (int i = 0; i < FFT::elements_per_thread; i++) {
+    // Pre shift with twiddle
+    SINCOS(twiddle_factor_args[i]*(Q-1),&twiddle.y,&twiddle.x);
+    thread_data[i] *= twiddle;
+    // increment the output mapping. 
+    output_MAP[i]++;
+  }
+
+  FFT().execute(thread_data, shared_mem, workspace);
+
+  io<FFT>::store_r2c_transposed_xy(thread_data, &output_values[ ReturnZplane(blockDim.y, mem_offsets.physical_x_output)], output_MAP, gridDim.y, mem_offsets.physical_x_output);
+} 
+
+template<class FFT, class ComplexType, class ScalarType>
+__launch_bounds__(XZ_STRIDE*FFT::max_threads_per_block) __global__
+void block_fft_kernel_R2C_INCREASE_XZ(const ScalarType*  __restrict__ input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace) {
+
+  // Initialize the shared memory, assuming everyting matches the input data X size in
+  using complex_type = ComplexType;
+  using scalar_type  = ScalarType;
+  
+  // The data store is non-coalesced, so don't aggregate the data in shared mem.
+  extern __shared__  scalar_type shared_input[];
+  complex_type* shared_mem = (complex_type*)&shared_input[mem_offsets.shared_input];
+
+  // Memory used by FFT
+  complex_type twiddle;
+  complex_type thread_data[FFT::storage_size];
+
+  // To re-map the thread index to the data ... these really could be short ints, but I don't know how that will perform. TODO benchmark
+  // It is also questionable whether storing these vs, recalculating makes more sense.
+  int input_MAP[FFT::storage_size];
+  int output_MAP[FFT::storage_size];
+  float twiddle_factor_args[FFT::storage_size];  
+  
+  io<FFT>::load_r2c_shared(&input_values[Return1DFFTAddress(mem_offsets.physical_x_input)], shared_input, thread_data, twiddle_factor_args, twiddle_in, input_MAP, output_MAP, Q);
+
+
+  
+  FFT().execute(thread_data, &shared_mem[threadIdx.z * FFT::shared_memory_size/sizeof(complex_type)], workspace);
+  __syncthreads();
+  
+  // synchronizing 
+  io<FFT>::transpose_in_shared_XZ(shared_mem, thread_data);
+
+  ///////////////
+    // Transpose XZ, so the proper Z dimension now comes from X
+    io<FFT>::store_r2c_transposed_xz_strided_Z(shared_mem, output_values);
+
+  ////////////////////////
+
+/*
+
+ Much of this will need to come before the transposed xz_strided Z ()
+  io<FFT>::store_r2c_transposed_xy(thread_data, &output_values[ ReturnZplane(blockDim.y, mem_offsets.physical_x_output)], output_MAP, gridDim.y);
+
+
+  // For the other fragments we need the initial twiddle
+  for (int sub_fft = 1; sub_fft < Q-1; sub_fft++) {
+      io<FFT>::copy_from_shared(shared_input, thread_data, input_MAP);
+      for (int i = 0; i < FFT::elements_per_thread; i++) {
+        // Pre shift with twiddle
+        SINCOS(twiddle_factor_args[i]*sub_fft,&twiddle.y,&twiddle.x);
+        thread_data[i] *= twiddle;
+        // increment the output mapping. 
+        output_MAP[i]++;
+      }
+  
+      FFT().execute(thread_data, shared_mem, workspace);
+
+
+    io<FFT>::store_r2c_transposed_xy(thread_data, &output_values[ ReturnZplane(blockDim.y, mem_offsets.physical_x_output)], output_MAP, gridDim.y);
+  }
+
+  // For the last fragment we need to also do a bounds check.
+  io<FFT>::copy_from_shared(shared_input, thread_data, input_MAP);
+  for (int i = 0; i < FFT::elements_per_thread; i++) {
     // Pre shift with twiddle
     SINCOS(twiddle_factor_args[i]*(Q-1),&twiddle.y,&twiddle.x);
     thread_data[i] *= twiddle;
@@ -1096,7 +1148,8 @@ void block_fft_kernel_R2C_INCREASE_XY(const ScalarType* __restrict__  input_valu
 
   io<FFT>::store_r2c_transposed_xy(thread_data, &output_values[ ReturnZplane(blockDim.y, mem_offsets.physical_x_output)], output_MAP, gridDim.y, mem_offsets.physical_x_output);
 
-} // end of block_fft_kernel_R2C_INCREASE_XY
+  */
+}
 
 // __launch_bounds__(FFT::max_threads_per_block)  we don't know this because it is threadDim.x * threadDim.z - this could be templated if it affects performance significantly
 template<class FFT, class ComplexType, class ScalarType>
