@@ -583,7 +583,9 @@ void unit_impulse_test(std::vector<int>size, bool do_3d, bool do_increase_size)
       #elif DEBUG_FFT_STAGE == 1
         // If we are doing a fwd increase, the data will have only been expanded along the (transposed) X dimension at this point
         // So the (apparent) X is dims_in.y not dims_out.y
-        PrintArray(host_output.complex_values, dims_in.y, dims_in.z, dims_out.w);
+        if (do_3d) { std::cout << " in 3d print " << std::endl; PrintArray(host_output.complex_values, dims_in.z, dims_in.y, dims_out.w); }
+        else      PrintArray(host_output.complex_values, dims_in.y, dims_in.z, dims_out.w);        
+        
         MyTestPrintAndExit( "stage 1 " );
       #elif DEBUG_FFT_STAGE == 2
         // If we are doing a fwd increase, the data will have only been expanded along the (transposed) X dimension at this point
@@ -1404,7 +1406,9 @@ int main(int argc, char** argv)
 
     // random_image_test(test_size, false);
 
-    const_image_test(test_size_3d, do_3d);
+    // const_image_test(test_size_3d, do_3d);
+    unit_impulse_test(test_size_3d, do_3d, true);
+
     exit(0);
     do_3d = false;
     const_image_test(test_size, do_3d);
