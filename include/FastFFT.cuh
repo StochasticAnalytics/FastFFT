@@ -744,7 +744,7 @@ struct io {
         }
     }
 
-  
+    // Store a transposed tile, made up of contiguous (full) FFTS
     static inline __device__ void store_r2c_transposed_xz_strided_Z(const complex_type* shared_mem,
                                                                     complex_type*       output) {
         const unsigned int stride = stride_size();
@@ -758,6 +758,25 @@ struct io {
         constexpr unsigned int values_left_to_store = threads_per_fft == 1 ? 1 : (output_values_to_store % threads_per_fft);
         if (threadIdx.x < values_left_to_store) {
             output[Return1DFFTAddress_XZ_transpose_strided_Z(index)] = shared_mem[index];
+        }
+    }
+
+    // Store a transposed tile, made up of non-contiguous (strided partial) FFTS
+    // 
+    static inline __device__ void store_r2c_transposed_xz_strided_Z(const complex_type* shared_mem,
+                                                                    complex_type*       output,
+                                                                    const int*          output_map) {
+        const unsigned int stride = stride_size();
+        constexpr unsigned int output_values_to_store = (cufftdx::size_of<FFT>::value / 2) + 1;
+        unsigned int       index  = threadIdx.x + threadIdx.z * output_values_to_store ;
+        for (unsigned int i = 0; i < FFT::elements_per_thread / 2; i++) {
+            output[Return1DFFTAddress_XZ_transpose_strided_Z(index) + output_map[i]] = complex_type(3.14,0);//shared_mem[index];
+            index += stride;
+        }
+        constexpr unsigned int threads_per_fft        = cufftdx::size_of<FFT>::value / FFT::elements_per_thread;
+        constexpr unsigned int values_left_to_store = threads_per_fft == 1 ? 1 : (output_values_to_store % threads_per_fft);
+        if (threadIdx.x < values_left_to_store) {
+            output[Return1DFFTAddress_XZ_transpose_strided_Z(index) + output_map[FFT::elements_per_thread / 2]] = complex_type(3.14,0);//shared_mem[index];
         }
     }
 

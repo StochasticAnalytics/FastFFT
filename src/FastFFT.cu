@@ -7,7 +7,7 @@
 #include <cufftdx.hpp>
 
 
-#include "FastFFT.cuh"
+#include "../include/FastFFT.cuh"
 
 
 
@@ -403,7 +403,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::FwdFFT(bool swap_re
           break;
         }
         case increase: {
-          SetPrecisionAndExectutionMethod(r2c_increase);
+          SetPrecisionAndExectutionMethod(r2c_increase_XZ);
           transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
           // SetPrecisionAndExectutionMethod(c2c_fwd_increase_Z);   
           break;
@@ -1083,7 +1083,8 @@ void block_fft_kernel_R2C_INCREASE_XZ(const ScalarType*  __restrict__ input_valu
 
     // The data store is non-coalesced, so don't aggregate the data in shared mem.
     extern __shared__  scalar_type shared_input[];
-    complex_type* shared_mem = (complex_type*)&shared_input[mem_offsets.shared_input];
+    complex_type* shared_mem = (complex_type*)&shared_input[XZ_STRIDE * mem_offsets.shared_input]; 
+
 
     // Memory used by FFT
     complex_type twiddle;
@@ -1094,59 +1095,51 @@ void block_fft_kernel_R2C_INCREASE_XZ(const ScalarType*  __restrict__ input_valu
     int input_MAP[FFT::storage_size];
     int output_MAP[FFT::storage_size];
     float twiddle_factor_args[FFT::storage_size];  
-
-    io<FFT>::load_r2c_shared(&input_values[Return1DFFTAddress(mem_offsets.physical_x_input)], shared_input, thread_data, twiddle_factor_args, twiddle_in, input_MAP, output_MAP, Q);
+    // Note: Q is used to calculate the strided output, which in this use, will end up being an offest in Z, so
+    // we multiply by the NXY physical mem size of the OUTPUT array (which will be ZY') Then in the sub_fft loop, instead of adding one
+    // we add NXY
+    io<FFT>::load_r2c_shared(&input_values[Return1DFFTAddress_strided_Z(mem_offsets.physical_x_input)], 
+                             &shared_input[threadIdx.z * mem_offsets.shared_input], 
+                             thread_data, twiddle_factor_args, twiddle_in, input_MAP, output_MAP, Q*blockDim.z*blockDim.y);
 
     FFT().execute(thread_data, &shared_mem[threadIdx.z * FFT::shared_memory_size/sizeof(complex_type)], workspace);
-    __syncthreads();
   
-  // synchronizing 
-  io<FFT>::transpose_r2c_in_shared_XZ(shared_mem, thread_data);
+    // Now we have a partial strided output due to the transform decomposition. In the 2D case we either write it out, or coalsece it in to shared memory
+    // until we have the full output. Here, we are working on a tile, so we can transpose the data, and write it out partially coalesced.
 
-  ///////////////
-    // Transpose XZ, so the proper Z dimension now comes from X
-    io<FFT>::store_r2c_transposed_xz_strided_Z(shared_mem, output_values);
+    io<FFT>::transpose_r2c_in_shared_XZ(shared_mem, thread_data);
+    io<FFT>::store_r2c_transposed_xz_strided_Z(shared_mem, output_values, output_MAP);
 
-  ////////////////////////
+    // Now we need to loop over the remaining fragments.
+    // For the other fragments we need the initial twiddle
+    for (int sub_fft = 1; sub_fft < Q-1; sub_fft++) {
+        io<FFT>::copy_from_shared(&shared_input[threadIdx.z * mem_offsets.shared_input], thread_data, input_MAP);
+        for (int i = 0; i < FFT::elements_per_thread; i++) {
+            // Pre shift with twiddle
+            SINCOS(twiddle_factor_args[i]*sub_fft,&twiddle.y,&twiddle.x);
+            thread_data[i] *= twiddle;
+            // increment the output mapping. 
+            output_MAP[i]+=(blockDim.z*blockDim.y);
+        }
 
-/*
+        FFT().execute(thread_data, &shared_mem[threadIdx.z * FFT::shared_memory_size/sizeof(complex_type)], workspace); // FIXME the workspace is probably not going to work with the batched, look at the examples to see what to do.
+        io<FFT>::transpose_r2c_in_shared_XZ(shared_mem, thread_data); 
+        io<FFT>::store_r2c_transposed_xz_strided_Z(shared_mem, output_values, output_MAP);
+    }
 
- Much of this will need to come before the transposed xz_strided Z ()
-  io<FFT>::store_r2c_transposed_xy(thread_data, &output_values[ ReturnZplane(blockDim.y, mem_offsets.physical_x_output)], output_MAP, gridDim.y);
-
-
-  // For the other fragments we need the initial twiddle
-  for (int sub_fft = 1; sub_fft < Q-1; sub_fft++) {
-      io<FFT>::copy_from_shared(shared_input, thread_data, input_MAP);
-      for (int i = 0; i < FFT::elements_per_thread; i++) {
+    // For the last fragment we need to also do a bounds check. FIXME where does this happen
+    io<FFT>::copy_from_shared(&shared_input[threadIdx.z * mem_offsets.shared_input], thread_data, input_MAP);
+    for (int i = 0; i < FFT::elements_per_thread; i++) {
         // Pre shift with twiddle
-        SINCOS(twiddle_factor_args[i]*sub_fft,&twiddle.y,&twiddle.x);
+        SINCOS(twiddle_factor_args[i]*(Q-1),&twiddle.y,&twiddle.x);
         thread_data[i] *= twiddle;
         // increment the output mapping. 
-        output_MAP[i]++;
-      }
-  
-      FFT().execute(thread_data, shared_mem, workspace);
+        output_MAP[i]+=(blockDim.z*blockDim.y);
+    }
 
-
-    io<FFT>::store_r2c_transposed_xy(thread_data, &output_values[ ReturnZplane(blockDim.y, mem_offsets.physical_x_output)], output_MAP, gridDim.y);
-  }
-
-  // For the last fragment we need to also do a bounds check.
-  io<FFT>::copy_from_shared(shared_input, thread_data, input_MAP);
-  for (int i = 0; i < FFT::elements_per_thread; i++) {
-    // Pre shift with twiddle
-    SINCOS(twiddle_factor_args[i]*(Q-1),&twiddle.y,&twiddle.x);
-    thread_data[i] *= twiddle;
-    // increment the output mapping. 
-    output_MAP[i]++;
-  }
-
-  FFT().execute(thread_data, shared_mem, workspace);
-
-  io<FFT>::store_r2c_transposed_xy(thread_data, &output_values[ ReturnZplane(blockDim.y, mem_offsets.physical_x_output)], output_MAP, gridDim.y, mem_offsets.physical_x_output);
-
-  */
+    FFT().execute(thread_data, &shared_mem[threadIdx.z * FFT::shared_memory_size/sizeof(complex_type)], workspace); // FIXME this is not setup for tiled approach
+    io<FFT>::transpose_r2c_in_shared_XZ(shared_mem, thread_data);
+    io<FFT>::store_r2c_transposed_xz_strided_Z(shared_mem, output_values, output_MAP);
 }
 
 // __launch_bounds__(FFT::max_threads_per_block)  we don't know this because it is threadDim.x * threadDim.z - this could be templated if it affects performance significantly
@@ -2310,8 +2303,6 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
         #else
           is_in_buffer_memory = ! is_in_buffer_memory;
         #endif
-
-
            
         break;
       }
@@ -2392,6 +2383,31 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
 
         break;
       }
+
+      case r2c_increase_XZ: {
+        using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() );  
+        cudaError_t error_code = cudaSuccess;
+        auto workspace = make_workspace<FFT>(error_code);   // FIXME: I don't think this is right when XZ_STRIDE is used
+        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_increase_XZ);
+        
+        int shared_memory = XZ_STRIDE*FFT::shared_memory_size + XZ_STRIDE * LP.mem_offsets.shared_input * (unsigned int)sizeof(scalar_type);
+
+        CheckSharedMemory(shared_memory, device_properties);
+        cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_R2C_INCREASE_XZ<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+        PrintState();
+        PrintLaunchParameters(LP);
+        std::cerr << "shared_memory: " << shared_memory << std::endl;
+        #if DEBUG_FFT_STAGE > 0
+          precheck
+          block_fft_kernel_R2C_INCREASE_XZ<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+          ( scalar_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
+          postcheck 
+        #else
+          is_in_buffer_memory = ! is_in_buffer_memory;
+        #endif
+
+        break;
+      }      
 
       case c2c_fwd_none: {
 
@@ -3077,7 +3093,7 @@ LaunchParams FourierTransformer<ComputeType, InputType, OutputType>::SetLaunchPa
     L.mem_offsets.physical_x_input = fwd_dims_in.w*2; // scalar type, natural 
     L.mem_offsets.physical_x_output = fwd_dims_out.w;
 
-    if (kernel_type == r2c_none_XZ)
+    if (kernel_type == r2c_none_XZ || kernel_type == r2c_increase_XZ)
     {
       L.threadsPerBlock.z = XZ_STRIDE;
       L.gridDims.z /= XZ_STRIDE;
