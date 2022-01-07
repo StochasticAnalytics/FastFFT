@@ -125,6 +125,7 @@ static __device__ __forceinline__ unsigned int Return1DFFTAddress(const unsigned
 // Return the address of the 1D transform index 0. Right now testing for a stride of 2, but this could be modifiable if it works.
 static __device__ __forceinline__ unsigned int Return1DFFTAddress_strided_Z(const unsigned int pixel_pitch) {
     // In the current condition, threadIdx.z is either 0 || 1, and gridDim.z = size_z / 2
+    // index into a 2D tile in the XZ plane, for output in the ZX transposed plane (for coalsced write.)
     return pixel_pitch * ( blockIdx.y + (XZ_STRIDE*blockIdx.z+threadIdx.z) * gridDim.y);
 }
 
@@ -141,7 +142,7 @@ static __device__ __forceinline__ unsigned int Return1DFFTAddress_Z(const unsign
 // Return the address of the 1D transform index 0
 static __device__ __forceinline__ unsigned int Return1DFFTColumn_XYZ_transpose(const unsigned int NX) {
     // NX should be size_of<FFT>::value for this method. Should this be templated?
-    // return NX * ( ( XZ_STRIDE * blockIdx.y + threadIdx.z ) + (XZ_STRIDE * gridDim.y * blockIdx.z));
+    // presumably the XZ axis is alread transposed on the forward, used to index into this state. Indexs in (ZY)' plane for input, to be transposed and permuted to output.'   
     return NX * ( XZ_STRIDE * (blockIdx.y + gridDim.y * blockIdx.z) + threadIdx.z);
 }
 
@@ -331,7 +332,7 @@ void block_fft_kernel_C2C_NONE_XZ(const ComplexType* __restrict__  input_values,
 
 template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(XZ_STRIDE*FFT::max_threads_per_block) __global__
-void block_fft_kernel_C2C_NONE_XZY(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+void block_fft_kernel_C2C_NONE_XYZ(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
 
 
 /////////////
@@ -694,8 +695,8 @@ struct io {
 
       
     // Now we need to transpose in shared mem, fix bank conflicts later. TODO
-    static inline __device__ void transpose_in_shared_XZ(complex_type* shared_mem,
-                                                         complex_type* thread_data) {    
+    static inline __device__ void transpose_r2c_in_shared_XZ(complex_type* shared_mem,
+                                                             complex_type* thread_data) {    
         const unsigned int stride = stride_size();
         unsigned int       index  = threadIdx.x;
         for (unsigned int i = 0; i < FFT::elements_per_thread / 2; i++) {
@@ -711,6 +712,20 @@ struct io {
             shared_mem[threadIdx.z + index*XZ_STRIDE] = thread_data[FFT::elements_per_thread / 2];
         }
         __syncthreads();
+    }
+
+    // Now we need to transpose in shared mem, fix bank conflicts later. TODO
+    static inline __device__ void transpose_in_shared_XZ(complex_type* shared_mem,
+                                                         complex_type* thread_data) {
+        const unsigned int stride = io<FFT>::stride_size();
+        unsigned int       index  = threadIdx.x;
+        for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
+            // return (XZ_STRIDE*blockIdx.z + threadIdx.z) + (XZ_STRIDE*gridDim.z) * ( blockIdx.y + X * gridDim.y );
+            // XZ_STRIDE == blockDim.z
+            shared_mem[threadIdx.z + index*XZ_STRIDE] = thread_data[i];
+            index += stride;
+        }
+        __syncthreads();                                                             
     }
   
     static inline __device__ void store_r2c_transposed_xz(const complex_type* thread_data,
@@ -936,7 +951,7 @@ struct io {
 
     static inline __device__ void store(const complex_type* thread_data,
                                         complex_type*       output) {
-        const unsigned int  stride = stride_size();
+        const unsigned int stride = stride_size();
         unsigned int       index  = threadIdx.x;
         for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
             output[index] = thread_data[i];
@@ -946,8 +961,8 @@ struct io {
 
 
     static inline __device__ void store_Z(const complex_type* shared_mem,
-                                        complex_type*         output) {
-        const unsigned int  stride = stride_size();
+                                          complex_type*       output) {
+        const unsigned int stride = stride_size();
         unsigned int       index  = threadIdx.x + threadIdx.z*size_of<FFT>::value;
         for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
             output[Return1DFFTAddress_YZ_transpose_strided_Z(index)] = shared_mem[index];
@@ -959,7 +974,7 @@ struct io {
     static inline __device__ void store(const complex_type* thread_data,
                                         complex_type*       output, 
                                         unsigned int        memory_limit) {
-        const unsigned int  stride = stride_size();
+        const unsigned int stride = stride_size();
         unsigned int       index  = threadIdx.x;
         for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
         {
