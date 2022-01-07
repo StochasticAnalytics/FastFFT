@@ -231,6 +231,333 @@
         <!-- Table of contents -->
         <div class="d-none d-md-block col-md-2 bd-toc show">
             
+            <div class="tocsection onthispage pt-5 pb-3">
+                <i class="fas fa-list"></i> Contents
+            </div>
+            <nav id="bd-toc-nav" aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#layout">
+   Layout
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#summary">
+     Summary
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#logical-dimesion">
+       Logical dimesion
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#physical-dimension">
+       Physical dimension
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#offsets">
+     Offsets
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#fft-size">
+       FFT size
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#indexing-mapping-operations">
+     Indexing (mapping) operations
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#int-getsharedmempaddedindex-const-int-index">
+       <code class="docutils literal notranslate">
+        <span class="pre">
+         int
+        </span>
+        <span class="pre">
+         GetSharedMemPaddedIndex(const
+        </span>
+        <span class="pre">
+         int
+        </span>
+        <span class="pre">
+         index)
+        </span>
+       </code>
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#unsigned-int-getsharedmempaddedindex-const-unsigned-int-index">
+       <code class="docutils literal notranslate">
+        <span class="pre">
+         unsigned
+        </span>
+        <span class="pre">
+         int
+        </span>
+        <span class="pre">
+         GetSharedMemPaddedIndex(const
+        </span>
+        <span class="pre">
+         unsigned
+        </span>
+        <span class="pre">
+         int
+        </span>
+        <span class="pre">
+         index)
+        </span>
+       </code>
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#unsigned-int-return1dfftaddress-const-unsigned-int-pixel-pitch">
+       <code class="docutils literal notranslate">
+        <span class="pre">
+         unsigned
+        </span>
+        <span class="pre">
+         int
+        </span>
+        <span class="pre">
+         Return1DFFTAddress(const
+        </span>
+        <span class="pre">
+         unsigned
+        </span>
+        <span class="pre">
+         int
+        </span>
+        <span class="pre">
+         pixel_pitch)
+        </span>
+       </code>
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#unsigned-int-return1dfftaddress-strided-z-const-unsigned-int-pixel-pitch">
+       <code class="docutils literal notranslate">
+        <span class="pre">
+         unsigned
+        </span>
+        <span class="pre">
+         int
+        </span>
+        <span class="pre">
+         Return1DFFTAddress_strided_Z(const
+        </span>
+        <span class="pre">
+         unsigned
+        </span>
+        <span class="pre">
+         int
+        </span>
+        <span class="pre">
+         pixel_pitch)
+        </span>
+       </code>
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#unsigned-int-returnzplane-const-unsigned-int-nx-const-unsigned-int-ny">
+       <code class="docutils literal notranslate">
+        <span class="pre">
+         unsigned
+        </span>
+        <span class="pre">
+         int
+        </span>
+        <span class="pre">
+         ReturnZplane(const
+        </span>
+        <span class="pre">
+         unsigned
+        </span>
+        <span class="pre">
+         int
+        </span>
+        <span class="pre">
+         NX,
+        </span>
+        <span class="pre">
+         const
+        </span>
+        <span class="pre">
+         unsigned
+        </span>
+        <span class="pre">
+         int
+        </span>
+        <span class="pre">
+         NY)
+        </span>
+       </code>
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#unsigned-int-return1dfftaddress-z-const-unsigned-int-ny">
+       <code class="docutils literal notranslate">
+        <span class="pre">
+         unsigned
+        </span>
+        <span class="pre">
+         int
+        </span>
+        <span class="pre">
+         Return1DFFTAddress_Z(const
+        </span>
+        <span class="pre">
+         unsigned
+        </span>
+        <span class="pre">
+         int
+        </span>
+        <span class="pre">
+         NY)
+        </span>
+       </code>
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#unsigned-int-return1dfftcolumn-xyz-transpose-const-unsigned-int-nx">
+       <code class="docutils literal notranslate">
+        <span class="pre">
+         unsigned
+        </span>
+        <span class="pre">
+         int
+        </span>
+        <span class="pre">
+         Return1DFFTColumn_XYZ_transpose(const
+        </span>
+        <span class="pre">
+         unsigned
+        </span>
+        <span class="pre">
+         int
+        </span>
+        <span class="pre">
+         NX)
+        </span>
+       </code>
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#unsigned-int-return1dfftaddress-xz-transpose-const-unsigned-int-x">
+       <code class="docutils literal notranslate">
+        <span class="pre">
+         unsigned
+        </span>
+        <span class="pre">
+         int
+        </span>
+        <span class="pre">
+         Return1DFFTAddress_XZ_transpose(const
+        </span>
+        <span class="pre">
+         unsigned
+        </span>
+        <span class="pre">
+         int
+        </span>
+        <span class="pre">
+         X)
+        </span>
+       </code>
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#unsigned-int-return1dfftaddress-xz-transpose-strided-z-const-unsigned-int-idx">
+       <code class="docutils literal notranslate">
+        <span class="pre">
+         unsigned
+        </span>
+        <span class="pre">
+         int
+        </span>
+        <span class="pre">
+         Return1DFFTAddress_XZ_transpose_strided_Z(const
+        </span>
+        <span class="pre">
+         unsigned
+        </span>
+        <span class="pre">
+         int
+        </span>
+        <span class="pre">
+         IDX)
+        </span>
+       </code>
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#unsigned-int-return1dfftaddress-yz-transpose-strided-z-const-unsigned-int-idx">
+       <code class="docutils literal notranslate">
+        <span class="pre">
+         unsigned
+        </span>
+        <span class="pre">
+         int
+        </span>
+        <span class="pre">
+         Return1DFFTAddress_YZ_transpose_strided_Z(const
+        </span>
+        <span class="pre">
+         unsigned
+        </span>
+        <span class="pre">
+         int
+        </span>
+        <span class="pre">
+         IDX)
+        </span>
+       </code>
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#unsigned-int-return1dfftcolumn-xz-to-xy">
+       <code class="docutils literal notranslate">
+        <span class="pre">
+         unsigned
+        </span>
+        <span class="pre">
+         int
+        </span>
+        <span class="pre">
+         Return1DFFTColumn_XZ_to_XY()
+        </span>
+       </code>
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#unsigned-int-return1dfftaddress-yx">
+       <code class="docutils literal notranslate">
+        <span class="pre">
+         unsigned
+        </span>
+        <span class="pre">
+         int
+        </span>
+        <span class="pre">
+         Return1DFFTAddress_YX()
+        </span>
+       </code>
+      </a>
+     </li>
+    </ul>
+   </li>
+  </ul>
+ </li>
+</ul>
+
+            </nav>
         </div>
     </div>
 </div>
@@ -241,6 +568,123 @@
                 
   <div class="section" id="coordinate-system-conventions">
 <h1>Coordinate System Conventions<a class="headerlink" href="#coordinate-system-conventions" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="layout">
+<h2>Layout<a class="headerlink" href="#layout" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="summary">
+<h3>Summary<a class="headerlink" href="#summary" title="Permalink to this headline">¶</a></h3>
+<p>Similar to the Image and GpuImage class in <em>cis</em>TEM (link) the FourierTransformer class provides functionality to map multi-dimensional arrays onto linear memory.</p>
+<div class="section" id="logical-dimesion">
+<h4>Logical dimesion<a class="headerlink" href="#logical-dimesion" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li><p>refer to the extents (number of elements) of the data, without respect to any padding.</p></li>
+<li><p>a consumer of the FourierTransformer class only ever worries about input and output logical dimensions.</p></li>
+</ul>
+</div>
+<div class="section" id="physical-dimension">
+<h4>Physical dimension<a class="headerlink" href="#physical-dimension" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li><p>refers to the extents (number of elements) of the data in memory.</p>
+<ul>
+<li><p>for R2C, even out of place transforms, only the positive half of the physical x dimension is stored.</p></li>
+<li><p>while the constructor asks whether the input data are padded or packed, for the time being, only cuFFT/FFTW padding are handled.</p></li>
+</ul>
+</li>
+<li><p>all references to transpose and permutation of axes in the kernel names refer to the physical coordinate system, which remains fixed through the lifetime of the object.</p></li>
+</ul>
+</div>
+</div>
+<div class="section" id="offsets">
+<h3>Offsets<a class="headerlink" href="#offsets" title="Permalink to this headline">¶</a></h3>
+<p>These are used for allocating dynamic shared memory and mapping from linear memory to higher dimensional constructs.</p>
+<ul class="simple">
+<li><p>shared_input is used when the input data are to be transformed multiple times with different twiddle factors, within a kernel. Generally, this is for zero padded ffts.</p></li>
+<li><p>shared_output is used to coalesce output that are calculated with strides, again general for zero padded ffts, where the stride will be Q = N/P (see definitions for <a class="reference internal" href="#fft-size-label"><span class="std std-ref">FFT size</span></a>)</p></li>
+<li><p>physical_x_input[output] refers to the number of elements along the x-axis in physical memory, i.e. the fast contiguous dimension. May include padding.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This often does not relate to the logical dimensions, e.g. in a 2D R2C kernel ending with “XY” the physical_x_input is the input logical x dimension + padding, while the physical_x_output will be the logical y input dimension due to the implicit transpose.</p>
+</div>
+<p>defintion:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="k">typedef</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span> <span class="nc">__align__</span><span class="p">(</span><span class="mi">8</span><span class="p">)</span><span class="w"> </span><span class="n">_Offsets</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">short</span><span class="w"> </span><span class="n">shared_input</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">short</span><span class="w"> </span><span class="n">shared_output</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">short</span><span class="w"> </span><span class="n">physical_x_input</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">short</span><span class="w"> </span><span class="n">physical_x_output</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"> </span><span class="n">Offsets</span><span class="p">;</span><span class="w"></span>
+</pre></div>
+</div>
+<div class="section" id="fft-size">
+<span id="fft-size-label"></span><h4>FFT size<a class="headerlink" href="#fft-size" title="Permalink to this headline">¶</a></h4>
+<p>Describes the one-dimensional size of the FFT, and relates the information containing vs zero valued sizes. Note that the non-zero values are currently only handled for consecutive indices, however, this is not a requirement in the transform decomposition, and for movie alignment in particular.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Currently only power of 2 sizes are supported and N must be divisible by P and P == L. Checked at runtime.</p>
+</div>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="k">typedef</span><span class="w"> </span>
+<span class="w">    </span><span class="k">struct</span> <span class="nc">__align__</span><span class="p">(</span><span class="mi">8</span><span class="p">)</span><span class="w"> </span><span class="n">_FFT_Size</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="c1">// Following Sorensen &amp; Burrus 1993 for clarity</span>
+<span class="w">    </span><span class="kt">short</span><span class="w"> </span><span class="n">N</span><span class="p">;</span><span class="w"> </span><span class="c1">// N : 1d FFT size</span>
+<span class="w">    </span><span class="kt">short</span><span class="w"> </span><span class="n">L</span><span class="p">;</span><span class="w"> </span><span class="c1">// L : number of non-zero output/input points </span>
+<span class="w">    </span><span class="kt">short</span><span class="w"> </span><span class="n">P</span><span class="p">;</span><span class="w"> </span><span class="c1">// P &gt;= L &amp;&amp; N % P == 0 : The size of the sub-FFT used to compute the full transform. Currently also must be a power of 2.</span>
+<span class="w">    </span><span class="kt">short</span><span class="w"> </span><span class="n">Q</span><span class="p">;</span><span class="w"> </span><span class="c1">// Q = N/P : The number of sub-FFTs used to compute the full transform</span>
+<span class="p">}</span><span class="w"> </span><span class="n">FFT_Size</span><span class="p">;</span><span class="w"></span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="indexing-mapping-operations">
+<h3>Indexing (mapping) operations<a class="headerlink" href="#indexing-mapping-operations" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="int-getsharedmempaddedindex-const-int-index">
+<h4><code class="docutils literal notranslate"><span class="pre">int</span> <span class="pre">GetSharedMemPaddedIndex(const</span> <span class="pre">int</span> <span class="pre">index)</span></code><a class="headerlink" href="#int-getsharedmempaddedindex-const-int-index" title="Permalink to this headline">¶</a></h4>
+<p>Returns the index in the shared memory buffer that corresponds to the given index in the input data.</p>
+</div>
+<div class="section" id="unsigned-int-getsharedmempaddedindex-const-unsigned-int-index">
+<h4><code class="docutils literal notranslate"><span class="pre">unsigned</span> <span class="pre">int</span> <span class="pre">GetSharedMemPaddedIndex(const</span> <span class="pre">unsigned</span> <span class="pre">int</span> <span class="pre">index)</span></code><a class="headerlink" href="#unsigned-int-getsharedmempaddedindex-const-unsigned-int-index" title="Permalink to this headline">¶</a></h4>
+<p>Returns the index in the shared memory buffer that corresponds to the given index in the input data.</p>
+</div>
+<div class="section" id="unsigned-int-return1dfftaddress-const-unsigned-int-pixel-pitch">
+<h4><code class="docutils literal notranslate"><span class="pre">unsigned</span> <span class="pre">int</span> <span class="pre">Return1DFFTAddress(const</span> <span class="pre">unsigned</span> <span class="pre">int</span> <span class="pre">pixel_pitch)</span></code><a class="headerlink" href="#unsigned-int-return1dfftaddress-const-unsigned-int-pixel-pitch" title="Permalink to this headline">¶</a></h4>
+<p>Returns the address in memory for each 1D FFT along the fast axis of a multi-dimensional array.</p>
+</div>
+<div class="section" id="unsigned-int-return1dfftaddress-strided-z-const-unsigned-int-pixel-pitch">
+<h4><code class="docutils literal notranslate"><span class="pre">unsigned</span> <span class="pre">int</span> <span class="pre">Return1DFFTAddress_strided_Z(const</span> <span class="pre">unsigned</span> <span class="pre">int</span> <span class="pre">pixel_pitch)</span></code><a class="headerlink" href="#unsigned-int-return1dfftaddress-strided-z-const-unsigned-int-pixel-pitch" title="Permalink to this headline">¶</a></h4>
+<p>Returns the address in memory for each 1D FFT along the fast axis of a multi-dimensional array, where each block performs XZ_STRIDE ffts that are indexed into using threadIdx.z. These compose a 2D tile taken along the XZ plane which will in most cases be output to a tile in the ZX plane (transposed). The goal is for partial coalsecing on the write op.</p>
+</div>
+<div class="section" id="unsigned-int-returnzplane-const-unsigned-int-nx-const-unsigned-int-ny">
+<h4><code class="docutils literal notranslate"><span class="pre">unsigned</span> <span class="pre">int</span> <span class="pre">ReturnZplane(const</span> <span class="pre">unsigned</span> <span class="pre">int</span> <span class="pre">NX,</span> <span class="pre">const</span> <span class="pre">unsigned</span> <span class="pre">int</span> <span class="pre">NY)</span></code><a class="headerlink" href="#unsigned-int-returnzplane-const-unsigned-int-nx-const-unsigned-int-ny" title="Permalink to this headline">¶</a></h4>
+<p>Returns the address in memory of a given plane in a 3D array, determined by blockIdx.z.</p>
+</div>
+<div class="section" id="unsigned-int-return1dfftaddress-z-const-unsigned-int-ny">
+<h4><code class="docutils literal notranslate"><span class="pre">unsigned</span> <span class="pre">int</span> <span class="pre">Return1DFFTAddress_Z(const</span> <span class="pre">unsigned</span> <span class="pre">int</span> <span class="pre">NY)</span></code><a class="headerlink" href="#unsigned-int-return1dfftaddress-z-const-unsigned-int-ny" title="Permalink to this headline">¶</a></h4>
+</div>
+<div class="section" id="unsigned-int-return1dfftcolumn-xyz-transpose-const-unsigned-int-nx">
+<h4><code class="docutils literal notranslate"><span class="pre">unsigned</span> <span class="pre">int</span> <span class="pre">Return1DFFTColumn_XYZ_transpose(const</span> <span class="pre">unsigned</span> <span class="pre">int</span> <span class="pre">NX)</span></code><a class="headerlink" href="#unsigned-int-return1dfftcolumn-xyz-transpose-const-unsigned-int-nx" title="Permalink to this headline">¶</a></h4>
+<p>Returns a 1D address for any of the ffts making up a 2D tile in the physical XY plane. Depends on tIdx.z.Similar to <code class="docutils literal notranslate"><span class="pre">Return1DFFTAddress_strided_Z</span></code> but assuming the XZ axes are already transposed, i.e. the tile is in the transformed (ZY)’ plane</p>
+</div>
+<div class="section" id="unsigned-int-return1dfftaddress-xz-transpose-const-unsigned-int-x">
+<h4><code class="docutils literal notranslate"><span class="pre">unsigned</span> <span class="pre">int</span> <span class="pre">Return1DFFTAddress_XZ_transpose(const</span> <span class="pre">unsigned</span> <span class="pre">int</span> <span class="pre">X)</span></code><a class="headerlink" href="#unsigned-int-return1dfftaddress-xz-transpose-const-unsigned-int-x" title="Permalink to this headline">¶</a></h4>
+<p>Returns the address in the transposed output array, swapping XZ axes.</p>
+</div>
+<div class="section" id="unsigned-int-return1dfftaddress-xz-transpose-strided-z-const-unsigned-int-idx">
+<h4><code class="docutils literal notranslate"><span class="pre">unsigned</span> <span class="pre">int</span> <span class="pre">Return1DFFTAddress_XZ_transpose_strided_Z(const</span> <span class="pre">unsigned</span> <span class="pre">int</span> <span class="pre">IDX)</span></code><a class="headerlink" href="#unsigned-int-return1dfftaddress-xz-transpose-strided-z-const-unsigned-int-idx" title="Permalink to this headline">¶</a></h4>
+<p>Returns the address in the transposed output array, swapping XZ axes. Depends on XZ_STRIDE and tIdx.z. Used in partial coalsecing of batched transforms.</p>
+</div>
+<div class="section" id="unsigned-int-return1dfftaddress-yz-transpose-strided-z-const-unsigned-int-idx">
+<h4><code class="docutils literal notranslate"><span class="pre">unsigned</span> <span class="pre">int</span> <span class="pre">Return1DFFTAddress_YZ_transpose_strided_Z(const</span> <span class="pre">unsigned</span> <span class="pre">int</span> <span class="pre">IDX)</span></code><a class="headerlink" href="#unsigned-int-return1dfftaddress-yz-transpose-strided-z-const-unsigned-int-idx" title="Permalink to this headline">¶</a></h4>
+<p>Returns the output address in the physical XZ plane corresponding to the transformed (YZ)’ plane.</p>
+</div>
+<div class="section" id="unsigned-int-return1dfftcolumn-xz-to-xy">
+<h4><code class="docutils literal notranslate"><span class="pre">unsigned</span> <span class="pre">int</span> <span class="pre">Return1DFFTColumn_XZ_to_XY()</span></code><a class="headerlink" href="#unsigned-int-return1dfftcolumn-xz-to-xy" title="Permalink to this headline">¶</a></h4>
+<p>Called by <code class="docutils literal notranslate"><span class="pre">Return1DFFTAddress_YX()</span></code> seems to not be used, FIXME.</p>
+</div>
+<div class="section" id="unsigned-int-return1dfftaddress-yx">
+<h4><code class="docutils literal notranslate"><span class="pre">unsigned</span> <span class="pre">int</span> <span class="pre">Return1DFFTAddress_YX()</span></code><a class="headerlink" href="#unsigned-int-return1dfftaddress-yx" title="Permalink to this headline">¶</a></h4>
+<p>seems to not be used, FIXME.</p>
+</div>
+</div>
+</div>
 </div>
 
     <script type="text/x-thebe-config">
