@@ -19,4 +19,4 @@ The FourierTransformer class, in the FastFFT namespace may be used in your cpp/c
 
 
 #### Manuscript:
-The [live development of the manuscript](https://bhimes.github.io/FastFFT/_docs/MS/intro.html) is being updated regularly as of late summer 2021.
+The [live development of the manuscript](https://bhimes.github.io/FastFFT/_docs/MS/manuscript.html) is being updated regularly as of late summer 2021.
