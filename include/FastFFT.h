@@ -71,14 +71,14 @@ namespace FastFFT {
         unsigned short physical_x_output;
     } Offsets;
 
-  typedef 
-  struct __align__(64) _LaunchParams{
-    int Q;
-    float twiddle_in;
-    dim3 gridDims;
-    dim3 threadsPerBlock;
-    Offsets mem_offsets;
-  } LaunchParams;
+    typedef 
+        struct __align__(64) _LaunchParams {
+        int Q;
+        float twiddle_in;
+        dim3 gridDims;
+        dim3 threadsPerBlock;
+        Offsets mem_offsets;
+    } LaunchParams;
 
   
 

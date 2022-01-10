@@ -996,11 +996,11 @@ void block_fft_kernel_R2C_NONE_XZ(const ScalarType*  __restrict__ input_values, 
 
   io<FFT>::load_r2c(&input_values[Return1DFFTAddress_strided_Z(mem_offsets.physical_x_input)], thread_data);
 
-  FFT().execute(thread_data, &shared_mem[threadIdx.z * FFT::shared_memory_size/sizeof(complex_type)], workspace);
-  __syncthreads();
+  constexpr const unsigned int n_compute_elements = FFT::shared_memory_size/sizeof(complex_type);
+  FFT().execute(thread_data, &shared_mem[threadIdx.z * n_compute_elements], workspace);
+  __syncthreads(); // TODO: is this needed?
 
-
-  // synchronizing 
+  // memory is at least large enough to hold the output with padding. synchronizing 
   io<FFT>::transpose_r2c_in_shared_XZ(shared_mem, thread_data);
   
   // Transpose XZ, so the proper Z dimension now comes from X
@@ -1083,63 +1083,60 @@ void block_fft_kernel_R2C_INCREASE_XZ(const ScalarType*  __restrict__ input_valu
 
     // The data store is non-coalesced, so don't aggregate the data in shared mem.
     extern __shared__  scalar_type shared_input[];
-    complex_type* shared_mem = (complex_type*)&shared_input[XZ_STRIDE * mem_offsets.shared_input]; 
+    complex_type* shared_mem = (complex_type*)&shared_input[blockDim.z * mem_offsets.shared_input]; 
 
 
     // Memory used by FFT
     complex_type twiddle;
     complex_type thread_data[FFT::storage_size];
 
-    // To re-map the thread index to the data ... these really could be short ints, but I don't know how that will perform. TODO benchmark
-    // It is also questionable whether storing these vs, recalculating makes more sense.
-    int input_MAP[FFT::storage_size];
-    int output_MAP[FFT::storage_size];
+
     float twiddle_factor_args[FFT::storage_size];  
     // Note: Q is used to calculate the strided output, which in this use, will end up being an offest in Z, so
     // we multiply by the NXY physical mem size of the OUTPUT array (which will be ZY') Then in the sub_fft loop, instead of adding one
     // we add NXY
     io<FFT>::load_r2c_shared(&input_values[Return1DFFTAddress_strided_Z(mem_offsets.physical_x_input)], 
                              &shared_input[threadIdx.z * mem_offsets.shared_input], 
-                             thread_data, twiddle_factor_args, twiddle_in, input_MAP, output_MAP, Q*blockDim.z*blockDim.y);
+                             thread_data, twiddle_factor_args, twiddle_in);
 
     FFT().execute(thread_data, &shared_mem[threadIdx.z * FFT::shared_memory_size/sizeof(complex_type)], workspace);
-  
+    __syncthreads();
     // Now we have a partial strided output due to the transform decomposition. In the 2D case we either write it out, or coalsece it in to shared memory
     // until we have the full output. Here, we are working on a tile, so we can transpose the data, and write it out partially coalesced.
 
     io<FFT>::transpose_r2c_in_shared_XZ(shared_mem, thread_data);
-    io<FFT>::store_r2c_transposed_xz_strided_Z(shared_mem, output_values, output_MAP);
+    io<FFT>::store_r2c_transposed_xz_strided_Z(shared_mem, output_values, Q, 0);
 
     // Now we need to loop over the remaining fragments.
     // For the other fragments we need the initial twiddle
-    for (int sub_fft = 1; sub_fft < Q-1; sub_fft++) {
-        io<FFT>::copy_from_shared(&shared_input[threadIdx.z * mem_offsets.shared_input], thread_data, input_MAP);
+    for (int sub_fft = 1; sub_fft < Q; sub_fft++) {
+        io<FFT>::copy_from_shared(&shared_input[threadIdx.z * mem_offsets.shared_input], thread_data);
         for (int i = 0; i < FFT::elements_per_thread; i++) {
             // Pre shift with twiddle
             SINCOS(twiddle_factor_args[i]*sub_fft,&twiddle.y,&twiddle.x);
             thread_data[i] *= twiddle;
             // increment the output mapping. 
-            output_MAP[i]+=(blockDim.z*blockDim.y);
         }
 
         FFT().execute(thread_data, &shared_mem[threadIdx.z * FFT::shared_memory_size/sizeof(complex_type)], workspace); // FIXME the workspace is probably not going to work with the batched, look at the examples to see what to do.
+        __syncthreads();
         io<FFT>::transpose_r2c_in_shared_XZ(shared_mem, thread_data); 
-        io<FFT>::store_r2c_transposed_xz_strided_Z(shared_mem, output_values, output_MAP);
+        io<FFT>::store_r2c_transposed_xz_strided_Z(shared_mem, output_values, Q, sub_fft);
     }
 
-    // For the last fragment we need to also do a bounds check. FIXME where does this happen
-    io<FFT>::copy_from_shared(&shared_input[threadIdx.z * mem_offsets.shared_input], thread_data, input_MAP);
-    for (int i = 0; i < FFT::elements_per_thread; i++) {
-        // Pre shift with twiddle
-        SINCOS(twiddle_factor_args[i]*(Q-1),&twiddle.y,&twiddle.x);
-        thread_data[i] *= twiddle;
-        // increment the output mapping. 
-        output_MAP[i]+=(blockDim.z*blockDim.y);
-    }
+    // // For the last fragment we need to also do a bounds check. FIXME where does this happen
+    // io<FFT>::copy_from_shared(&shared_input[threadIdx.z * mem_offsets.shared_input], thread_data);
+    // for (int i = 0; i < FFT::elements_per_thread; i++) {
+    //     // Pre shift with twiddle
+    //     SINCOS(twiddle_factor_args[i]*(Q-1),&twiddle.y,&twiddle.x);
+    //     thread_data[i] *= twiddle;
+    //     // increment the output mapping. 
+    // }
 
-    FFT().execute(thread_data, &shared_mem[threadIdx.z * FFT::shared_memory_size/sizeof(complex_type)], workspace); // FIXME this is not setup for tiled approach
-    io<FFT>::transpose_r2c_in_shared_XZ(shared_mem, thread_data);
-    io<FFT>::store_r2c_transposed_xz_strided_Z(shared_mem, output_values, output_MAP);
+    // FFT().execute(thread_data, &shared_mem[threadIdx.z * FFT::shared_memory_size/sizeof(complex_type)], workspace); // FIXME the workspace is not setup for tiled approach
+    // __syncthreads();
+    // io<FFT>::transpose_r2c_in_shared_XZ(shared_mem, thread_data);
+    // io<FFT>::store_r2c_transposed_xz_strided_Z(shared_mem, output_values, Q, 0);
 }
 
 // __launch_bounds__(FFT::max_threads_per_block)  we don't know this because it is threadDim.x * threadDim.z - this could be templated if it affects performance significantly
@@ -2080,785 +2077,756 @@ template <class FFT_base_arch, bool use_thread_method>
 void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(KernelType kernel_type, bool do_forward_transform)
 {
 
-  using complex_type = typename FFT_base_arch::value_type;
-	using scalar_type    = typename complex_type::value_type;
+    using complex_type = typename FFT_base_arch::value_type;
+    using scalar_type    = typename complex_type::value_type;
 
-  complex_type* complex_input;
-  complex_type* complex_output;
-  scalar_type*  scalar_input;
-  scalar_type*  scalar_output;
+    complex_type* complex_input;
+    complex_type* complex_output;
+    scalar_type*  scalar_input;
+    scalar_type*  scalar_output;
 
-  // Make sure we are in the right chunk of the memory pool.
-  if (is_in_buffer_memory) 
-  {
-    complex_input  = (complex_type*)d_ptr.momentum_space_buffer;
-    complex_output = (complex_type*)d_ptr.momentum_space;
+    // Make sure we are in the right chunk of the memory pool.
+    if (is_in_buffer_memory) {
+        complex_input  = (complex_type*)d_ptr.momentum_space_buffer;
+        complex_output = (complex_type*)d_ptr.momentum_space;
 
-    scalar_input   = (scalar_type*)d_ptr.position_space_buffer;
-    scalar_output  = (scalar_type*)d_ptr.position_space;
+        scalar_input   = (scalar_type*)d_ptr.position_space_buffer;
+        scalar_output  = (scalar_type*)d_ptr.position_space;
 
-    is_in_buffer_memory = false;
-  }
-  else
-  {
-    complex_input  = (complex_type*)d_ptr.momentum_space;
-    complex_output = (complex_type*)d_ptr.momentum_space_buffer;
+        is_in_buffer_memory = false;
+    }
+    else {
+        complex_input  = (complex_type*)d_ptr.momentum_space;
+        complex_output = (complex_type*)d_ptr.momentum_space_buffer;
 
-    scalar_input   = (scalar_type*)d_ptr.position_space;
-    scalar_output  = (scalar_type*)d_ptr.position_space_buffer;
+        scalar_input   = (scalar_type*)d_ptr.position_space;
+        scalar_output  = (scalar_type*)d_ptr.position_space_buffer;
 
-    is_in_buffer_memory = true;
-  }
+        is_in_buffer_memory = true;
+    }
 
   
-  if constexpr (detail::is_operator<fft_operator::thread, FFT_base_arch>::value)
-  {
-    switch (kernel_type)
-    {
-      case r2c_decomposed: {
-
-        using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>() + Type<fft_type::c2c>() ); 
-
-        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_decomposed);  
-      
-        int shared_mem = LP.mem_offsets.shared_output * sizeof(complex_type);
-        CheckSharedMemory(shared_mem, device_properties);
-        cudaErr(cudaFuncSetAttribute((void*)thread_fft_kernel_R2C_decomposed<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem));        
-        #if DEBUG_FFT_STAGE > 0
-          precheck
-          thread_fft_kernel_R2C_decomposed<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
-          (scalar_input, complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q);
-          postcheck
-        #else
-          is_in_buffer_memory = ! is_in_buffer_memory;
-        #endif    
-        break; 
-      }
-
-      case r2c_decomposed_transposed: {
-
-        using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>() + Type<fft_type::c2c>() ); 
-
-        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_decomposed_transposed);
-      
-        int shared_mem = LP.mem_offsets.shared_output * sizeof(complex_type);
-        CheckSharedMemory(shared_mem, device_properties);
-        cudaErr(cudaFuncSetAttribute((void*)thread_fft_kernel_R2C_decomposed_transposed<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem));        
-        #if DEBUG_FFT_STAGE > 0
-          precheck
-          thread_fft_kernel_R2C_decomposed_transposed<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
-          (scalar_input, complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q);
-          postcheck
-        #else
-          is_in_buffer_memory = ! is_in_buffer_memory;
-        #endif
-
-        break; 
-      }
-    case c2r_decomposed: {
-
-      // Note that unlike the block C2R we require a C2C sub xform.
-      using FFT = decltype(FFT_base_arch() + Direction<fft_direction::inverse>() + Type<fft_type::c2c>());
-      // TODO add completeness check.
-
-      LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2r_decomposed);
-      int shared_memory = LP.mem_offsets.shared_output * sizeof(scalar_type);
-      CheckSharedMemory(shared_memory, device_properties);
-      cudaErr(cudaFuncSetAttribute((void*)thread_fft_kernel_C2R_decomposed<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
-      #if DEBUG_FFT_STAGE > 6
-        precheck
-        thread_fft_kernel_C2R_decomposed<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-        (complex_input, complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q);
-        postcheck
-      #else
-        is_in_buffer_memory = ! is_in_buffer_memory;
-      #endif
-
-      break; 
-    }
-    case c2r_decomposed_transposed: {  
-      // Note that unlike the block C2R we require a C2C sub xform.
-      using FFT = decltype(FFT_base_arch() + Direction<fft_direction::inverse>() + Type<fft_type::c2c>());
-
-      LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2r_decomposed_transposed);
-      int shared_memory = LP.mem_offsets.shared_output * sizeof(scalar_type);
-      CheckSharedMemory(shared_memory, device_properties);
-      cudaErr(cudaFuncSetAttribute((void*)thread_fft_kernel_C2R_decomposed_transposed<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
-      #if DEBUG_FFT_STAGE > 6
-        precheck
-        thread_fft_kernel_C2R_decomposed_transposed<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-        (complex_input, complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q);
-        postcheck
-      #else
-        is_in_buffer_memory = ! is_in_buffer_memory;
-      #endif
+    if constexpr (detail::is_operator<fft_operator::thread, FFT_base_arch>::value) {
     
-      break; 
+    switch (kernel_type) {
+
+        case r2c_decomposed: {
+            using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>() + Type<fft_type::c2c>() ); 
+
+            LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_decomposed);  
+            
+            int shared_mem = LP.mem_offsets.shared_output * sizeof(complex_type);
+            CheckSharedMemory(shared_mem, device_properties);
+            cudaErr(cudaFuncSetAttribute((void*)thread_fft_kernel_R2C_decomposed<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem));        
+            #if DEBUG_FFT_STAGE > 0
+                precheck
+                thread_fft_kernel_R2C_decomposed<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
+                (scalar_input, complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q);
+                postcheck
+            #else
+                is_in_buffer_memory = ! is_in_buffer_memory;
+            #endif    
+            break; 
+        }
+
+        case r2c_decomposed_transposed: {
+            using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>() + Type<fft_type::c2c>() ); 
+
+            LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_decomposed_transposed);
+            
+            int shared_mem = LP.mem_offsets.shared_output * sizeof(complex_type);
+            CheckSharedMemory(shared_mem, device_properties);
+            cudaErr(cudaFuncSetAttribute((void*)thread_fft_kernel_R2C_decomposed_transposed<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_mem));        
+            #if DEBUG_FFT_STAGE > 0
+                precheck
+                thread_fft_kernel_R2C_decomposed_transposed<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_mem, cudaStreamPerThread>> >
+                (scalar_input, complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q);
+                postcheck
+            #else
+                is_in_buffer_memory = ! is_in_buffer_memory;
+            #endif
+
+            break; 
+        }
+
+        case c2r_decomposed: {
+            // Note that unlike the block C2R we require a C2C sub xform.
+            using FFT = decltype(FFT_base_arch() + Direction<fft_direction::inverse>() + Type<fft_type::c2c>());
+            // TODO add completeness check.
+
+            LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2r_decomposed);
+            int shared_memory = LP.mem_offsets.shared_output * sizeof(scalar_type);
+            CheckSharedMemory(shared_memory, device_properties);
+            cudaErr(cudaFuncSetAttribute((void*)thread_fft_kernel_C2R_decomposed<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+            #if DEBUG_FFT_STAGE > 6
+            precheck
+            thread_fft_kernel_C2R_decomposed<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+            (complex_input, complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q);
+            postcheck
+            #else
+            is_in_buffer_memory = ! is_in_buffer_memory;
+            #endif
+
+            break; 
+        }
+
+        case c2r_decomposed_transposed: {  
+            // Note that unlike the block C2R we require a C2C sub xform.
+            using FFT = decltype(FFT_base_arch() + Direction<fft_direction::inverse>() + Type<fft_type::c2c>());
+
+            LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2r_decomposed_transposed);
+            int shared_memory = LP.mem_offsets.shared_output * sizeof(scalar_type);
+            CheckSharedMemory(shared_memory, device_properties);
+            cudaErr(cudaFuncSetAttribute((void*)thread_fft_kernel_C2R_decomposed_transposed<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+            #if DEBUG_FFT_STAGE > 6
+                precheck
+                thread_fft_kernel_C2R_decomposed_transposed<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+                (complex_input, complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q);
+                postcheck
+            #else
+                is_in_buffer_memory = ! is_in_buffer_memory;
+            #endif
+            
+            break; 
+        } 
+
+        case xcorr_decomposed: {
+
+            using    FFT = decltype( FFT_base_arch() + Type<fft_type::c2c>() + Direction<fft_direction::forward>() );  
+            using invFFT = decltype( FFT_base_arch() + Type<fft_type::c2c>() + Direction<fft_direction::inverse>() ); 
+
+            LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, xcorr_decomposed);
+
+            int shared_memory = LP.mem_offsets.shared_output * sizeof(complex_type);
+            CheckSharedMemory(shared_memory, device_properties);
+
+            // FIXME
+            bool swap_real_space_quadrants = false;
+
+            if (swap_real_space_quadrants) {
+                MyFFTRunTimeAssertTrue(false, "decomposed xcorr with swap real space quadrants is not implemented.");
+                cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul_SwapRealSpaceQuadrants<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+
+                // precheck
+                // block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul_SwapRealSpaceQuadrants<FFT,invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+                // ( (complex_type*) image_to_search, (complex_type*)  d_ptr.momentum_space_buffer,  (complex_type*) d_ptr.momentum_space, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace_fwd, workspace_inv);
+                // postcheck
+            }
+            else {
+                cudaErr(cudaFuncSetAttribute((void*)thread_fft_kernel_C2C_decomposed_ConjMul<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+
+                #if DEBUG_FFT_STAGE > 2
+                // the image_to_search pointer is set during call to CrossCorrelate,
+                precheck
+                thread_fft_kernel_C2C_decomposed_ConjMul<FFT, invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+                ( (complex_type *)d_ptr.image_to_search, complex_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q);
+                postcheck
+                #else
+                is_in_buffer_memory = ! is_in_buffer_memory;
+                #endif
+            }     
+            break; 
+        }
+
+        case c2c_decomposed: {
+            using FFT_nodir = decltype(FFT_base_arch() + Type<fft_type::c2c>() );
+
+            LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_decomposed, do_forward_transform);
+
+            if (do_forward_transform) {
+                using FFT = decltype( FFT_nodir() + Direction<fft_direction::forward>() );
+                int shared_memory = LP.mem_offsets.shared_output * sizeof(complex_type);
+                CheckSharedMemory(shared_memory, device_properties);
+                cudaErr(cudaFuncSetAttribute((void*)thread_fft_kernel_C2C_decomposed<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+                #if DEBUG_FFT_STAGE > 2
+                precheck
+                thread_fft_kernel_C2C_decomposed<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+                ( complex_input, complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q);
+                postcheck
+                #else
+                is_in_buffer_memory = ! is_in_buffer_memory;
+                #endif
+            }
+            else {
+            
+                using FFT = decltype( FFT_nodir() + Direction<fft_direction::inverse>() );
+                int shared_memory = LP.mem_offsets.shared_output * sizeof(complex_type);
+                CheckSharedMemory(shared_memory, device_properties);
+                cudaErr(cudaFuncSetAttribute((void*)thread_fft_kernel_C2C_decomposed<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+                #if DEBUG_FFT_STAGE > 4
+                precheck
+                thread_fft_kernel_C2C_decomposed<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+                ( complex_input, complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q);
+                postcheck
+                #else
+                is_in_buffer_memory = ! is_in_buffer_memory;  
+                #endif
+            }  
+            break; 
+        }  
+    }  // switch on (thread) kernel_type
     } 
-    case xcorr_decomposed: {
+    else {
 
-      using    FFT = decltype( FFT_base_arch() + Type<fft_type::c2c>() + Direction<fft_direction::forward>() );  
-      using invFFT = decltype( FFT_base_arch() + Type<fft_type::c2c>() + Direction<fft_direction::inverse>() ); 
+    switch (kernel_type) {
+        case r2c_none_XY: {
+            using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() );  
+            cudaError_t error_code = cudaSuccess;
+            auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
+            LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_none_XY);
 
-      LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, xcorr_decomposed);
+            int shared_memory = FFT::shared_memory_size;
+            CheckSharedMemory(shared_memory, device_properties);
+            cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_R2C_NONE_XY<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
 
-      int shared_memory = LP.mem_offsets.shared_output * sizeof(complex_type);
-      CheckSharedMemory(shared_memory, device_properties);
+            // cudaErr(cudaSetDevice(0));
+            //  cudaErr(cudaFuncSetCacheConfig( (void*)block_fft_kernel_R2C_NONE_XY<FFT,complex_type,scalar_type>,cudaFuncCachePreferShared ));
+            //  cudaFuncSetSharedMemConfig ( (void*)block_fft_kernel_R2C_NONE_XY<FFT,complex_type,scalar_type>, cudaSharedMemBankSizeEightByte );
 
-      // FIXME
-      bool swap_real_space_quadrants = false;
+            #if DEBUG_FFT_STAGE > 0
+                precheck
+                block_fft_kernel_R2C_NONE_XY<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+                (scalar_input, complex_output, LP.mem_offsets, workspace);
+                postcheck 
+            #else
+                is_in_buffer_memory = ! is_in_buffer_memory;
+            #endif
+                
+            break;
+        }
 
-      if (swap_real_space_quadrants)
-      {
-        MyFFTRunTimeAssertTrue(false, "decomposed xcorr with swap real space quadrants is not implemented.");
-        cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul_SwapRealSpaceQuadrants<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+        case r2c_none_XZ: {
+            using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() );  
+            cudaError_t error_code = cudaSuccess;
+            auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
+            LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_none_XZ);
 
-        // precheck
-        // block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul_SwapRealSpaceQuadrants<FFT,invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-        // ( (complex_type*) image_to_search, (complex_type*)  d_ptr.momentum_space_buffer,  (complex_type*) d_ptr.momentum_space, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace_fwd, workspace_inv);
-        // postcheck
-      }
-      else
-      {
-        cudaErr(cudaFuncSetAttribute((void*)thread_fft_kernel_C2C_decomposed_ConjMul<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+            int shared_memory = std::max(LP.threadsPerBlock.z * FFT::shared_memory_size, LP.threadsPerBlock.z * LP.mem_offsets.physical_x_output * (unsigned int)sizeof(complex_type));
+            CheckSharedMemory(shared_memory, device_properties);
 
-        #if DEBUG_FFT_STAGE > 2
-          // the image_to_search pointer is set during call to CrossCorrelate,
-          precheck
-          thread_fft_kernel_C2C_decomposed_ConjMul<FFT, invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-          ( (complex_type *)d_ptr.image_to_search, complex_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q);
-          postcheck
-        #else
-          is_in_buffer_memory = ! is_in_buffer_memory;
-        #endif
-      }
+            cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_R2C_NONE_XZ<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+
+            // cudaErr(cudaSetDevice(0));
+            //  cudaErr(cudaFuncSetCacheConfig( (void*)block_fft_kernel_R2C_NONE_XZ<FFT,complex_type,scalar_type>,cudaFuncCachePreferShared ));
+            //  cudaFuncSetSharedMemConfig ( (void*)block_fft_kernel_R2C_NONE_XZ<FFT,complex_type,scalar_type>, cudaSharedMemBankSizeEightByte );
+
+
+            #if DEBUG_FFT_STAGE > 0
+                precheck
+                block_fft_kernel_R2C_NONE_XZ<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+                (scalar_input, complex_output, LP.mem_offsets, workspace);
+                postcheck 
+            #else
+                is_in_buffer_memory = ! is_in_buffer_memory;
+            #endif
+                
+            break;
+        }          
       
-      break; 
-    }
-    case c2c_decomposed: {
-      using FFT_nodir = decltype(FFT_base_arch() + Type<fft_type::c2c>() );
+        case r2c_decrease: {
+            using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() );  
+            cudaError_t error_code = cudaSuccess;
+            auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
+            LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_decrease);
 
-      LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_decomposed, do_forward_transform);
+            // the shared mem is mixed between storage, shuffling and FFT. For this kernel we need to add padding to avoid bank conlicts (N/32)
+            int shared_memory = std::max( FFT::shared_memory_size * LP.threadsPerBlock.z, (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input/32) * (unsigned int)sizeof(complex_type));
 
-      if (do_forward_transform)
-      {
-        using FFT = decltype( FFT_nodir() + Direction<fft_direction::forward>() );
-        int shared_memory = LP.mem_offsets.shared_output * sizeof(complex_type);
-        CheckSharedMemory(shared_memory, device_properties);
-        cudaErr(cudaFuncSetAttribute((void*)thread_fft_kernel_C2C_decomposed<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
-        #if DEBUG_FFT_STAGE > 2
-          precheck
-          thread_fft_kernel_C2C_decomposed<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-          ( complex_input, complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q);
-          postcheck
-        #else
-          is_in_buffer_memory = ! is_in_buffer_memory;
-        #endif
-      }
-      else
-      {
-    
-        using FFT = decltype( FFT_nodir() + Direction<fft_direction::inverse>() );
-        int shared_memory = LP.mem_offsets.shared_output * sizeof(complex_type);
-        CheckSharedMemory(shared_memory, device_properties);
-        cudaErr(cudaFuncSetAttribute((void*)thread_fft_kernel_C2C_decomposed<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
-        #if DEBUG_FFT_STAGE > 4
-          precheck
-          thread_fft_kernel_C2C_decomposed<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-          ( complex_input, complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q);
-          postcheck
-        #else
-          is_in_buffer_memory = ! is_in_buffer_memory;  
-        #endif
-      }
-    }
-    
-    break; 
-    }    
-  }
-  else // Block
-  {
-    switch (kernel_type)
-    {
-      case r2c_none_XY: {
+            CheckSharedMemory(shared_memory, device_properties);
+            cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_R2C_DECREASE_XY<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));  
 
-        using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() );  
-        cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
-        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_none_XY);
+            #if DEBUG_FFT_STAGE > 0
+            precheck
+            block_fft_kernel_R2C_DECREASE_XY<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+            ( scalar_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
+            postcheck 
+            #else
+            is_in_buffer_memory = ! is_in_buffer_memory;
+            #endif
+            break;
+        }
 
-        int shared_memory = FFT::shared_memory_size;
-        CheckSharedMemory(shared_memory, device_properties);
-        cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_R2C_NONE_XY<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
-   
-        // cudaErr(cudaSetDevice(0));
-        //  cudaErr(cudaFuncSetCacheConfig( (void*)block_fft_kernel_R2C_NONE_XY<FFT,complex_type,scalar_type>,cudaFuncCachePreferShared ));
-        //  cudaFuncSetSharedMemConfig ( (void*)block_fft_kernel_R2C_NONE_XY<FFT,complex_type,scalar_type>, cudaSharedMemBankSizeEightByte );
+        case r2c_increase: {
+            using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() );  
+            cudaError_t error_code = cudaSuccess;
+            auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
+            LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_increase);
 
-        #if DEBUG_FFT_STAGE > 0
-          precheck
-          block_fft_kernel_R2C_NONE_XY<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-          (scalar_input, complex_output, LP.mem_offsets, workspace);
-          postcheck 
-        #else
-          is_in_buffer_memory = ! is_in_buffer_memory;
-        #endif
-           
-        break;
-      }
+            int shared_memory = LP.mem_offsets.shared_input*sizeof(scalar_type) + FFT::shared_memory_size;
 
-
-      case r2c_none_XZ: {
-
-        using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() );  
-        cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
-        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_none_XZ);
-
-        int shared_memory = std::max(XZ_STRIDE*FFT::shared_memory_size, XZ_STRIDE * LP.mem_offsets.physical_x_output * (unsigned int)sizeof(complex_type));
-        CheckSharedMemory(shared_memory, device_properties);
-
-        cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_R2C_NONE_XZ<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
-   
-        // cudaErr(cudaSetDevice(0));
-        //  cudaErr(cudaFuncSetCacheConfig( (void*)block_fft_kernel_R2C_NONE_XZ<FFT,complex_type,scalar_type>,cudaFuncCachePreferShared ));
-        //  cudaFuncSetSharedMemConfig ( (void*)block_fft_kernel_R2C_NONE_XZ<FFT,complex_type,scalar_type>, cudaSharedMemBankSizeEightByte );
-
-
-        #if DEBUG_FFT_STAGE > 0
-          precheck
-          block_fft_kernel_R2C_NONE_XZ<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-          (scalar_input, complex_output, LP.mem_offsets, workspace);
-          postcheck 
-        #else
-          is_in_buffer_memory = ! is_in_buffer_memory;
-        #endif
-           
-        break;
-      }          
-      
-      case r2c_decrease: {
-
-        using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() );  
-        cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
-        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_decrease);
-
-        // the shared mem is mixed between storage, shuffling and FFT. For this kernel we need to add padding to avoid bank conlicts (N/32)
-        int shared_memory = std::max( FFT::shared_memory_size * LP.threadsPerBlock.z, (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input/32) * (unsigned int)sizeof(complex_type));
-
-        CheckSharedMemory(shared_memory, device_properties);
-        cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_R2C_DECREASE_XY<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));  
-
-        #if DEBUG_FFT_STAGE > 0
-          precheck
-          block_fft_kernel_R2C_DECREASE_XY<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-          ( scalar_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
-          postcheck 
-        #else
-          is_in_buffer_memory = ! is_in_buffer_memory;
-        #endif
-        break;
-      }
-
-      case r2c_increase: {
-        using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() );  
-        cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
-        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_increase);
-
-        int shared_memory = LP.mem_offsets.shared_input*sizeof(scalar_type) + FFT::shared_memory_size;
-
-        CheckSharedMemory(shared_memory, device_properties);
-        cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_R2C_INCREASE_XY<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
-    
-        #if DEBUG_FFT_STAGE > 0
-          precheck
-          block_fft_kernel_R2C_INCREASE_XY<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-          ( scalar_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
-          postcheck 
-        #else
-          is_in_buffer_memory = ! is_in_buffer_memory;
-        #endif
-
-        break;
-      }
-
-      case r2c_increase_XZ: {
-        using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() );  
-        cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code);   // FIXME: I don't think this is right when XZ_STRIDE is used
-        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_increase_XZ);
+            CheckSharedMemory(shared_memory, device_properties);
+            cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_R2C_INCREASE_XY<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
         
-        int shared_memory = XZ_STRIDE*FFT::shared_memory_size + XZ_STRIDE * LP.mem_offsets.shared_input * (unsigned int)sizeof(scalar_type);
+            #if DEBUG_FFT_STAGE > 0
+            precheck
+            block_fft_kernel_R2C_INCREASE_XY<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+            ( scalar_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
+            postcheck 
+            #else
+            is_in_buffer_memory = ! is_in_buffer_memory;
+            #endif
 
-        CheckSharedMemory(shared_memory, device_properties);
-        cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_R2C_INCREASE_XZ<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
-        PrintState();
-        PrintLaunchParameters(LP);
-        std::cerr << "shared_memory: " << shared_memory << std::endl;
-        #if DEBUG_FFT_STAGE > 0
-          precheck
-          block_fft_kernel_R2C_INCREASE_XZ<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-          ( scalar_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
-          postcheck 
-        #else
-          is_in_buffer_memory = ! is_in_buffer_memory;
-        #endif
+            break;
+        }
 
-        break;
-      }      
+        case r2c_increase_XZ: {
+            using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() );  
+            cudaError_t error_code = cudaSuccess;
+            auto workspace = make_workspace<FFT>(error_code);   // FIXME: I don't think this is right when XZ_STRIDE is used
+            LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_increase_XZ);
+            
+            // We need shared memory to hold the input array(s) that is const through the kernel.
+            // We alternate using additional shared memory for the computation and the transposition of the data.
+            int shared_memory = std::max(XZ_STRIDE*FFT::shared_memory_size, LP.mem_offsets.physical_x_output / LP.Q * (unsigned int)sizeof(complex_type));
+            shared_memory += XZ_STRIDE * LP.mem_offsets.shared_input * (unsigned int)sizeof(scalar_type);
 
-      case c2c_fwd_none: {
+            CheckSharedMemory(shared_memory, device_properties);
+            cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_R2C_INCREASE_XZ<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+            PrintState();
+            PrintLaunchParameters(LP);
+            std::cerr << "shared_memory: " << shared_memory << std::endl;
+            #if DEBUG_FFT_STAGE > 0
+            precheck
+            block_fft_kernel_R2C_INCREASE_XZ<FFT,complex_type,scalar_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+            ( scalar_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
+            postcheck 
+            #else
+            is_in_buffer_memory = ! is_in_buffer_memory;
+            #endif
 
-        using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>() + Type<fft_type::c2c>() ); 
-  
-        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_fwd_none);
+            break;
+        }      
 
-        cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
-        int shared_memory = FFT::shared_memory_size;
+        case c2c_fwd_none: {
+            using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>() + Type<fft_type::c2c>() ); 
+    
+            LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_fwd_none);
 
-        #if DEBUG_FFT_STAGE > 2
-          CheckSharedMemory(shared_memory, device_properties);
-          cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_NONE<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
-          precheck
-          block_fft_kernel_C2C_NONE<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-          ( complex_input,  complex_output, LP.mem_offsets, workspace);
-          postcheck
-        #else
-          // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
-          is_in_buffer_memory = ! is_in_buffer_memory;
-        #endif
+            cudaError_t error_code = cudaSuccess;
+            auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
+            int shared_memory = FFT::shared_memory_size;
 
-        break;
-      }
+            #if DEBUG_FFT_STAGE > 2
+            CheckSharedMemory(shared_memory, device_properties);
+            cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_NONE<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+            precheck
+            block_fft_kernel_C2C_NONE<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+            ( complex_input,  complex_output, LP.mem_offsets, workspace);
+            postcheck
+            #else
+            // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
+            is_in_buffer_memory = ! is_in_buffer_memory;
+            #endif
+
+            break;
+        }
 
       case c2c_fwd_none_Z: {
-
-        using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>() + Type<fft_type::c2c>() ); 
-  
-        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_fwd_none_Z);
-
-        cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
-        int shared_memory = std::max( XZ_STRIDE * FFT::shared_memory_size, size_of<FFT>::value * (unsigned int)sizeof(complex_type) * XZ_STRIDE);
-
-        #if DEBUG_FFT_STAGE > 1
-          CheckSharedMemory(shared_memory, device_properties);
-          cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_NONE_XYZ<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory)); 
-          precheck
-          block_fft_kernel_C2C_NONE_XYZ<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-          ( complex_input,  complex_output, LP.mem_offsets, workspace);
-          postcheck
-        #else
-          // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
-          is_in_buffer_memory = ! is_in_buffer_memory;
-        #endif
-
-        break;
-      }
-
-      case c2c_fwd_decrease: {
-
-        using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() );  
-        cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
-        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_fwd_decrease);
-
-        #if DEBUG_FFT_STAGE > 2
-          // the shared mem is mixed between storage, shuffling and FFT. For this kernel we need to add padding to avoid bank conlicts (N/32)
-          // For decrease methods, the shared_input > shared_output
-          int shared_memory = std::max( FFT::shared_memory_size * LP.threadsPerBlock.z, (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input/32) * (unsigned int)sizeof(complex_type));
-
-          CheckSharedMemory(shared_memory, device_properties);
-          cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_DECREASE<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
-      
-          precheck
-          block_fft_kernel_C2C_DECREASE<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-          ( complex_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
-          postcheck 
-        #else
-          // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
-          is_in_buffer_memory = ! is_in_buffer_memory;
-        #endif
-
-        break;
-      }
-      case c2c_fwd_increase: {
-  
-        using FFT = decltype(FFT_base_arch() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() );  
-  
-        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_fwd_increase);
-        
-        cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;        
-        // cudaErr(cudaFuncSetCacheConfig( (void*)block_fft_kernel_C2C_INCREASE<FFT,complex_type>,cudaFuncCachePreferShared ));
-          // cudaFuncSetSharedMemConfig ( (void*)block_fft_kernel_C2C_INCREASE<FFT,complex_type>, cudaSharedMemBankSizeEightByte )
-        #if DEBUG_FFT_STAGE > 2
-          int shared_memory;
-          // Aggregate the transformed frequency data in shared memory so that we can write to global coalesced.
-          shared_memory = LP.mem_offsets.shared_output*sizeof(complex_type) + LP.mem_offsets.shared_input*sizeof(complex_type) + FFT::shared_memory_size;
-
-          CheckSharedMemory(shared_memory, device_properties);
+            using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>() + Type<fft_type::c2c>() ); 
     
-          // std::cout << "shared_memory " << shared_memory << std::endl;
-          // When it is the output dims being smaller, may need a logical or different method
-          //FIXME
-          bool swap_real_space_quadrants = false;
-          if (swap_real_space_quadrants)
-          {
-            MyFFTRunTimeAssertTrue(false, "c2c_fwd_increase with swap_real_space_quadrants == true, is not yet implemented.");
-            cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_INCREASE_SwapRealSpaceQuadrants<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));
+            LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_fwd_none_Z);
 
+            cudaError_t error_code = cudaSuccess;
+            auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
+            int shared_memory = std::max( XZ_STRIDE * FFT::shared_memory_size, size_of<FFT>::value * (unsigned int)sizeof(complex_type) * XZ_STRIDE);
+
+            #if DEBUG_FFT_STAGE > 1
+            CheckSharedMemory(shared_memory, device_properties);
+            cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_NONE_XYZ<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory)); 
             precheck
-            block_fft_kernel_C2C_INCREASE_SwapRealSpaceQuadrants<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+            block_fft_kernel_C2C_NONE_XYZ<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+            ( complex_input,  complex_output, LP.mem_offsets, workspace);
+            postcheck
+            #else
+            // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
+            is_in_buffer_memory = ! is_in_buffer_memory;
+            #endif
+
+            break;
+        }
+
+        case c2c_fwd_decrease: {
+
+            using FFT = decltype( FFT_base_arch() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() );  
+            cudaError_t error_code = cudaSuccess;
+            auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
+            LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_fwd_decrease);
+
+            #if DEBUG_FFT_STAGE > 2
+            // the shared mem is mixed between storage, shuffling and FFT. For this kernel we need to add padding to avoid bank conlicts (N/32)
+            // For decrease methods, the shared_input > shared_output
+            int shared_memory = std::max( FFT::shared_memory_size * LP.threadsPerBlock.z, (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input/32) * (unsigned int)sizeof(complex_type));
+
+            CheckSharedMemory(shared_memory, device_properties);
+            cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_DECREASE<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+        
+            precheck
+            block_fft_kernel_C2C_DECREASE<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
             ( complex_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
-            postcheck
-          }
-          else
-          {
-            cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_INCREASE<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));
+            postcheck 
+            #else
+            // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
+            is_in_buffer_memory = ! is_in_buffer_memory;
+            #endif
 
-            precheck
-            block_fft_kernel_C2C_INCREASE<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-            ( complex_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
-            postcheck
-          }
-        #else
-          // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
-          is_in_buffer_memory = ! is_in_buffer_memory;
-        #endif
-             
-        // do something
-        break; 
-      }
+            break;
+        }   
 
-
-
-      case c2c_inv_none: {
-
-        using FFT = decltype( FFT_base_arch() + Type<fft_type::c2c>() + Direction<fft_direction::inverse>() );
-
-  
-        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_inv_none);
-
-        cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;        
-        
-          int shared_memory = FFT::shared_memory_size;
-
-          CheckSharedMemory(shared_memory, device_properties);
-          cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_NONE<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
-        #if DEBUG_FFT_STAGE > 4  
-          precheck
-          block_fft_kernel_C2C_NONE<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-          ( complex_input, complex_output, LP.mem_offsets, workspace);
-          postcheck
-        #else
-          // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
-          is_in_buffer_memory = ! is_in_buffer_memory;         
-        #endif
-        
-      
-        // do something
-        break; 
-      }
-      
-      case c2c_inv_none_XZ: {
-
-        using FFT = decltype( FFT_base_arch() + Type<fft_type::c2c>() + Direction<fft_direction::inverse>() );
-
-  
-        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_inv_none_XZ);
-
-        cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;        
-
-          int shared_memory = std::max(FFT::shared_memory_size * XZ_STRIDE, size_of<FFT>::value * (unsigned int)sizeof(complex_type) * XZ_STRIDE);
-
-          CheckSharedMemory(shared_memory, device_properties);
-          cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_NONE_XZ<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
-        #if DEBUG_FFT_STAGE > 4  
-          precheck
-          block_fft_kernel_C2C_NONE_XZ<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-          ( complex_input, complex_output, LP.mem_offsets, workspace);
-          postcheck
-        #else
-          // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
-          is_in_buffer_memory = ! is_in_buffer_memory;         
-        #endif
-        
-      
-        // do something
-        break; 
-      }
-      case c2c_inv_none_Z: {
-
-        using FFT = decltype( FFT_base_arch() + Direction<fft_direction::inverse>() + Type<fft_type::c2c>() ); 
-  
-        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_inv_none_Z);
-
-        cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
-        int shared_memory = std::max( XZ_STRIDE * FFT::shared_memory_size, size_of<FFT>::value * (unsigned int)sizeof(complex_type) * XZ_STRIDE);
-
-        #if DEBUG_FFT_STAGE > 5
-          CheckSharedMemory(shared_memory, device_properties);
-          cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_NONE_XYZ<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory)); 
-          precheck
-          block_fft_kernel_C2C_NONE_XYZ<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-          ( complex_input,  complex_output, LP.mem_offsets, workspace);
-          postcheck
-        #else
-          // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
-          is_in_buffer_memory = ! is_in_buffer_memory;
-        #endif
-
-        break;
-      }
-
-      case c2c_inv_decrease: {
-
-        using FFT = decltype( FFT_base_arch() + Direction<fft_direction::inverse>()+ Type<fft_type::c2c>() );  
-        cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
-        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_inv_decrease);
-
-        #if DEBUG_FFT_STAGE > 4
-          // the shared mem is mixed between storage, shuffling and FFT. For this kernel we need to add padding to avoid bank conlicts (N/32)
-          // For decrease methods, the shared_input > shared_output
-          int shared_memory = std::max( FFT::shared_memory_size * LP.threadsPerBlock.z, (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input/32) * (unsigned int)sizeof(complex_type));
-
-          CheckSharedMemory(shared_memory, device_properties);
-          cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_DECREASE<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
-      
-          precheck
-          block_fft_kernel_C2C_DECREASE<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-          ( complex_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
-          postcheck 
-        #else
-          // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
-          is_in_buffer_memory = ! is_in_buffer_memory;
-        #endif
-
-        break;
-      }
-
-      case c2c_inv_increase: {
-        MyFFTRunTimeAssertTrue(false, "c2c_inv_increase is not yet implemented.");
-
-        #if DEBUG_FFT_STAGE > 4
-        #else
-          // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
-          is_in_buffer_memory = ! is_in_buffer_memory;
-        #endif
-
-        break;
-      }
-
-      case c2r_none: {
-  
-        using FFT = decltype(FFT_base_arch() + Direction<fft_direction::inverse>()+ Type<fft_type::c2r>() ); 
-  
-        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2r_none);
-      
-        cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;        cudaErr(error_code);
-
-        int shared_memory = FFT::shared_memory_size;
-
-        CheckSharedMemory(shared_memory, device_properties);
-        cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2R_NONE<FFT,complex_type, scalar_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));  
-        #if DEBUG_FFT_STAGE > 6
-          precheck
-          block_fft_kernel_C2R_NONE<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-          ( complex_input, scalar_output, LP.mem_offsets, workspace);
-          postcheck
-        #else
-          is_in_buffer_memory = ! is_in_buffer_memory;
-        #endif
-  
-        break; 
-      }
-
-      case c2r_none_XY: {
-  
-        using FFT = decltype(FFT_base_arch() + Direction<fft_direction::inverse>()+ Type<fft_type::c2r>() ); 
-  
-        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2r_none_XY);
-      
-        cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;        cudaErr(error_code);
-
-        int shared_memory = FFT::shared_memory_size;
-
-        CheckSharedMemory(shared_memory, device_properties);
-        cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2R_NONE_XY<FFT,complex_type, scalar_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));  
-        #if DEBUG_FFT_STAGE > 6
-          precheck
-          block_fft_kernel_C2R_NONE_XY<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-          ( complex_input, scalar_output, LP.mem_offsets, workspace);
-          postcheck
-        #else
-          is_in_buffer_memory = ! is_in_buffer_memory;
-        #endif
-  
-        break; 
-      }
-
-      case c2r_decrease: {
-        using FFT = decltype(FFT_base_arch() + Direction<fft_direction::inverse>()+ Type<fft_type::c2r>() ); 
-  
-        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2r_decrease);
-      
-        cudaError_t error_code = cudaSuccess;
-        auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;        cudaErr(error_code);
-
-        int shared_memory = std::max( FFT::shared_memory_size * LP.gridDims.z , (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input/32) * (unsigned int)sizeof(complex_type));
-
-        CheckSharedMemory(shared_memory, device_properties);
-        cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2R_DECREASE_XY<FFT,complex_type, scalar_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory)); 
-
-
-        #if DEBUG_FFT_STAGE > 6
-          precheck
-          block_fft_kernel_C2R_DECREASE_XY<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-          ( complex_input, scalar_output, LP.mem_offsets, LP.twiddle_in, LP.Q, workspace);
-          postcheck
-
-          transform_stage_completed = TransformStageCompleted::inv;
-        #else
-          is_in_buffer_memory = ! is_in_buffer_memory;  
-        #endif
-   
-        break;
-      }
-
-      case c2r_increase: {
-        MyFFTRunTimeAssertTrue(false, "c2r_increase is not yet implemented.");
-        break;
-      }
-
-      case xcorr_fwd_increase_inv_none: {
-  
-        using FFT    = decltype( FFT_base_arch() + Type<fft_type::c2c>() + Direction<fft_direction::forward>() ); 
-        using invFFT = decltype( FFT_base_arch() + Type<fft_type::c2c>() + Direction<fft_direction::inverse>() ); 
-          
-        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, xcorr_fwd_increase_inv_none);
-
-        cudaError_t error_code = cudaSuccess;
-        auto workspace_fwd = make_workspace<FFT>(error_code); // presumably larger of the two
-        cudaErr(error_code);
-        error_code = cudaSuccess;
-        auto workspace_inv = make_workspace<invFFT>(error_code); // presumably larger of the two
-        cudaErr(error_code);
-  
-        int shared_memory = invFFT::shared_memory_size;
-        CheckSharedMemory(shared_memory, device_properties);
-          // cudaErr(cudaFuncSetCacheConfig( (void*)block_fft_kernel_C2C_INCREASE<FFT,complex_type>,cudaFuncCachePreferShared ));
-          // cudaFuncSetSharedMemConfig ( (void*)block_fft_kernel_C2C_INCREASE<FFT,complex_type>, cudaSharedMemBankSizeEightByte );  
-        // FIXME
-        #if DEBUG_FFT_STAGE > 2
-          bool swap_real_space_quadrants = false;   
-          if (swap_real_space_quadrants)
-          {
-            MyFFTRunTimeAssertTrue(false, "Swapping real space quadrants is not yet implemented.");
-            // cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul_SwapRealSpaceQuadrants<FFT,invFFT, complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
-
-            // precheck
-            // block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul_SwapRealSpaceQuadrants<FFT,invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-            // ( (complex_type *)d_ptr.image_to_search, complex_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace_fwd, workspace_inv);
-            // postcheck
-          }
-          else
-          {
-
-            cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul<FFT, invFFT, complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
-            precheck
-
-            // Right now, because of the n_threads == size_of<FFT> requirement, we are explicitly zero padding, so we need to send an "apparent Q" to know the input size.
-            // Could send the actual size, but later when converting to use the transform decomp with different sized FFTs this will be a more direct conversion.
-            int apperent_Q = size_of<FFT>::value / fwd_dims_in.y;
-   
-            block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul<FFT, invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-            ( (complex_type *)d_ptr.image_to_search, complex_input, complex_output , LP.mem_offsets,apperent_Q, workspace_fwd, workspace_inv);
-            postcheck
-          }
-        #else
-          is_in_buffer_memory = ! is_in_buffer_memory;
-        #endif
+        case c2c_fwd_increase: {
+            using FFT = decltype(FFT_base_arch() + Direction<fft_direction::forward>()+ Type<fft_type::c2c>() );  
+    
+            LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_fwd_increase);
             
-        // do something
-        break; 
-      }
+            cudaError_t error_code = cudaSuccess;
+            auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;        
+            // cudaErr(cudaFuncSetCacheConfig( (void*)block_fft_kernel_C2C_INCREASE<FFT,complex_type>,cudaFuncCachePreferShared ));
+            // cudaFuncSetSharedMemConfig ( (void*)block_fft_kernel_C2C_INCREASE<FFT,complex_type>, cudaSharedMemBankSizeEightByte )
+            #if DEBUG_FFT_STAGE > 2
+            int shared_memory;
+            // Aggregate the transformed frequency data in shared memory so that we can write to global coalesced.
+            shared_memory = LP.mem_offsets.shared_output*sizeof(complex_type) + LP.mem_offsets.shared_input*sizeof(complex_type) + FFT::shared_memory_size;
 
-      case xcorr_fwd_none_inv_decrease: {
-        using FFT    = decltype( FFT_base_arch() + Type<fft_type::c2c>() + Direction<fft_direction::forward>() ); 
-        using invFFT = decltype( FFT_base_arch() + Type<fft_type::c2c>() + Direction<fft_direction::inverse>() ); 
-          
-        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, xcorr_fwd_none_inv_decrease);
-  
-        cudaError_t error_code = cudaSuccess;
-        auto workspace_fwd = make_workspace<FFT>(error_code); // presumably larger of the two
-        cudaErr(error_code);
-        error_code = cudaSuccess;
-        auto workspace_inv = make_workspace<invFFT>(error_code); // presumably larger of the two
-        cudaErr(error_code);
-  
-        // Max shared memory needed to store the full 1d fft remaining on the forward transform
-        unsigned int shared_memory = FFT::shared_memory_size + (unsigned int)sizeof(complex_type) * LP.mem_offsets.physical_x_input;
-        // shared_memory = std::max( shared_memory, std::max( invFFT::shared_memory_size * LP.threadsPerBlock.z, (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input/32) * (unsigned int)sizeof(complex_type)));
-
-        CheckSharedMemory(shared_memory, device_properties);
- 
+            CheckSharedMemory(shared_memory, device_properties);
         
-          // cudaErr(cudaFuncSetCacheConfig( (void*)block_fft_kernel_C2C_INCREASE<FFT,complex_type>,cudaFuncCachePreferShared ));
-          // cudaFuncSetSharedMemConfig ( (void*)block_fft_kernel_C2C_INCREASE<FFT,complex_type>, cudaSharedMemBankSizeEightByte );  
-        // FIXME
-        #if DEBUG_FFT_STAGE > 2
+            // std::cout << "shared_memory " << shared_memory << std::endl;
+            // When it is the output dims being smaller, may need a logical or different method
+            //FIXME
+            bool swap_real_space_quadrants = false;
+            if (swap_real_space_quadrants) {
+                MyFFTRunTimeAssertTrue(false, "c2c_fwd_increase with swap_real_space_quadrants == true, is not yet implemented.");
+                cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_INCREASE_SwapRealSpaceQuadrants<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));
 
+                precheck
+                block_fft_kernel_C2C_INCREASE_SwapRealSpaceQuadrants<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+                ( complex_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
+                postcheck
+            }
+            else {
+                cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_INCREASE<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));
 
-          bool swap_real_space_quadrants = false;   
-          if (swap_real_space_quadrants)
-          {
-            // cudaErr(cudaFuncSetAttribute((void*)_INV_DECREASE_ConjMul_SwapRealSpaceQuadrants<FFT,invFFT, complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
-            MyFFTDebugAssertFalse(swap_real_space_quadrants, "Swap real space quadrants not yet implemented in xcorr_fwd_none_inv_decrease.");
+                precheck
+                block_fft_kernel_C2C_INCREASE<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+                ( complex_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
+                postcheck
+            }
+            #else
+            // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
+            is_in_buffer_memory = ! is_in_buffer_memory;
+            #endif
+                
+            // do something
+            break; 
+        }
 
-            // precheck
-            // _INV_DECREASE_ConjMul_SwapRealSpaceQuadrants<FFT,invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-            // ( (complex_type *)d_ptr.image_to_search, complex_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace_fwd, workspace_inv);
-            // postcheck
-          }
-          else
-          {
-            cudaErr(cudaFuncSetAttribute((void*)_INV_DECREASE_ConjMul<FFT, invFFT, complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
-            // Right now, because of the n_threads == size_of<FFT> requirement, we are explicitly zero padding, so we need to send an "apparent Q" to know the input size.
-            // Could send the actual size, but later when converting to use the transform decomp with different sized FFTs this will be a more direct conversion.
-            int apparent_Q = size_of<FFT>::value / inv_dims_out.y;
-            precheck
-            _INV_DECREASE_ConjMul<FFT, invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-            ( (complex_type *)d_ptr.image_to_search, complex_input, complex_output , LP.mem_offsets, LP.twiddle_in, apparent_Q, workspace_fwd, workspace_inv);
-            postcheck
-          }
-          transform_stage_completed = TransformStageCompleted::fwd;
+        case c2c_inv_none: {
+            using FFT = decltype( FFT_base_arch() + Type<fft_type::c2c>() + Direction<fft_direction::inverse>() );
 
-        #else
-          is_in_buffer_memory = ! is_in_buffer_memory;
-        #endif
+            LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_inv_none);
+
+            cudaError_t error_code = cudaSuccess;
+            auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;        
             
-        // do something
-        break; 
-      } // end case xcorr_fwd_none_inv_decrease    
-      default:
-        // throw something
-        break;
-  
-    }
-  }
+                int shared_memory = FFT::shared_memory_size;
+
+                CheckSharedMemory(shared_memory, device_properties);
+                cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_NONE<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+            #if DEBUG_FFT_STAGE > 4  
+                precheck
+                block_fft_kernel_C2C_NONE<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+                ( complex_input, complex_output, LP.mem_offsets, workspace);
+                postcheck
+            #else
+                // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
+                is_in_buffer_memory = ! is_in_buffer_memory;         
+            #endif
+            
+            
+            // do something
+            break; 
+        }
+      
+        case c2c_inv_none_XZ: {
+            using FFT = decltype( FFT_base_arch() + Type<fft_type::c2c>() + Direction<fft_direction::inverse>() );
+
+
+            LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_inv_none_XZ);
+
+            cudaError_t error_code = cudaSuccess;
+            auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;        
+
+                int shared_memory = std::max(FFT::shared_memory_size * XZ_STRIDE, size_of<FFT>::value * (unsigned int)sizeof(complex_type) * XZ_STRIDE);
+
+                CheckSharedMemory(shared_memory, device_properties);
+                cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_NONE_XZ<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+            #if DEBUG_FFT_STAGE > 4  
+                precheck
+                block_fft_kernel_C2C_NONE_XZ<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+                ( complex_input, complex_output, LP.mem_offsets, workspace);
+                postcheck
+            #else
+                // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
+                is_in_buffer_memory = ! is_in_buffer_memory;         
+            #endif
+            
+            // do something
+            break; 
+        }
+
+        case c2c_inv_none_Z: {
+            using FFT = decltype( FFT_base_arch() + Direction<fft_direction::inverse>() + Type<fft_type::c2c>() ); 
+
+            LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_inv_none_Z);
+
+            cudaError_t error_code = cudaSuccess;
+            auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
+            int shared_memory = std::max( XZ_STRIDE * FFT::shared_memory_size, size_of<FFT>::value * (unsigned int)sizeof(complex_type) * XZ_STRIDE);
+
+            #if DEBUG_FFT_STAGE > 5
+                CheckSharedMemory(shared_memory, device_properties);
+                cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_NONE_XYZ<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory)); 
+                precheck
+                block_fft_kernel_C2C_NONE_XYZ<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+                ( complex_input,  complex_output, LP.mem_offsets, workspace);
+                postcheck
+            #else
+                // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
+                is_in_buffer_memory = ! is_in_buffer_memory;
+            #endif
+
+            break;
+        }
+
+        case c2c_inv_decrease: {
+            using FFT = decltype( FFT_base_arch() + Direction<fft_direction::inverse>()+ Type<fft_type::c2c>() );  
+            cudaError_t error_code = cudaSuccess;
+            auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
+            LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_inv_decrease);
+
+            #if DEBUG_FFT_STAGE > 4
+                // the shared mem is mixed between storage, shuffling and FFT. For this kernel we need to add padding to avoid bank conlicts (N/32)
+                // For decrease methods, the shared_input > shared_output
+                int shared_memory = std::max( FFT::shared_memory_size * LP.threadsPerBlock.z, (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input/32) * (unsigned int)sizeof(complex_type));
+
+                CheckSharedMemory(shared_memory, device_properties);
+                cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_DECREASE<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+            
+                precheck
+                block_fft_kernel_C2C_DECREASE<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+                ( complex_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace);
+                postcheck 
+            #else
+                // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
+                is_in_buffer_memory = ! is_in_buffer_memory;
+            #endif
+
+            break;
+        }
+
+        case c2c_inv_increase: {
+            MyFFTRunTimeAssertTrue(false, "c2c_inv_increase is not yet implemented.");
+
+            #if DEBUG_FFT_STAGE > 4
+            #else
+                // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
+                is_in_buffer_memory = ! is_in_buffer_memory;
+            #endif
+
+            break;
+        }
+
+        case c2r_none: {
+            using FFT = decltype(FFT_base_arch() + Direction<fft_direction::inverse>()+ Type<fft_type::c2r>() ); 
+
+            LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2r_none);
+            
+            cudaError_t error_code = cudaSuccess;
+            auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;        cudaErr(error_code);
+
+            int shared_memory = FFT::shared_memory_size;
+
+            CheckSharedMemory(shared_memory, device_properties);
+            cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2R_NONE<FFT,complex_type, scalar_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));  
+            #if DEBUG_FFT_STAGE > 6
+                precheck
+                block_fft_kernel_C2R_NONE<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+                ( complex_input, scalar_output, LP.mem_offsets, workspace);
+                postcheck
+            #else
+                is_in_buffer_memory = ! is_in_buffer_memory;
+            #endif
+
+            break; 
+        }
+
+        case c2r_none_XY: {
+            using FFT = decltype(FFT_base_arch() + Direction<fft_direction::inverse>()+ Type<fft_type::c2r>() ); 
+
+            LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2r_none_XY);
+            
+            cudaError_t error_code = cudaSuccess;
+            auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;        cudaErr(error_code);
+
+            int shared_memory = FFT::shared_memory_size;
+
+            CheckSharedMemory(shared_memory, device_properties);
+            cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2R_NONE_XY<FFT,complex_type, scalar_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));  
+            #if DEBUG_FFT_STAGE > 6
+                precheck
+                block_fft_kernel_C2R_NONE_XY<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+                ( complex_input, scalar_output, LP.mem_offsets, workspace);
+                postcheck
+            #else
+                is_in_buffer_memory = ! is_in_buffer_memory;
+            #endif
+
+            break; 
+        }
+
+        case c2r_decrease: {
+            using FFT = decltype(FFT_base_arch() + Direction<fft_direction::inverse>()+ Type<fft_type::c2r>() ); 
+
+            LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2r_decrease);
+            
+            cudaError_t error_code = cudaSuccess;
+            auto workspace = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;        cudaErr(error_code);
+
+            int shared_memory = std::max( FFT::shared_memory_size * LP.gridDims.z , (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input/32) * (unsigned int)sizeof(complex_type));
+
+            CheckSharedMemory(shared_memory, device_properties);
+            cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2R_DECREASE_XY<FFT,complex_type, scalar_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory)); 
+
+
+            #if DEBUG_FFT_STAGE > 6
+                precheck
+                block_fft_kernel_C2R_DECREASE_XY<FFT, complex_type, scalar_type><< <LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+                ( complex_input, scalar_output, LP.mem_offsets, LP.twiddle_in, LP.Q, workspace);
+                postcheck
+
+                transform_stage_completed = TransformStageCompleted::inv;
+            #else
+                is_in_buffer_memory = ! is_in_buffer_memory;  
+            #endif
+
+            break;
+        }
+
+        case c2r_increase: {
+            MyFFTRunTimeAssertTrue(false, "c2r_increase is not yet implemented.");
+            break;
+        }
+
+        case xcorr_fwd_increase_inv_none: {
+            using FFT    = decltype( FFT_base_arch() + Type<fft_type::c2c>() + Direction<fft_direction::forward>() ); 
+            using invFFT = decltype( FFT_base_arch() + Type<fft_type::c2c>() + Direction<fft_direction::inverse>() ); 
+                
+            LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, xcorr_fwd_increase_inv_none);
+
+            cudaError_t error_code = cudaSuccess;
+            auto workspace_fwd = make_workspace<FFT>(error_code); // presumably larger of the two
+            cudaErr(error_code);
+            error_code = cudaSuccess;
+            auto workspace_inv = make_workspace<invFFT>(error_code); // presumably larger of the two
+            cudaErr(error_code);
+
+            int shared_memory = invFFT::shared_memory_size;
+            CheckSharedMemory(shared_memory, device_properties);
+                // cudaErr(cudaFuncSetCacheConfig( (void*)block_fft_kernel_C2C_INCREASE<FFT,complex_type>,cudaFuncCachePreferShared ));
+                // cudaFuncSetSharedMemConfig ( (void*)block_fft_kernel_C2C_INCREASE<FFT,complex_type>, cudaSharedMemBankSizeEightByte );  
+                // FIXME
+            #if DEBUG_FFT_STAGE > 2
+                bool swap_real_space_quadrants = false;   
+                if (swap_real_space_quadrants) {
+                MyFFTRunTimeAssertTrue(false, "Swapping real space quadrants is not yet implemented.");
+                // cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul_SwapRealSpaceQuadrants<FFT,invFFT, complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+
+                // precheck
+                // block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul_SwapRealSpaceQuadrants<FFT,invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+                // ( (complex_type *)d_ptr.image_to_search, complex_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace_fwd, workspace_inv);
+                // postcheck
+                }
+                else {
+
+                cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul<FFT, invFFT, complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+                precheck
+
+                // Right now, because of the n_threads == size_of<FFT> requirement, we are explicitly zero padding, so we need to send an "apparent Q" to know the input size.
+                // Could send the actual size, but later when converting to use the transform decomp with different sized FFTs this will be a more direct conversion.
+                int apperent_Q = size_of<FFT>::value / fwd_dims_in.y;
+
+                block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul<FFT, invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+                ( (complex_type *)d_ptr.image_to_search, complex_input, complex_output , LP.mem_offsets,apperent_Q, workspace_fwd, workspace_inv);
+                postcheck
+                }
+            #else
+                is_in_buffer_memory = ! is_in_buffer_memory;
+            #endif
+                
+            // do something
+            break; 
+        }
+
+        case xcorr_fwd_none_inv_decrease: {
+            using FFT    = decltype( FFT_base_arch() + Type<fft_type::c2c>() + Direction<fft_direction::forward>() ); 
+            using invFFT = decltype( FFT_base_arch() + Type<fft_type::c2c>() + Direction<fft_direction::inverse>() ); 
+                
+            LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, xcorr_fwd_none_inv_decrease);
+
+            cudaError_t error_code = cudaSuccess;
+            auto workspace_fwd = make_workspace<FFT>(error_code); // presumably larger of the two
+            cudaErr(error_code);
+            error_code = cudaSuccess;
+            auto workspace_inv = make_workspace<invFFT>(error_code); // presumably larger of the two
+            cudaErr(error_code);
+
+            // Max shared memory needed to store the full 1d fft remaining on the forward transform
+            unsigned int shared_memory = FFT::shared_memory_size + (unsigned int)sizeof(complex_type) * LP.mem_offsets.physical_x_input;
+            // shared_memory = std::max( shared_memory, std::max( invFFT::shared_memory_size * LP.threadsPerBlock.z, (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input/32) * (unsigned int)sizeof(complex_type)));
+
+            CheckSharedMemory(shared_memory, device_properties);
+
+            
+                // cudaErr(cudaFuncSetCacheConfig( (void*)block_fft_kernel_C2C_INCREASE<FFT,complex_type>,cudaFuncCachePreferShared ));
+                // cudaFuncSetSharedMemConfig ( (void*)block_fft_kernel_C2C_INCREASE<FFT,complex_type>, cudaSharedMemBankSizeEightByte );  
+            // FIXME
+            #if DEBUG_FFT_STAGE > 2
+                bool swap_real_space_quadrants = false;   
+                if (swap_real_space_quadrants) {                    
+                    // cudaErr(cudaFuncSetAttribute((void*)_INV_DECREASE_ConjMul_SwapRealSpaceQuadrants<FFT,invFFT, complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+                    MyFFTDebugAssertFalse(swap_real_space_quadrants, "Swap real space quadrants not yet implemented in xcorr_fwd_none_inv_decrease.");
+
+                    // precheck
+                    // _INV_DECREASE_ConjMul_SwapRealSpaceQuadrants<FFT,invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+                    // ( (complex_type *)d_ptr.image_to_search, complex_input, complex_output, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace_fwd, workspace_inv);
+                    // postcheck
+                }
+                else {
+                    cudaErr(cudaFuncSetAttribute((void*)_INV_DECREASE_ConjMul<FFT, invFFT, complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+                    // Right now, because of the n_threads == size_of<FFT> requirement, we are explicitly zero padding, so we need to send an "apparent Q" to know the input size.
+                    // Could send the actual size, but later when converting to use the transform decomp with different sized FFTs this will be a more direct conversion.
+                    int apparent_Q = size_of<FFT>::value / inv_dims_out.y;
+                    precheck
+                    _INV_DECREASE_ConjMul<FFT, invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+                    ( (complex_type *)d_ptr.image_to_search, complex_input, complex_output , LP.mem_offsets, LP.twiddle_in, apparent_Q, workspace_fwd, workspace_inv);
+                    postcheck
+                }
+                transform_stage_completed = TransformStageCompleted::fwd;
+
+            #else
+                is_in_buffer_memory = ! is_in_buffer_memory;
+            #endif
+                
+            // do something
+            break; 
+        } // end case xcorr_fwd_none_inv_decrease    
+            default:
+            // throw something
+            break;
+    
+    } // block switch.
+    } // constexpr if on thread/block
 
   // 
-} // end set and launc kernel
+} // end set and launch kernel
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Some helper functions that are annoyingly long to have in the header.
