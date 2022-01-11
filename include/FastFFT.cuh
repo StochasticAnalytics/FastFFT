@@ -154,7 +154,22 @@ static __device__ __forceinline__ unsigned int Return1DFFTAddress_XZ_transpose(c
 // Return the address of the 1D transform index 0
 static __device__ __forceinline__ unsigned int Return1DFFTAddress_XZ_transpose_strided_Z(const unsigned int IDX) {
     // return (XZ_STRIDE*blockIdx.z + (X % XZ_STRIDE)) + (XZ_STRIDE*gridDim.z) * ( blockIdx.y + (X / XZ_STRIDE) * gridDim.y );
+    // (IDX % XZ_STRIDE) -> transposed x coordinate in tile
+    // ((blockIdx.z*XZ_STRIDE) -> tile offest in physical X (with above gives physical X out (transposed Z))
+    // (XZ_STRIDE*gridDim.z) -> n elements in physical X (transposed Z)
+    // above * blockIdx.y -> offset in physical Y (transposed Y)
+    // (IDX / XZ_STRIDE) -> n elements physical Z (transposed X)
     return ((IDX % XZ_STRIDE) + (blockIdx.z*XZ_STRIDE)) + (XZ_STRIDE*gridDim.z) * ( blockIdx.y + (IDX / XZ_STRIDE) * gridDim.y );
+}
+
+static __device__ __forceinline__ unsigned int Return1DFFTAddress_XZ_transpose_strided_Z(const unsigned int IDX, const unsigned int Q, const unsigned int sub_fft) {
+    // return (XZ_STRIDE*blockIdx.z + (X % XZ_STRIDE)) + (XZ_STRIDE*gridDim.z) * ( blockIdx.y + (X / XZ_STRIDE) * gridDim.y );
+    // (IDX % XZ_STRIDE) -> transposed x coordinate in tile
+    // ((blockIdx.z*XZ_STRIDE) -> tile offest in physical X (with above gives physical X out (transposed Z))
+    // (XZ_STRIDE*gridDim.z) -> n elements in physical X (transposed Z)
+    // above * blockIdx.y -> offset in physical Y (transposed Y)
+    // (IDX / XZ_STRIDE) -> n elements physical Z (transposed X)
+    return ((IDX % XZ_STRIDE) + (blockIdx.z*XZ_STRIDE)) + (XZ_STRIDE*gridDim.z) * ( blockIdx.y + ((IDX / XZ_STRIDE) * Q + sub_fft) * gridDim.y );
 }
 
 // Return the address of the 1D transform index 0
@@ -162,6 +177,12 @@ static __device__ __forceinline__ unsigned int Return1DFFTAddress_YZ_transpose_s
     // return (XZ_STRIDE*blockIdx.z + (X % XZ_STRIDE)) + (XZ_STRIDE*gridDim.z) * ( blockIdx.y + (X / XZ_STRIDE) * gridDim.y );
     return ((IDX % XZ_STRIDE) + (blockIdx.y*XZ_STRIDE)) + (gridDim.y*XZ_STRIDE) * ( blockIdx.z + (IDX / XZ_STRIDE) * gridDim.z );
 }  
+
+// Return the address of the 1D transform index 0
+static __device__ __forceinline__ unsigned int Return1DFFTAddress_YZ_transpose_strided_Z(const unsigned int IDX, const unsigned int Q, const unsigned int sub_fft) {
+    // return (XZ_STRIDE*blockIdx.z + (X % XZ_STRIDE)) + (XZ_STRIDE*gridDim.z) * ( blockIdx.y + (X / XZ_STRIDE) * gridDim.y );
+    return ((IDX % XZ_STRIDE) + (blockIdx.y*XZ_STRIDE)) + (gridDim.y*XZ_STRIDE) * ( blockIdx.z + ((IDX / XZ_STRIDE) * Q + sub_fft) * gridDim.z );
+} 
 
 // Return the address of the 1D transform index 0
 static __device__ __forceinline__ unsigned int Return1DFFTColumn_XZ_to_XY() {
@@ -334,7 +355,9 @@ template<class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(XZ_STRIDE*FFT::max_threads_per_block) __global__
 void block_fft_kernel_C2C_NONE_XYZ(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
 
-
+template<class FFT, class ComplexType = typename FFT::value_type>
+__launch_bounds__(XZ_STRIDE*FFT::max_threads_per_block) __global__
+void block_fft_kernel_C2C_INCREASE_XYZ(const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 /////////////
 // C2R 
 /////////////
@@ -479,79 +502,46 @@ struct io {
         }
     } 
 
-    // expected to be in between R2C (so transposed) and C2C
-    static inline __device__ void load_Z(const complex_type* input,
-                                         complex_type*       thread_data) {
+        // Since we can make repeated use of the same shared memory for each sub-fft
+    // we use this method to load into shared mem instead of directly to registers
+    // TODO set this up for async mem load
+    static inline __device__ void load_shared(const complex_type* input,
+                                              complex_type*       shared_input,
+                                              complex_type*       thread_data,
+                                              float*              twiddle_factor_args,
+                                              float               twiddle_in) {
         const unsigned int stride = stride_size();
-        unsigned int       index  =  threadIdx.x; // 1d index
+        unsigned int       index  =  threadIdx.x;
         for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
-            // The inline method is poorly named, based on utiltity in store_r2c_transposed_XZ
-            
-            thread_data[i] = input[index];
-            index += stride;
-        }
-    } 
-
-    // expected to be in between R2C (so transposed) and C2C
-    static inline __device__ void load_Z(const complex_type* input,
-                                            complex_type*       thread_data,
-                                            const unsigned int  input_pitch_xy) {
-        const unsigned int stride = stride_size();
-        unsigned int       index  =  threadIdx.x; // 1d index
-        for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
-            // The inline method is poorly named, based on utiltity in store_r2c_transposed_XZ
-            
-            thread_data[i] = input[index*input_pitch_xy];
-            index += stride;
-        }
-    } 
-
-    // expected to be in between R2C (so transposed) and C2C
-    static inline __device__ void load_shared_Z(const complex_type* input,
-                                                complex_type*       shared_input,
-                                                complex_type*       thread_data,
-                                                float*               twiddle_factor_args,
-                                                float                twiddle_in,
-                                                int*                input_map,
-                                                int*                output_map,
-                                                int                  Q,
-                                                const unsigned int  input_pitch_xy) {
-        const unsigned int stride = stride_size();
-        unsigned int       index  =  threadIdx.x; // 1d index
-        for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
-            input_map[i] = index;
-            output_map[i] = Q*index + (blockIdx.z * input_pitch_xy);
             twiddle_factor_args[i] = twiddle_in * index;
-            thread_data[i] = input[index + (blockIdx.z * input_pitch_xy)];
+            thread_data[i] = input[index];
             shared_input[index] = thread_data[i];
             index += stride;
         }
-    }
+    } 
 
     static inline __device__ void load_shared(const complex_type* input,
                                               complex_type*       shared_input,
                                               complex_type*       thread_data,
-                                              float*               twiddle_factor_args,
-                                              float                twiddle_in,
+                                              float*              twiddle_factor_args,
+                                              float               twiddle_in,
                                               int*                input_map,
                                               int*                output_map,
-                                              int                  Q,
+                                              int                 Q,
                                               int                 number_of_elements) {
         const unsigned int stride = stride_size();
         unsigned int       index  =  threadIdx.x;
         for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
-            if (index < number_of_elements)
-            {
-            input_map[i] = index;
-            output_map[i] = Q*index;
-            twiddle_factor_args[i] = twiddle_in * index;
-            thread_data[i] = input[index];
-            shared_input[index] = thread_data[i];
-            index += stride;
+            if (index < number_of_elements) {
+                input_map[i] = index;
+                output_map[i] = Q*index;
+                twiddle_factor_args[i] = twiddle_in * index;
+                thread_data[i] = input[index];
+                shared_input[index] = thread_data[i];
+                index += stride;
             }
-            else
-            {
-            input_map[i] = -9999; // ignore this in subsequent ops
+            else {
+                input_map[i] = -9999; // ignore this in subsequent ops
             }
         }
     }
@@ -581,6 +571,25 @@ struct io {
         }
     }
 
+    // Since we can make repeated use of the same shared memory for each sub-fft
+    // we use this method to load into shared mem instead of directly to registers
+    // TODO set this up for async mem load - alternatively, load to registers then copy but leave in register for firt compute
+    static inline __device__ void load_r2c_shared(const scalar_type*  input,
+                                                  scalar_type*        shared_input,
+                                                  complex_type*       thread_data,
+                                                  float*              twiddle_factor_args,
+                                                  float               twiddle_in) {
+        const unsigned int stride = stride_size();
+        unsigned int       index  = threadIdx.x;
+        for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
+            twiddle_factor_args[i] = twiddle_in * index;
+            thread_data[i].x = input[index];
+            thread_data[i].y = 0.0f;
+            shared_input[index] =  thread_data[i].x;
+            index += stride;
+        }
+    }    
+
     static inline __device__ void load_r2c_shared_and_pad(const scalar_type*  input,
                                                         complex_type*       shared_mem) {
         const unsigned int stride = stride_size();
@@ -593,8 +602,8 @@ struct io {
     } 
 
     static inline __device__ void copy_from_shared(const complex_type*  shared_mem,
-                                                    complex_type*        thread_data,
-                                                    const unsigned int   Q) {
+                                                   complex_type*        thread_data,
+                                                   const unsigned int   Q) {
         const unsigned int stride = stride_size() * Q; // I think the Q is needed, but double check me TODO
         unsigned int       index  = (threadIdx.x * Q) + threadIdx.z;
         for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
@@ -679,6 +688,27 @@ struct io {
         }
     }
 
+    static inline __device__ void copy_from_shared(const scalar_type* shared_input,
+                                                   complex_type*      thread_data) {
+        const unsigned int stride = stride_size();
+        unsigned int       index  = threadIdx.x;
+        for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
+            thread_data[i].x = shared_input[index];
+            thread_data[i].y = 0.0f;
+            index += stride;
+        }
+    }
+
+    static inline __device__ void copy_from_shared(const complex_type* shared_input_complex,
+                                                   complex_type*      thread_data) {
+        const unsigned int stride = stride_size();
+        unsigned int       index  = threadIdx.x;                                                       
+        for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
+            thread_data[i] = shared_input_complex[index];
+            index += stride;
+        }
+    }    
+
     static inline __device__ void load_shared_and_conj_multiply(const complex_type*  image_to_search,
                                                                 complex_type*        thread_data) {
         const unsigned int stride = stride_size();
@@ -694,34 +724,34 @@ struct io {
     }
 
       
-    // Now we need to transpose in shared mem, fix bank conflicts later. TODO
+    // Now we need send to shared mem and transpose on the way
+    // TODO: fix bank conflicts later. 
     static inline __device__ void transpose_r2c_in_shared_XZ(complex_type* shared_mem,
                                                              complex_type* thread_data) {    
         const unsigned int stride = stride_size();
         unsigned int       index  = threadIdx.x;
         for (unsigned int i = 0; i < FFT::elements_per_thread / 2; i++) {
-            // return (XZ_STRIDE*blockIdx.z + threadIdx.z) + (XZ_STRIDE*gridDim.z) * ( blockIdx.y + X * gridDim.y );
-            // XZ_STRIDE == blockDim.z
-            shared_mem[threadIdx.z + index*XZ_STRIDE] = thread_data[i];
+            shared_mem[threadIdx.z + index * XZ_STRIDE] = thread_data[i];
             index += stride;
         }
         constexpr unsigned int threads_per_fft        = cufftdx::size_of<FFT>::value / FFT::elements_per_thread;
         constexpr unsigned int output_values_to_store = (cufftdx::size_of<FFT>::value / 2) + 1;
         constexpr unsigned int values_left_to_store = threads_per_fft == 1 ? 1 : (output_values_to_store % threads_per_fft);
         if (threadIdx.x < values_left_to_store) {
-            shared_mem[threadIdx.z + index*XZ_STRIDE] = thread_data[FFT::elements_per_thread / 2];
+            shared_mem[threadIdx.z + index * XZ_STRIDE] = thread_data[FFT::elements_per_thread / 2];
         }
         __syncthreads();
     }
 
-    // Now we need to transpose in shared mem, fix bank conflicts later. TODO
+    // Now we need send to shared mem and transpose on the way
+    // TODO: fix bank conflicts later.     
     static inline __device__ void transpose_in_shared_XZ(complex_type* shared_mem,
                                                          complex_type* thread_data) {
         const unsigned int stride = io<FFT>::stride_size();
         unsigned int       index  = threadIdx.x;
         for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
             // return (XZ_STRIDE*blockIdx.z + threadIdx.z) + (XZ_STRIDE*gridDim.z) * ( blockIdx.y + X * gridDim.y );
-            // XZ_STRIDE == blockDim.z
+            // XZ_STRIDE == XZ_STRIDE
             shared_mem[threadIdx.z + index*XZ_STRIDE] = thread_data[i];
             index += stride;
         }
@@ -742,6 +772,7 @@ struct io {
         if (threadIdx.x < values_left_to_store) {
             output[Return1DFFTAddress_XZ_transpose(index)] =  thread_data[FFT::elements_per_thread / 2];
         }
+        __syncthreads();
     }
 
     // Store a transposed tile, made up of contiguous (full) FFTS
@@ -759,25 +790,28 @@ struct io {
         if (threadIdx.x < values_left_to_store) {
             output[Return1DFFTAddress_XZ_transpose_strided_Z(index)] = shared_mem[index];
         }
+        __syncthreads();
     }
 
     // Store a transposed tile, made up of non-contiguous (strided partial) FFTS
     // 
     static inline __device__ void store_r2c_transposed_xz_strided_Z(const complex_type* shared_mem,
                                                                     complex_type*       output,
-                                                                    const int*          output_map) {
+                                                                    const unsigned int  Q,
+                                                                    const unsigned int  sub_fft) {
         const unsigned int stride = stride_size();
         constexpr unsigned int output_values_to_store = (cufftdx::size_of<FFT>::value / 2) + 1;
         unsigned int       index  = threadIdx.x + threadIdx.z * output_values_to_store ;
         for (unsigned int i = 0; i < FFT::elements_per_thread / 2; i++) {
-            output[Return1DFFTAddress_XZ_transpose_strided_Z(index) + output_map[i]] = complex_type(3.14,0);//shared_mem[index];
+            output[Return1DFFTAddress_XZ_transpose_strided_Z(index, Q, sub_fft)] = shared_mem[index];
             index += stride;
         }
         constexpr unsigned int threads_per_fft        = cufftdx::size_of<FFT>::value / FFT::elements_per_thread;
         constexpr unsigned int values_left_to_store = threads_per_fft == 1 ? 1 : (output_values_to_store % threads_per_fft);
         if (threadIdx.x < values_left_to_store) {
-            output[Return1DFFTAddress_XZ_transpose_strided_Z(index) + output_map[FFT::elements_per_thread / 2]] = complex_type(3.14,0);//shared_mem[index];
+            output[Return1DFFTAddress_XZ_transpose_strided_Z(index, Q, sub_fft)] = shared_mem[index];
         }
+        __syncthreads();
     }
 
     static inline __device__ void store_transposed_xz_strided_Z(const complex_type* shared_mem,
@@ -788,6 +822,7 @@ struct io {
             output[Return1DFFTAddress_XZ_transpose_strided_Z(index)] = shared_mem[index];
             index += stride;
         }
+        __syncthreads();
     }
 
     static inline __device__ void store_r2c_transposed_xy(const complex_type* thread_data,
@@ -978,6 +1013,18 @@ struct io {
         }
     } 
 
+    static inline __device__ void store(const complex_type* thread_data,
+                                        complex_type*       output,
+                                        const unsigned int  Q,
+                                        const unsigned int  sub_fft) {
+        const unsigned int stride = stride_size();
+        unsigned int       index  = threadIdx.x;
+        for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
+            output[index*Q + sub_fft] = thread_data[i];
+            index += stride;
+        }
+    }     
+
 
     static inline __device__ void store_Z(const complex_type* shared_mem,
                                           complex_type*       output) {
@@ -989,6 +1036,19 @@ struct io {
             index += stride;
         }
     } 
+
+    static inline __device__ void store_Z(const complex_type* shared_mem,
+                                          complex_type*       output, 
+                                          const unsigned int  Q,
+                                          const unsigned int  sub_fft) {
+        const unsigned int stride = stride_size();
+        unsigned int       index  = threadIdx.x + threadIdx.z*size_of<FFT>::value;
+        for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
+            output[Return1DFFTAddress_YZ_transpose_strided_Z(index, Q, sub_fft)] = shared_mem[index];
+            index += stride;
+        }
+        __syncthreads();
+    }     
 
     static inline __device__ void store(const complex_type* thread_data,
                                         complex_type*       output, 
