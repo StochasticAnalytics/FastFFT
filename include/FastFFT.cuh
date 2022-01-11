@@ -1013,6 +1013,18 @@ struct io {
         }
     } 
 
+    static inline __device__ void store(const complex_type* thread_data,
+                                        complex_type*       output,
+                                        const unsigned int  Q,
+                                        const unsigned int  sub_fft) {
+        const unsigned int stride = stride_size();
+        unsigned int       index  = threadIdx.x;
+        for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
+            output[index*Q + sub_fft] = thread_data[i];
+            index += stride;
+        }
+    }     
+
 
     static inline __device__ void store_Z(const complex_type* shared_mem,
                                           complex_type*       output) {
