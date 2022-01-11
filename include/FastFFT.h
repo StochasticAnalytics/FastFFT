@@ -386,7 +386,7 @@ private:
                     r2c_decomposed_transposed, // Thread based, full length, transposed.
                     r2c_none_XY, r2c_none_XZ, 
                     r2c_decrease, r2c_increase, r2c_increase_XZ,
-                    c2c_fwd_none, c2c_fwd_none_Z, c2c_fwd_decrease, c2c_fwd_increase,
+                    c2c_fwd_none, c2c_fwd_none_Z, c2c_fwd_decrease, c2c_fwd_increase, c2c_fwd_increase_Z,
                     c2c_inv_none, c2c_inv_none_XZ, c2c_inv_none_Z, c2c_inv_decrease, c2c_inv_increase,                       
                     c2c_decomposed,
                     c2r_decomposed, 
@@ -403,7 +403,7 @@ private:
                     "r2c_decomposed_transposed", 
                     "r2c_none_XY", "r2c_none_XZ", 
                     "r2c_decrease", "r2c_increase", "r2c_increase_XZ",
-                    "c2c_fwd_none", "c2c_fwd_none_Z", "c2c_fwd_increase", "c2c_fwd_increase", 
+                    "c2c_fwd_none", "c2c_fwd_none_Z", "c2c_fwd_increase", "c2c_fwd_increase", "c2c_fwd_increase_Z",
                     "c2c_inv_none", "c2c_inv_none_XZ", "c2c_inv_none_Z", "c2c_inv_increase", "c2c_inv_increase",
                     "c2c_decomposed", 
                     "c2r_decomposed", 
@@ -428,7 +428,7 @@ private:
              kernel_type == r2c_decrease || kernel_type == r2c_increase || kernel_type == r2c_increase_XZ ||
              kernel_type == c2c_fwd_none || c2c_fwd_none_Z || 
              kernel_type == c2c_fwd_decrease || 
-             kernel_type == c2c_fwd_increase || 
+             kernel_type == c2c_fwd_increase || kernel_type == c2c_fwd_increase_Z ||
              kernel_type == c2c_inv_none || kernel_type == c2c_inv_none_XZ || kernel_type == c2c_inv_none_Z ||
              kernel_type == c2c_inv_decrease || kernel_type == c2c_inv_increase ||
              kernel_type == c2r_none || kernel_type == c2r_none_XY || kernel_type == c2r_decrease || kernel_type == c2r_increase ||
@@ -472,7 +472,7 @@ private:
       if (kernel_type == r2c_decomposed || kernel_type == r2c_decomposed_transposed ||
           kernel_type == r2c_none_XY || kernel_type == r2c_none_XZ || 
           kernel_type == r2c_decrease || kernel_type == r2c_increase || kernel_type == r2c_increase_XZ ||
-          kernel_type == c2c_fwd_none || kernel_type == c2c_fwd_none_Z || 
+          kernel_type == c2c_fwd_none || kernel_type == c2c_fwd_none_Z || kernel_type == c2c_fwd_increase_Z ||
           kernel_type == c2c_fwd_decrease || 
           kernel_type == c2c_fwd_increase || 
           kernel_type == xcorr_fwd_decrease_inv_none || kernel_type == xcorr_fwd_increase_inv_none)
@@ -486,7 +486,7 @@ private:
 
   inline bool IsTransormAlongZ(KernelType kernel_type)
   {
-    if (kernel_type == c2c_fwd_none_Z || 
+    if (kernel_type == c2c_fwd_none_Z || kernel_type == c2c_fwd_increase_Z ||
         kernel_type == c2c_inv_none_Z )
     {
       return true;
