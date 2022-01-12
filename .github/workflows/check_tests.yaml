@@ -11,7 +11,10 @@ jobs:
     - uses: actions/checkout@v2
       with:
         fetch-depth: 0
-    - name: check file
+    - name: check pass file
       run: | 
-        echo "Testing the workflow"
-        cat  cat $(git rev-parse --show-toplevel)/src/tests/test-results.txt
+        echo "Testing Pass condition"
+        if [[ $(cat $(git rev-parse --show-toplevel)/src/tests/test-testP-results.txt) == "pass" ]]; exit 0 ; fi
+    - name: check fail file
+        echo "Testing Fail condition"
+        if [[ $(cat $(git rev-parse --show-toplevel)/src/tests/test-testF-results.txt) == "fail" ]]; exit 1 ; fi
