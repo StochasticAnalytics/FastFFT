@@ -79,7 +79,6 @@ else
 	NVCC_FLAGS+=-DHEAVYERRORCHECKING_FFT
 endif
 
-ifeq()
 
 # Assuming make is being run from build
 TESTS_BUILD_DIR := ./tests
@@ -109,9 +108,9 @@ BENCHMARK_OBJS=$(patsubst %,%.o,$(BENCHMARK_TARGETS))
 
 all: $(TEST_TARGETS)
 ifeq (${remove_debug_file}, 0)
-touch built_without_debug.txt
+	touch built_without_debug.txt
 else
-rm -f built_without_debug.txt
+	rm -f built_without_debug.txt
 endif
 
 $(TEST_TARGETS): $(TEST_OBJS)

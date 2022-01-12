@@ -2516,10 +2516,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::SetAndLaunchKernel(
             #if DEBUG_FFT_STAGE > 2
             CheckSharedMemory(shared_memory, device_properties);
             cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_INCREASE<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));  
-            
-            PrintState();
-            PrintLaunchParameters(LP);
-            std::cout << "shared mem "<< shared_memory << "\n";
+  
             precheck
             block_fft_kernel_C2C_INCREASE<FFT,complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
             ( complex_input,  complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q, workspace);
