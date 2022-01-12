@@ -14,5 +14,40 @@ jobs:
     - name: check pass file
       run: | 
         echo "Testing Pass condition"
-        if [[ $(cat $(git rev-parse --show-toplevel)/src/tests/test-testP-results.txt) == "pass" ]]; then exit 0 ; fi
+        if [[ $(cat $(git rev-parse --show-toplevel)/src/tests/2d-unit-tests-results.txt) == "pass" ]]; then exit 0 ; else exit 1; fi
 
+name: 3d Unit Tests
+
+on: [push, pull_request]
+
+
+jobs:
+  build:
+
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0       
+    - name: check pass file
+      run: | 
+        echo "Testing Pass condition"
+        if [[ $(cat $(git rev-parse --show-toplevel)/src/tests/3d-unit-tests-results.txt) == "pass" ]]; then exit 0 ; else exit 1; fi        
+
+name: 2d Regression Tests
+
+on: [push, pull_request]
+
+
+jobs:
+  build:
+
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0       
+    - name: check pass file
+      run: | 
+        echo "Testing Pass condition"
+        if [[ $(cat $(git rev-parse --show-toplevel)/src/tests/src/tests/2d-performance-tests.txt) == "pass" ]]; then exit 0 ; else exit 1; fi

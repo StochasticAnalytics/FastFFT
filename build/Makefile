@@ -15,7 +15,7 @@ NVCC_FLAGS+=-DCUFFTDX_DISABLE_RUNTIME_ASSERTS
 # Gencode arguments, only supporting Volta or newer
 # SMS ?= 70 75 80 86
 # In initial dev, only compile for 70 or 86 depending on which workstation I'm on, b/c it is faster.
-SMS ?= 86
+SMS ?= 70 86
 
 
 
