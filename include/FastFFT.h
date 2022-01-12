@@ -17,7 +17,7 @@
 // #include "/groups/himesb/git/cufftdx/example/common.hpp"
 // #include <iostream>
 
-namespace FastFFT {
+namespace fastfft {
 
     // For debugging
 

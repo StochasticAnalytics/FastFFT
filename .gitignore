@@ -33,6 +33,10 @@
 
 .nfs*
 
+# for make builds
 build/*
 !build/Makefile
 !build/build
+
+# For cmake builds
+_build/*

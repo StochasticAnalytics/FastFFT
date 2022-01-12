@@ -11,7 +11,7 @@
 
 
 
-namespace FastFFT {
+namespace fastfft {
 
 
 template <class ComputeType, class InputType, class OutputType>

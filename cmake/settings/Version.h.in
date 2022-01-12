@@ -1,0 +1,13 @@
+#pragma once
+
+// Project version comes from the PROJECT_VERSION* CMake variables
+#define FASTFFT_MAJOR_VERSION @PROJECT_VERSION_MAJOR@
+#define FASTFFT_MINOR_VERSION @PROJECT_VERSION_MINOR@
+#define FASTFFT_PATCH_VERSION @PROJECT_VERSION_PATCH@
+#define FASTFFT_VERSION "@PROJECT_VERSION@"
+
+// Project url comes from the PROJECT_HOMEPAGE_URL CMake variable
+#define FASTFFT_URL "@PROJECT_HOMEPAGE_URL@"
+
+// After generation time, one can include this file with:
+// #include "FASTFFT/Version.h"

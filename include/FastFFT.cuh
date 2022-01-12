@@ -96,7 +96,7 @@ __device__ __forceinline__ void SINCOS(float arg, float* s, float* c) {
 #endif
 
 
-namespace FastFFT {
+namespace fastfft {
 
 __device__ __forceinline__ int
 d_ReturnReal1DAddressFromPhysicalCoord(int3 coords, short4 img_dims) {
@@ -1409,7 +1409,7 @@ struct io_thread
     }
 }; // struct thread_io
 
-} // namespace FastFFT
+} // namespace fastfft
 
 
 #endif // Fast_FFT_cuh_
