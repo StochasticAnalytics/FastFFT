@@ -1,6 +1,8 @@
 # FastFFT
 
 [![2d Unit Tests](https://github.com/bHimes/FastFFT/actions/workflows/2d_Unit_Tests.yaml/badge.svg)](https://github.com/bHimes/FastFFT/actions/workflows/2d_Unit_Tests.yaml)
+[![3d Unit Tests](https://github.com/bHimes/FastFFT/actions/workflows/3d_Unit_Tests.yaml/badge.svg)](https://github.com/bHimes/FastFFT/actions/workflows/3d_Unit_Tests.yaml)
+[![2d Regression Tests](https://github.com/bHimes/FastFFT/actions/workflows/2d_Regression_Tests.yaml/badge.svg)](https://github.com/bHimes/FastFFT/actions/workflows/2d_Regression_Tests.yaml)
 
 ## Project Summary
 
