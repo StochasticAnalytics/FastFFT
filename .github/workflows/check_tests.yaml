@@ -1,0 +1,17 @@
+name: Check Tests
+
+on: [push, pull_request]
+
+
+jobs:
+  build:
+
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+    - name: check file
+      run: | 
+        echo "Testing the workflow"
+        cat  cat $(git rev-parse --show-toplevel)/src/tests/test-results.txt
