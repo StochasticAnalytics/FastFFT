@@ -14,4 +14,4 @@ jobs:
     - name: check 3d unit tests pass file
       run: | 
         echo "Testing Pass condition"
-        if [[ $(cat $(git rev-parse --show-toplevel)/src/tests/3d-unit-tests-results.txt) == "pass" ]]; then exit 0 ; else exit 1; fi        
+        if [[ $(cat $(git rev-parse --show-toplevel)/src/tests/3d-unit-tests-results.txt) != "pass" ]]; then exit 1 ; fi   

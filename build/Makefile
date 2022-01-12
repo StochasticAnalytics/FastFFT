@@ -68,9 +68,18 @@ debug_stage=${DEBUG_STAGE}
 $(info $$debug_stage is  [${DEBUG_STAGE}])
 endif
 
-ifneq (${debug_stage}, 8) 
+# Track what the last build did so that the pre-commit hook can skip re-building if there is no debug included.
+remove_debug_file=0
+ifeq (${debug_stage}, 8) 
+	ifneq (${debug_level},0)
+		remove_debug_file=1
+	endif
+else
+	remove_debug_file=1
 	NVCC_FLAGS+=-DHEAVYERRORCHECKING_FFT
 endif
+
+ifeq()
 
 # Assuming make is being run from build
 TESTS_BUILD_DIR := ./tests
@@ -99,6 +108,11 @@ BENCHMARK_OBJS=$(patsubst %,%.o,$(BENCHMARK_TARGETS))
 
 
 all: $(TEST_TARGETS)
+ifeq (${remove_debug_file}, 0)
+touch built_without_debug.txt
+else
+rm -f built_without_debug.txt
+endif
 
 $(TEST_TARGETS): $(TEST_OBJS)
 	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -o $@ $< -lfftw3f -lcufft_static -lculibos -lcudart_static -lrt

@@ -14,4 +14,4 @@ jobs:
     - name: check 2d regression tests file
       run: | 
         echo "Testing Pass condition"
-        if [[ $(cat $(git rev-parse --show-toplevel)/src/tests/src/tests/2d-performance-tests.txt) == "pass" ]]; then exit 0 ; else exit 1; fi
+        if [[ $(cat $(git rev-parse --show-toplevel)/src/tests/2d-performance-tests.txt) != "pass" ]]; then exit 1 ; fi
