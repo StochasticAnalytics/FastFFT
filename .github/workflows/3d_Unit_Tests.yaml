@@ -1,0 +1,17 @@
+name: 3d Unit Tests
+
+on: [push, pull_request]
+
+
+jobs:
+  build:
+
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0       
+    - name: check 3d unit tests pass file
+      run: | 
+        echo "Testing Pass condition"
+        if [[ $(cat $(git rev-parse --show-toplevel)/src/tests/3d-unit-tests-results.txt) != "pass" ]]; then exit 1 ; fi   

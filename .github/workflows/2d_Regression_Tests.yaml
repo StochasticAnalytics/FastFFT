@@ -1,0 +1,17 @@
+name: 2d Regression Tests
+
+on: [push, pull_request]
+
+
+jobs:
+  build:
+
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0       
+    - name: check 2d regression tests file
+      run: | 
+        echo "Testing Pass condition"
+        if [[ $(cat $(git rev-parse --show-toplevel)/src/tests/2d-performance-tests.txt) != "pass" ]]; then exit 1 ; fi

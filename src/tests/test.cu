@@ -1,5 +1,5 @@
-#include "Image.cu"
-#include "../src/FastFFT.cu"
+#include "../cpp/Image.cu"
+#include "../FastFFT.cu"
 #include <cufft.h>
 #include <cufftXt.h>
 
@@ -78,8 +78,7 @@ void PrintArray_XZ( float2* array, short NX, short NY, short NZ, int line_wrappi
 
 // The Fourier transform of a constant should be a unit impulse, and on back fft, without normalization, it should be a constant * N.
 // It is assumed the input/output have the same dimension (i.e. no padding)
-void const_image_test(std::vector<int> size, bool do_3d = false)
-{
+bool const_image_test(std::vector<int> size, bool do_3d = false) {
 
   bool all_passed = true;
   std::vector<bool> init_passed(size.size(), true);
@@ -260,10 +259,10 @@ void const_image_test(std::vector<int> size, bool do_3d = false)
 
     }
   }
+  return all_passed;
 }
 
-void random_image_test(std::vector<int> size, bool do_3d = false)
-{
+bool random_image_test(std::vector<int> size, bool do_3d = false) {
 
   bool all_passed = true;
   std::vector<bool> init_passed(size.size(), true);
@@ -443,10 +442,10 @@ void random_image_test(std::vector<int> size, bool do_3d = false)
 
     }
   }
+  return all_passed;
 }
 
-void unit_impulse_test(std::vector<int>size, bool do_3d, bool do_increase_size)
-{
+bool unit_impulse_test(std::vector<int>size, bool do_3d, bool do_increase_size) {
 
   bool all_passed = true;
   std::vector<bool> init_passed(size.size(), true);
@@ -684,11 +683,10 @@ void unit_impulse_test(std::vector<int>size, bool do_3d, bool do_increase_size)
 
     }
   }
-
+  return all_passed;
 }
 
-void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type)
-{
+void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
 
   bool skip_cufft_for_profiling = false;
   bool print_out_time = false;
@@ -1119,17 +1117,21 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type)
       #endif   
 
 
-      int n_loops;
-      if (do_3d)
-      {
-        if (std::max(fwd_dims_in.x, fwd_dims_out.x) > 256) n_loops = 300;
-        else n_loops = 1000;
-      } 
-      else
-      {
-        if (std::max(fwd_dims_in.x, fwd_dims_out.x) > 1024) n_loops = 4000;
-        else n_loops = 10000;
-      }
+    int n_loops;
+    if (do_3d) {
+        int max_size = std::max(fwd_dims_in.x, fwd_dims_out.x);
+        if (max_size < 128) { n_loops = 1000; }
+        else if (max_size <= 256) { n_loops = 400; }
+        else if (max_size <= 512) { n_loops = 150; }
+        else { n_loops = 50; }
+    } 
+    else {
+        int max_size = std::max(fwd_dims_in.x, fwd_dims_out.x);
+        if (max_size < 256) { n_loops = 10000; }
+        else if (max_size <= 512) { n_loops = 5000; }
+        else if (max_size <= 2048) { n_loops = 2500; }
+        else { n_loops = 1000; }
+    }
 
       cuFFT_output.record_start();
       for (int i = 0; i < n_loops; ++i)
@@ -1363,86 +1365,123 @@ void run_oned(std::vector<int> size)
 
 }
 
-int main(int argc, char** argv) 
-{
+void print_options(char** argv) {
+    std::cout << "Usage: " << argv[0] << "\n\n";
+    std::printf("%-24s : %-24s\n", "--all", "run all available tests");
+    std::printf("%-24s : %-24s\n", "--2d-unit-tests", "run constant image and unit impulse tests for 2d");
+    std::printf("%-24s : %-24s\n", "--3d-unit-tests", "run constant image and unit impulse tests for 3d");
+    std::printf("%-24s : %-24s\n", "--2d-performance-tests", "run base fft, and cross-correlation tests for 2d");
+    std::printf("%-24s : %-24s\n", "--3d-performance-tests", "run base fft, and cross-correlation tests for 3d");
 
-  std::printf("Entering main in tests.cpp\n");
-  std::printf("Standard is %i\n\n",__cplusplus);
+    std::cout << "\n" << std::endl;
+}
 
+int main(int argc, char** argv) {
 
-  bool run_validation_tests;
-  bool run_performance_tests;
+    bool this_test_failed = false;
+    
+    if (argc != 2) {
+        print_options(argv);
+        return 1;
+    }
 
-  if (argc > 1)
-  {
-    run_validation_tests = false;
-    run_performance_tests = true;
-    std::cout << "Running performance tests.\n";
-  }
-  else
-  {
-    run_validation_tests = true;
-    run_performance_tests = false;
-  }
+    std::string test_name = argv[1];
+    std::printf("Standard is %i\n\n",__cplusplus);
 
+    // Input size vectors to be tested.
+    std::vector<int> test_size = { 16, 32, 64, 128, 256, 512, 1024, 2048, 4096};
+    std::vector<int> test_size_3d = { 16, 32, 64, 128, 256, 512};
+    // std::vector<int> test_size_3d ={512};
+  
+    // The launch parameters fail for 4096 -> < 64 for r2c_decrease, not sure if it is the elements_per_thread or something else.
+    // For now, just over-ride these small sizes
+    std::vector<int> test_size_for_decrease = { 64, 128, 256, 512, 1024, 2048, 4096};
+    bool run_2d_unit_tests = false;
+    bool run_3d_unit_tests = false;
+    bool run_2d_performance_tests = false;
+    bool run_3d_performance_tests = false;
 
-  std::vector<int> test_size = { 16, 32, 64, 128, 256, 512, 1024, 2048, 4096};
-  std::vector<int> test_size_3d = { 16, 32, 64, 128, 256, 512};
-  // std::vector<int> test_size_3d ={512};
+    if (test_name == "--all") {
+        std::cout << "Running all tests" << std::endl;
+        run_2d_unit_tests = true;
+        run_3d_unit_tests = true;
+        run_2d_performance_tests = true;
+        run_3d_performance_tests = true;
+    } 
+    else if (test_name == "--2d-unit-tests") {
+        std::cout << "Running 2d unit tests" << std::endl;
+        run_2d_unit_tests = true;
+    }
+    else if (test_name == "--3d-unit-tests") {
+        std::cout << "Running 3d unit tests" << std::endl;
+        run_3d_unit_tests = true;
+    }
+    else if (test_name == "--2d-performance-tests") {
+        std::cout << "Running 2d performance tests" << std::endl;
+        run_2d_performance_tests = true;
+    }
+    else if (test_name == "--3d-performance-tests") {
+        std::cout << "Running 3d performance tests" << std::endl;
+        run_3d_performance_tests = true;
+    }
+    else {
+        std::cout << "\n\nUnknown test name: " << test_name << "\n\n";
+        print_options(argv);
+        return 1;
+    }   
 
-  // The launch parameters fail for 4096 -> < 64 for r2c_decrease, not sure if it is the elements_per_thread or something else.
-  // For now, just over-ride these small sizes
-  std::vector<int> test_size_for_decrease = { 64, 128, 256, 512, 1024, 2048, 4096};
+    if (run_2d_unit_tests) {
+        if (! const_image_test (test_size_3d, false)) return 1;
+        if (! unit_impulse_test(test_size_3d, false, true)) return 1;
+    }
 
+    if (run_3d_unit_tests) {
+        if (! const_image_test (test_size_3d, true)) return 1;
+        // if (! unit_impulse_test(test_size_3d, true, true)) return 1;
+    }
 
+    if (run_2d_performance_tests) {
+        #ifdef HEAVYERRORCHECKING_FFT
+        std::cout << "Running performance tests with heavy error checking.\n";
+        std::cout << "This doesn't make sense as the synchronizations are invalidating.\n";
+        exit(1);
+        #endif
 
-  if (run_validation_tests)  {
+        int size_change_type; 
+        bool do_3d = false;
+    
+        size_change_type = 0; // no change
+        compare_libraries(test_size, do_3d, size_change_type);
+    
+        size_change_type = 1; // increase
+        compare_libraries(test_size, do_3d, size_change_type);
+    
+        size_change_type = -1; // decrease
+        compare_libraries(test_size, do_3d, size_change_type);
+    }
 
-    // change onde these to just report the pass/fail.
-    // run_oned(test_size);
-    // exit(0);
+    if (run_3d_performance_tests) {
+        #ifdef HEAVYERRORCHECKING_FFT
+        std::cout << "Running performance tests with heavy error checking.\n";
+        std::cout << "This doesn't make sense as the synchronizations are invalidating.\n";
+        exit(1);
+        #endif
 
-    bool do_3d = true;
+        int size_change_type; 
+        bool do_3d = true;
+    
+        size_change_type = 0; // no change
+        compare_libraries(test_size, do_3d, size_change_type);
+    
+        // TODO: These are not yet completed.
+        // size_change_type = 1; // increase
+        // compare_libraries(test_size, do_3d, size_change_type);
+    
+        // size_change_type = -1; // decrease
+        // compare_libraries(test_size, do_3d, size_change_type);      
+    }
 
-    // random_image_test(test_size, false);
-
-    // const_image_test(test_size_3d, do_3d);
-    unit_impulse_test(test_size_3d, do_3d, true);
-
-    exit(0);
-    do_3d = false;
-    const_image_test(test_size, do_3d);
-    unit_impulse_test(test_size, do_3d, true);
-    unit_impulse_test(test_size_for_decrease, do_3d, false);
-
-
-  } // end of validation tests
-
-
-  if (run_performance_tests) {
-
-    #ifdef HEAVYERRORCHECKING_FFT
-      std::cout << "Running performance tests with heavy error checking.\n";
-      std::cout << "This doesn't make sense as the synchronizations are invalidating.\n";
-      // exit(1);
-    #endif
-
-    int size_change_type = 0; // no change
-
-    bool do_3d = true;
-    compare_libraries(test_size_3d, do_3d, size_change_type);
-
-    do_3d = false;
-    compare_libraries(test_size, do_3d, size_change_type);
-
-    size_change_type = 1; // increase
-    compare_libraries(test_size, do_3d, size_change_type);
-
-    size_change_type = -1; // decrease
-    compare_libraries(test_size, do_3d, size_change_type);
-
-
-  }
-  return 0;
+    // If we get here, all tests passed.
+    return 0;
 };
 
