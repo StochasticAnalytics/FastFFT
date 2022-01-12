@@ -1,5 +1,5 @@
-#include "Image.cu"
-#include "../src/FastFFT.cu"
+#include "../cpp/Image.cu"
+#include "../FastFFT.cu"
 #include <cufft.h>
 #include <cufftXt.h>
 
