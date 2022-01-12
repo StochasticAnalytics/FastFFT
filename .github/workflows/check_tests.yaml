@@ -16,6 +16,6 @@ jobs:
         echo "Testing Pass condition"
         if [[ $(cat $(git rev-parse --show-toplevel)/src/tests/test-testP-results.txt) == "pass" ]]; exit 0 ; fi
     - name: check fail file
-    - run:
+      run:
         echo "Testing Fail condition"
         if [[ $(cat $(git rev-parse --show-toplevel)/src/tests/test-testF-results.txt) == "fail" ]]; exit 1 ; fi
