@@ -10,11 +10,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
       with:
-        fetch-depth: 0
-    - name: check fail file
-      run: |
-        echo "Testing Fail condition"
-        if [[ $(cat $(git rev-parse --show-toplevel)/src/tests/test-testF-results.txt) == "fail" ]]; then exit 1 ; fi        
+        fetch-depth: 0       
     - name: check pass file
       run: | 
         echo "Testing Pass condition"

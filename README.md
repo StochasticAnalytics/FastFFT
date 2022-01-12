@@ -1,5 +1,7 @@
 # FastFFT
 
+[![2d Unit Tests](https://github.com/bHimes/FastFFT/actions/workflows/2d_Unit_Tests.yaml/badge.svg)](https://github.com/bHimes/FastFFT/actions/workflows/2d_Unit_Tests.yaml)
+
 ## Project Summary
 
 #### Goals:
