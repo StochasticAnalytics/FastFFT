@@ -1,4 +1,4 @@
-name: 2d Unit Tests
+name: 2d Regression Tests
 
 on: [push, pull_request]
 
@@ -14,4 +14,4 @@ jobs:
     - name: check pass file
       run: | 
         echo "Testing Pass condition"
-        if [[ $(cat $(git rev-parse --show-toplevel)/src/tests/2d-unit-tests-results.txt) == "pass" ]]; then exit 0 ; else exit 1; fi
+        if [[ $(cat $(git rev-parse --show-toplevel)/src/tests/src/tests/2d-performance-tests.txt) == "pass" ]]; then exit 0 ; else exit 1; fi
