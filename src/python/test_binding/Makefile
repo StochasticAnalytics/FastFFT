@@ -52,12 +52,17 @@ PYTHON_INCLUDES=-I/usr/include/python3.8 -I/groups/himesb/.myPyBind11/lib/python
 # $(TARGETS): $(SRCS)
 # 	$(COMPILER) $(CXX_FLAGS) $(PYTHON_INCLUDES) $^ -o $@
 
+# Track what the last build did so that the pre-commit hook can skip re-building if there is no debug included.
+
+ifneq (${debug_kernel},) 
+	NVCC_FLAGS+=-DHEAVYERRORCHECKING_FFT
+endif
 
 $(TARGETS): $(OBJS)
-	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -o $@ $<  -lculibos -lcudart -lrt
+	$(NVCC) $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) $(GENCODE_FLAGS) -o $@ $<  -lculibos -lcudart -lrt
 
 $(OBJS): $(SRCS)
-	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS)  $(PYTHON_INCLUDES) -o $@ $<
+	$(NVCC) -dc $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) $(GENCODE_FLAGS)  $(PYTHON_INCLUDES) -o $@ $<
 
 clean:
 	rm -f *.so
