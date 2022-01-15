@@ -57,16 +57,17 @@ class TestClass {
             return retval;
         }
 
-        void sum_cupy_array(TypeOne* cupy_ptr, int cupy_size) {
+        void sum_cupy_array(long cupy_ptr, int cupy_size) {
 
             // Simple test to take the pointer from a cupy array and work on it in the gpu.
-
+            TypeOne* d_array = reinterpret_cast<TypeOne*>(cupy_ptr);
             precheck
-            sum_array<<<1, 1, 0, cudaStreamPerThread>>>(cupy_ptr, cupy_size);
+            sum_array<<<1, 1, 0, cudaStreamPerThread>>>(d_array, cupy_size);
             postcheck
             cudaStreamSynchronize(cudaStreamPerThread);
 
         }
+     
 
     private:
         TypeOne one_;
@@ -83,6 +84,7 @@ void declare_array(py::module &m, const std::string &typestr) {
     .def("getTwo", &TestClass<typeOne, typeTwo>::getTwo) 
     .def("add", &TestClass<typeOne, typeTwo>::add)
     .def("sum_cupy_array", &TestClass<typeOne, typeTwo>::sum_cupy_array);
+
 }
 
 PYBIND11_MODULE(fastfft_test, m) {
