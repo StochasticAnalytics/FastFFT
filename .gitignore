@@ -1,3 +1,9 @@
+# Ignore anything without an extension
+*
+!/**/
+!*.*
+
+
 # Prerequisites
 *.d
 
@@ -33,6 +39,9 @@
 
 .nfs*
 
+
 build/*
 !build/Makefile
 !build/build
+
+
