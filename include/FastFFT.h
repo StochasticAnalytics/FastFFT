@@ -4,6 +4,7 @@
 #define fast_FFT_H_
 
 #include <random>
+#include <chrono>
 
 // For testing/debugging it is convenient to execute and have print functions for partial transforms.
 // These will go directly in the kernels and also in the helper Image.cuh definitions for PrintArray.
@@ -142,24 +143,36 @@ class FourierTransformer {
 
 public:
 
-  // Used to specify input/calc/output data types
-  enum DataType { int4_2, uint8, int8, uint16, int16, fp16, bf16, tf32, uint32, int32, fp32};
-  std::vector<std::string> DataTypeName { "int4_2", "uint8", "int8", "uint16", "int16", "fp16", "bf16", "tf32", "uint32", "int32", "fp32" };
-  enum OriginType { natural, centered, quadrant_swapped}; // Used to specify the origin of the data
-  std::vector<std::string> OriginTypeName { "natural", "centered", "quadrant_swapped" };
+    // Used to specify input/calc/output data types
+    enum DataType { int4_2, uint8, int8, uint16, int16, fp16, bf16, tf32, uint32, int32, fp32};
+    std::vector<std::string> DataTypeName { "int4_2", "uint8", "int8", "uint16", "int16", "fp16", "bf16", "tf32", "uint32", "int32", "fp32" };
+    enum OriginType { natural, centered, quadrant_swapped}; // Used to specify the origin of the data
+    std::vector<std::string> OriginTypeName { "natural", "centered", "quadrant_swapped" };
 
-  short padding_jump_val;
-  int   input_memory_allocated;
-  int   fwd_output_memory_allocated;
-  int   inv_output_memory_allocated;
-  int   compute_memory_allocated;
-  int   memory_size_to_copy;
+    // Using the enum directly from python is not something I've figured out yet. Just make simple methods.
+    inline void SetOriginTypeNatural(bool set_input_type = true) { 
+        if (set_input_type) input_origin_type = natural; 
+        else output_origin_type = natural;
+    }
+    inline void SetOriginTypeCentered(bool set_input_type = true) { 
+        if (set_input_type) input_origin_type = centered; 
+        else output_origin_type = centered;
+    }
+    inline void SetOriginTypeQuadrantSwapped(bool set_input_type = true) { 
+        if (set_input_type) input_origin_type = quadrant_swapped; 
+        else output_origin_type = quadrant_swapped;
+    } 
 
+    short padding_jump_val;
+    int   input_memory_allocated;
+    int   fwd_output_memory_allocated;
+    int   inv_output_memory_allocated;
+    int   compute_memory_allocated;
+    int   memory_size_to_copy;
 
-
-  ///////////////////////////////////////////////
-  // Initialization functions
-  ///////////////////////////////////////////////
+    ///////////////////////////////////////////////
+    // Initialization functions
+    ///////////////////////////////////////////////
 
   FourierTransformer();
   // FourierTransformer(const FourierTransformer &); // Copy constructor
@@ -169,24 +182,25 @@ public:
   void SetForwardFFTPlan(size_t input_logical_x_dimension,  size_t input_logical_y_dimension,  size_t input_logical_z_dimension, 
                          size_t output_logical_x_dimension, size_t output_logical_y_dimension, size_t output_logical_z_dimension,
                          bool is_padded_output, 
-                         bool is_host_memory_pinned,
-                         OriginType output_origin_type);
+                         bool is_host_memory_pinned);
 
   void SetInverseFFTPlan(size_t input_logical_x_dimension,  size_t input_logical_y_dimension,  size_t input_logical_z_dimension, 
                          size_t output_logical_x_dimension, size_t output_logical_y_dimension, size_t output_logical_z_dimension,
-                         bool is_padded_output, 
-                         OriginType output_origin_type);
+                         bool is_padded_output);
 
 
   // For the time being, the caller is responsible for having the memory allocated for any of these input/output pointers.
   void SetInputPointer(InputType* input_pointer, bool is_input_on_device);
-
+  // When passing in a pointer from python (cupy or pytorch) it is a long, and needs to be cast to input type.
+  // For now, we are assuming memory ops are all handled in the python code.
+  void SetInputPointer(long input_pointer);
 
   ///////////////////////////////////////////////
   // Public actions:
   // ALL public actions should call ::CheckDimensions() to ensure the meta data are properly intialized.
   // this ensures the prior three methods have been called and are valid.
   ///////////////////////////////////////////////
+    inline void Wait() { cudaStreamSynchronize(cudaStreamPerThread); };
 
   void CopyHostToDevice();
   // By default we are blocking with a stream sync until complete for simplicity. This is overkill and should FIXME.
@@ -346,6 +360,7 @@ private:
   enum  DimensionCheckType : uint8_t  { CopyFromHost, CopyToHost, FwdTransform, InvTransform }; 
   std::vector<std::string> DimensionCheckName { "CopyFromHost", "CopyToHost", "FwdTransform", "InvTransform" };
 
+    bool is_from_python_call;
 
   SizeChangeType fwd_size_change_type;
   SizeChangeType inv_size_change_type;
@@ -370,6 +385,8 @@ private:
   void SetDefaults();
   void ValidateDimensions();
   void SetDimensions(DimensionCheckType check_op_type);
+
+  void SetDevicePointers(bool should_allocate_buffer_memory);
 
   /*
     IMPORTANT: if you add a kernel, you need to modify
