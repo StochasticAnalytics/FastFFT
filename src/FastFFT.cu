@@ -821,7 +821,7 @@ void FourierTransformer<ComputeType, InputType, OutputType>::CrossCorrelate(__ha
 
 template <class ComputeType, class InputType, class OutputType>
 template <class FunctionType>
-void FourierTransformer<ComputeType, InputType, OutputType>::Generic_Fwd_Op_Inv(ComputeType* image_to_search, FunctionType user_lambda) {
+void FourierTransformer<ComputeType, InputType, OutputType>::Generic_Fwd_Op_Inv(float2* image_to_search, FunctionType user_lambda) {
 
     // Set the member pointer to the passed pointer
     d_ptr.image_to_search = image_to_search;

@@ -227,7 +227,7 @@ public:
         };
     */
     template<class FunctionType>
-    void Generic_Fwd_Op_Inv(ComputeType* data, FunctionType user_lambda);
+    void Generic_Fwd_Op_Inv(float2* data, FunctionType user_lambda);
 
     void ClipIntoTopLeft();
     void ClipIntoReal(int wanted_coordinate_of_box_center_x, int wanted_coordinate_of_box_center_y, int wanted_coordinate_of_box_center_z);
