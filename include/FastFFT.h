@@ -216,35 +216,44 @@ public:
   void CrossCorrelate(float2* image_to_search, bool swap_real_space_quadrants);
   void CrossCorrelate(__half2* image_to_search, bool swap_real_space_quadrants);
 
-  void ClipIntoTopLeft();
-  void ClipIntoReal(int wanted_coordinate_of_box_center_x, int wanted_coordinate_of_box_center_y, int wanted_coordinate_of_box_center_z);
+    /*
+    Could be Generic_op_Fwd_op_Inv_op, where Fwd/Inv refer to the FFT/IFFT. and op refers to a user defined operation defined in a lambda.
 
-  // For all real valued inputs, assumed for any InputType that is not float2 or __half2
+    For the time being, this is assumed to not capture anything (stateless).
+    TODO: verify statelessness.
+    
+            auto test_lambda = [] __device__ (float in) {
+            printf("%f\n", in);
+        };
+    */
+    template<class FunctionType>
+    void Generic_Fwd_Op_Inv(float2* data, FunctionType user_lambda);
 
-  int inline ReturnInputMemorySize() { return input_memory_allocated; }
-  int inline ReturnFwdOutputMemorySize() { return fwd_output_memory_allocated; }
-  int inline ReturnInvOutputMemorySize() { return inv_output_memory_allocated; }
+    void ClipIntoTopLeft();
+    void ClipIntoReal(int wanted_coordinate_of_box_center_x, int wanted_coordinate_of_box_center_y, int wanted_coordinate_of_box_center_z);
 
-  short4 inline ReturnFwdInputDimensions() { return fwd_dims_in; }
-  short4 inline ReturnFwdOutputDimensions() { return fwd_dims_out; }
-  short4 inline ReturnInvInputDimensions() { return inv_dims_in; }
-  short4 inline ReturnInvOutputDimensions() { return inv_dims_out; }
+    // For all real valued inputs, assumed for any InputType that is not float2 or __half2
 
-  template<typename T, bool is_on_host = true>
-  void SetToConstant(T* input_pointer, int N_values, const T& wanted_value)
-  {
-    if (is_on_host) 
-    {
-      for (int i = 0; i < N_values; i++)
-      {
-        input_pointer[i] = wanted_value;
-      }
+    int inline ReturnInputMemorySize() { return input_memory_allocated; }
+    int inline ReturnFwdOutputMemorySize() { return fwd_output_memory_allocated; }
+    int inline ReturnInvOutputMemorySize() { return inv_output_memory_allocated; }
+
+    short4 inline ReturnFwdInputDimensions() { return fwd_dims_in; }
+    short4 inline ReturnFwdOutputDimensions() { return fwd_dims_out; }
+    short4 inline ReturnInvInputDimensions() { return inv_dims_in; }
+    short4 inline ReturnInvOutputDimensions() { return inv_dims_out; }
+
+    template<typename T, bool is_on_host = true>
+    void SetToConstant(T* input_pointer, int N_values, const T& wanted_value) {
+        if (is_on_host)  {
+            for (int i = 0; i < N_values; i++) {
+                input_pointer[i] = wanted_value;
+            }
+        }
+        else {
+            exit(-1);
+        }
     }
-    else
-    {
-      exit(-1);
-    }
-  }
 
   template<typename T, bool is_on_host = true>
   void SetToRandom(T* input_pointer, int N_values, const T& wanted_mean, const T& wanted_stddev)
@@ -316,8 +325,9 @@ public:
     std::cout << "transform stage complete " << TransformStageCompletedName[transform_stage_completed] << std::endl;
     std::cout << "input_origin_type " << OriginTypeName[input_origin_type] << std::endl;
     std::cout << "output_origin_type " << OriginTypeName[output_origin_type] << std::endl;
-    
+ 
   }; // PrintState()
+
 
 private:
 
@@ -413,7 +423,8 @@ private:
                     xcorr_fwd_decrease_inv_none, // (e.g. Fourier cropping)
                     xcorr_fwd_none_inv_decrease, // (e.g. movie/particle translational search)
                     xcorr_fwd_decrease_inv_decrease, // (e.g. bandlimit, xcorr, translational search)
-                    xcorr_decomposed }; // Used to specify the origin of the data
+                    xcorr_decomposed,
+                    generic_fwd_none_op_inv_decrease }; 
   // WARNING this is flimsy and prone to breaking, you must ensure the order matches the KernelType enum.
   std::vector<std::string> 
         KernelName{ "r2c_decomposed", 
@@ -430,7 +441,8 @@ private:
                     "xcorr_fwd_decrease_inv_none",
                     "xcorr_fwd_none_inv_decrease",
                     "xcorr_fwd_decrease_inv_decrease",
-                    "xcorr_decomposed" };
+                    "xcorr_decomposed",
+                    "generic_fwd_none_op_inv_decrease" };
 
   inline bool IsThreadType(KernelType kernel_type)
   {
@@ -449,7 +461,8 @@ private:
              kernel_type == c2c_inv_none || kernel_type == c2c_inv_none_XZ || kernel_type == c2c_inv_none_Z ||
              kernel_type == c2c_inv_decrease || kernel_type == c2c_inv_increase ||
              kernel_type == c2r_none || kernel_type == c2r_none_XY || kernel_type == c2r_decrease || kernel_type == c2r_increase ||
-             kernel_type == xcorr_fwd_increase_inv_none || kernel_type == xcorr_fwd_decrease_inv_none || kernel_type == xcorr_fwd_none_inv_decrease || kernel_type == xcorr_fwd_decrease_inv_decrease)
+             kernel_type == xcorr_fwd_increase_inv_none || kernel_type == xcorr_fwd_decrease_inv_none || kernel_type == xcorr_fwd_none_inv_decrease || kernel_type == xcorr_fwd_decrease_inv_decrease ||
+             kernel_type == generic_fwd_none_op_inv_decrease)
     { 
       return false;
     }
@@ -492,7 +505,8 @@ private:
           kernel_type == c2c_fwd_none || kernel_type == c2c_fwd_none_Z || kernel_type == c2c_fwd_increase_Z ||
           kernel_type == c2c_fwd_decrease || 
           kernel_type == c2c_fwd_increase || 
-          kernel_type == xcorr_fwd_decrease_inv_none || kernel_type == xcorr_fwd_increase_inv_none)
+          kernel_type == xcorr_fwd_decrease_inv_none || kernel_type == xcorr_fwd_increase_inv_none ||
+          kernel_type == generic_fwd_none_op_inv_decrease)
 
     {
       return true;
@@ -560,22 +574,25 @@ private:
   template<class FFT, class invFFT> void FFT_C2C_WithPadding_ConjMul_C2C_t(float2* image_to_search, bool swap_real_space_quadrants);
   template<class FFT, class invFFT> void FFT_C2C_decomposed_ConjMul_C2C_t(float2* image_to_search, bool swap_real_space_quadrants);
 
+    // auto x = [](const auto&) { return true; }
+    // template<typename T, typename U = decltype(x)> void f(U u = x);
+
   // 1. 
   // First call passed from a public transform function, selects block or thread and the transform precision.
-  template <bool use_thread_method = false>
-  void SetPrecisionAndExectutionMethod(KernelType kernel_type, bool do_forward_transform = true);
+  template <bool use_thread_method = false, class FunctionType = double> // bool is just used as a dummy type
+  void SetPrecisionAndExectutionMethod(KernelType kernel_type, bool do_forward_transform = true, FunctionType user_lambda = ([]__device__ ()->double{ return double(0.0); })());
 
   // 2.
   // Second call, sets size of the transform kernel, selects the appropriate GPU arch
-  template <class FFT_base>
-  void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform);
+  template <class FFT_base, class FunctionType = double>
+  void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, FunctionType user_lambda = ([]__device__ ()->double { return double(0.0); })());
 
-  template <class FFT_base>
-  void SelectSizeAndType_3d(KernelType kernel_type, bool do_forward_transform);
+//   template <class FFT_base, class FunctionType>
+//   void SelectSizeAndType_3d(KernelType kernel_type, FunctionType  user_lambda = default_lambda, bool do_forward_transform);
   // 3.
   // Third call, sets the input and output dimensions and type
-  template <class FFT_base_arch, bool use_thread_method = false>
-  void SetAndLaunchKernel(KernelType kernel_type, bool do_forward_transform);
+  template <class FFT_base_arch, class FunctionType = double, bool use_thread_method = false>
+  void SetAndLaunchKernel(KernelType kernel_type, bool do_forward_transform, FunctionType user_lambda = ([]__device__ ()->double { return double(0.0); })());
 
 
 

@@ -176,7 +176,7 @@ bool const_image_test(std::vector<int> size, bool do_3d = false) {
     
     // Just to make sure we don't get a false positive, set the host memory to some undesired value.
     FT.SetToConstant<float>(host_output.real_values, host_output.real_memory_allocated, 2.0f);
-    
+
     // This method will call the regular FFT kernels given the input/output dimensions are equal when the class is instantiated.
     bool swap_real_space_quadrants = false;
     FT.FwdFFT(swap_real_space_quadrants);
@@ -927,6 +927,15 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
         cuFFT_output.MakeCufftPlan();
       }
 
+      std::cout << "Test lambda" << std::endl;
+      // Create a no capture lambda function. Target FFT is the pre-transformed image to search.
+      // template FFT will come from *this.
+      auto conj_mul_lambda = [] __device__ (float2 template_fft, float2 target_fft) {
+          // Is there a better way than declaring this variable each time?
+          float tmp  = (template_fft.x * target_fft.x + template_fft.y * target_fft.y); 
+          template_fft.y =  (template_fft.y * target_fft.x - template_fft.x * target_fft.y) ;
+          template_fft.x = tmp;
+      };
 
 
       //////////////////////////////////////////
@@ -934,7 +943,9 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
       // Warm up and check for accuracy
       if (set_conjMult_callback || is_size_change_decrease ) // we set set_conjMult_callback = false 
       {
-        FT.CrossCorrelate(targetFT.d_ptr.momentum_space, false);
+        // FT.CrossCorrelate(targetFT.d_ptr.momentum_space, false);
+            // Will type deduction work here?
+        FT.Generic_Fwd_Op_Inv(targetFT.d_ptr.momentum_space, conj_mul_lambda);
       }
       else
       {
@@ -1138,7 +1149,9 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
       {
         if (set_conjMult_callback || is_size_change_decrease )
         {
-          FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
+        //   FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
+        // Will type deduction work here?
+        FT.Generic_Fwd_Op_Inv(targetFT.d_ptr.momentum_space, conj_mul_lambda);          
         }
         else
         {
@@ -1431,8 +1444,8 @@ int main(int argc, char** argv) {
     }   
 
     if (run_2d_unit_tests) {
-        if (! const_image_test (test_size_3d, false)) return 1;
-        if (! unit_impulse_test(test_size_3d, false, true)) return 1;
+        if (! const_image_test (test_size, false)) return 1;
+        if (! unit_impulse_test(test_size, false, true)) return 1;
     }
 
     if (run_3d_unit_tests) {

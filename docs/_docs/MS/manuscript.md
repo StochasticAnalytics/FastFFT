@@ -146,6 +146,18 @@ By design, the cufft library from Nvidia returns an FFT in the natural order [TO
 | 1024 | 1.85 | 2.25 | | 1.79 | 2.43 |
 | 2048 | 1.95 | 1.95 | | 2.10| 2.10|
 
+*with a generic lambda*
+
+| 2D input | 2x size |  4096 | <- sm70 sm86 -> |2x size |  4096 |
+| --- | ---- | ---- | --- | ---- | ---- |
+| 32 | 2.31 | 2.52 | | 2.39 | 2.65 |
+| 64 | 2.54 | 2.61 | | 2.78 | 2.73 |
+| 128 | 2.29 | 2.64 | | 2.36 | 2.74 |
+| 256 | 1.59 | 2.50 |   | 1.63 | 2.71 |
+| 512 | 1.34 | 2.50 | | 1.32 | 2.63 |
+| 1024 | 1.90 | 2.30 | | 1.80 | 2.46 |
+| 2048 | 1.95 | 1.95 | | 2.10| 2.10|
+
 ##### Table 3: cuFFT/FastFFT runtime (sm70) zero padded convolution of input size (top row), where only (bottom row) pixel sq. is needed for output
 
 | | 32   |64   | 128 | 256 | 512 | 1024| 2048| 4096|
