@@ -176,7 +176,7 @@ bool const_image_test(std::vector<int> size, bool do_3d = false) {
     
     // Just to make sure we don't get a false positive, set the host memory to some undesired value.
     FT.SetToConstant<float>(host_output.real_values, host_output.real_memory_allocated, 2.0f);
-    
+
     // This method will call the regular FFT kernels given the input/output dimensions are equal when the class is instantiated.
     bool swap_real_space_quadrants = false;
     FT.FwdFFT(swap_real_space_quadrants);
@@ -927,7 +927,17 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
         cuFFT_output.MakeCufftPlan();
       }
 
-
+    //   std::cout << "Test lambda" << std::endl;
+    //   // Create a no capture lambda function. Target FFT is the pre-transformed image to search.
+    //   // template FFT will come from *this.
+    //   auto conj_mul_lambda = [] __device__ (__float2 template_fft, __float2 target_fft))) {
+    //       // Is there a better way than declaring this variable each time?
+    //       float tmp  = (template_fft.x * target_fft.x + template_fft.y * target_fft.y); 
+    //       template.y =  (template_fft.y * target_fft.x - template_fft.x * target_fft.y) ;
+    //       template.x = tmp;
+    //   };
+    //   // Will type deduction work here?
+    //   FT.Generic_Fwd_Op_Inv(targetFT.d_ptr.momentum_space, conj_mul_lambda);
 
       //////////////////////////////////////////
       //////////////////////////////////////////
@@ -1431,8 +1441,8 @@ int main(int argc, char** argv) {
     }   
 
     if (run_2d_unit_tests) {
-        if (! const_image_test (test_size_3d, false)) return 1;
-        if (! unit_impulse_test(test_size_3d, false, true)) return 1;
+        if (! const_image_test (test_size, false)) return 1;
+        if (! unit_impulse_test(test_size, false, true)) return 1;
     }
 
     if (run_3d_unit_tests) {

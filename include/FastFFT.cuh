@@ -332,6 +332,11 @@ __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul( const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, 
                                                 Offsets mem_offsets, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv);
 
+template<class FFT, class invFFT, class FunctionType, class ComplexType = typename FFT::value_type>
+__launch_bounds__(FFT::max_threads_per_block) __global__
+void block_fft_kernel_C2C_FWD_INCREASE_OP_INV_NONE( const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, 
+                                                    Offsets mem_offsets, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv, FunctionType user_lambda);                                                
+
 template<class FFT, class invFFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul_SwapRealSpaceQuadrants(const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, 
@@ -721,6 +726,21 @@ struct io {
             // a * conj b
             thread_data[i] = c;//ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
             index += stride;
+        }
+    }
+
+    template<class FunctionType>
+    static inline __device__ void load_shared_and_do_lambda(const complex_type*  image_to_search,
+                                                            complex_type*        thread_data,
+                                                            FunctionType         user_lambda) {
+        const unsigned int stride = stride_size();
+        unsigned int       index  = threadIdx.x;
+        for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
+            // a * conj b
+            if constexpr (! std::is_same<FunctionType, double>::value) {
+                thread_data[i] = user_lambda(thread_data[i], image_to_search[index]);//ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
+                index += stride;
+            }
         }
     }
 

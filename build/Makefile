@@ -6,7 +6,7 @@ NVCC_FLAGS=-ccbin=icpc -t 4
 
 # TODO: static may need to be added later or independently just for benchmarks, while libs to link through python are probably going to need to be dynamic.
 NVCC_FLAGS+=--cudart=static
-NVCC_FLAGS+=--default-stream per-thread -m64 -O3 --use_fast_math --extra-device-vectorization -std=c++17 -Xptxas --warn-on-local-memory-usage,--warn-on-spills, --generate-line-info -Xcompiler=-std=c++17
+NVCC_FLAGS+=--default-stream per-thread -m64 -O3 --use_fast_math --extra-device-vectorization --extended-lambda -std=c++17 -Xptxas --warn-on-local-memory-usage,--warn-on-spills, --generate-line-info -Xcompiler=-std=c++17
 # Experimental flag to allow relaxed constexpr host call in device code
 NVCC_FLAGS+=--expt-relaxed-constexpr
 # For testing, particularly until the cufftdx::BlockDim() operator is enabled
