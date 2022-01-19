@@ -595,10 +595,16 @@ private:
 
   // 2.
   // Second call, sets size of the transform kernel, selects the appropriate GPU arch
-  template <class FFT_base, class PreOpType = bool, class IntraOpType = bool, class PostOpType = bool>
-  void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda = false, IntraOpType intra_op_lambda = false, PostOpType post_op_lambda = false);     
-//   template <class FFT_base, class FunctionType>
-//   void SelectSizeAndType_3d(KernelType kernel_type, FunctionType  user_lambda = default_lambda, bool do_forward_transform);
+
+    // template <class FFT_base, class PreOpType, class IntraOpType, class PostOpType>
+    // void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda);
+
+    template <class FFT_base, class PreOpType, class IntraOpType, class PostOpType, unsigned int SizeValue>
+    void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda, bool size_is_found);
+
+    template <class FFT_base, class PreOpType, class IntraOpType, class PostOpType, unsigned int SizeValue, unsigned int ... OtherSizes>
+    void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda, bool size_is_found);
+
   // 3.
   // Third call, sets the input and output dimensions and type
   template <class FFT_base_arch, class PreOpType = bool, class IntraOpType = bool, class PostOpType = bool>

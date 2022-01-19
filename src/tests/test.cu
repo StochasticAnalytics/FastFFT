@@ -1417,8 +1417,8 @@ int main(int argc, char** argv) {
     std::printf("Standard is %i\n\n",__cplusplus);
 
     // Input size vectors to be tested.
-    std::vector<int> test_size = { 16, 32, 64, 128, 256, 512, 1024, 2048, 4096};
-    std::vector<int> test_size_3d = { 16, 32, 64, 128, 256, 512};
+    std::vector<int> test_size = {  32, 64, 128, 256, 512, 1024, 2048, 4096};
+    std::vector<int> test_size_3d = {  32, 64, 128, 256, 512};
     // std::vector<int> test_size_3d ={512};
   
     // The launch parameters fail for 4096 -> < 64 for r2c_decrease, not sure if it is the elements_per_thread or something else.
