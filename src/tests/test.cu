@@ -928,14 +928,16 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
       }
 
       std::cout << "Test lambda" << std::endl;
+
       // Create a no capture lambda function. Target FFT is the pre-transformed image to search.
       // template FFT will come from *this.
-      auto conj_mul_lambda = [] __device__ (float2 template_fft, float2 target_fft) {
+      auto conj_mul_lambda = [] __device__ (float2 template_fft, float2 target_fft) noexcept {
           // Is there a better way than declaring this variable each time?
           float tmp  = (template_fft.x * target_fft.x + template_fft.y * target_fft.y); 
           template_fft.y =  (template_fft.y * target_fft.x - template_fft.x * target_fft.y) ;
           template_fft.x = tmp;
       };
+
 
 
       //////////////////////////////////////////
@@ -945,7 +947,7 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
       {
         // FT.CrossCorrelate(targetFT.d_ptr.momentum_space, false);
             // Will type deduction work here?
-        FT.Generic_Fwd_Op_Inv(targetFT.d_ptr.momentum_space, conj_mul_lambda);
+        FT.Generic_Fwd_Image_Inv(targetFT.d_ptr.momentum_space, false, conj_mul_lambda);
       }
       else
       {
@@ -1151,7 +1153,7 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
         {
         //   FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
         // Will type deduction work here?
-        FT.Generic_Fwd_Op_Inv(targetFT.d_ptr.momentum_space, conj_mul_lambda);          
+        FT.Generic_Fwd_Image_Inv(targetFT.d_ptr.momentum_space, false, conj_mul_lambda);
         }
         else
         {

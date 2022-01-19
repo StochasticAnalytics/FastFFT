@@ -332,10 +332,11 @@ __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul( const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, 
                                                 Offsets mem_offsets, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv);
 
-template<class FFT, class invFFT, class FunctionType, class ComplexType = typename FFT::value_type>
+template<class FFT, class invFFT, class ComplexType = typename FFT::value_type, class PreOpType = bool, class IntraOpType = bool, class PostOpType = bool>
 __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_C2C_FWD_INCREASE_OP_INV_NONE( const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, 
-                                                    Offsets mem_offsets, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv, FunctionType user_lambda);                                                
+                                                    Offsets mem_offsets, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv, 
+                                                    PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda);                                                
 
 template<class FFT, class invFFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
@@ -729,16 +730,24 @@ struct io {
         }
     }
 
+    // TODO: set user lambda to default = false, then get rid of other load_shared
     template<class FunctionType>
-    static inline __device__ void load_shared_and_do_lambda(const complex_type*  image_to_search,
-                                                            complex_type*        thread_data,
-                                                            FunctionType         user_lambda) {
+    static inline __device__ void load_shared(const complex_type*  image_to_search,
+                                              complex_type*        thread_data,
+                                              FunctionType         intra_op_lambda) {
         const unsigned int stride = stride_size();
         unsigned int       index  = threadIdx.x;
-        for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
-            // a * conj b
-            if constexpr (! std::is_same<FunctionType, double>::value) {
-                thread_data[i] = user_lambda(thread_data[i], image_to_search[index]);//ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
+        if constexpr (std::is_same<FunctionType, bool>::value) {
+            for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
+                // a * conj b
+                thread_data[i] = thread_data[i], image_to_search[index];//ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
+                index += stride;
+            }
+        }
+        else {
+            for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
+                // a * conj b
+                thread_data[i] = intra_op_lambda(thread_data[i], image_to_search[index]);//ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
                 index += stride;
             }
         }
@@ -963,7 +972,7 @@ struct io {
 
     // this may benefit from asynchronous execution
     static inline __device__ void load(const complex_type* input,
-                                        complex_type*       thread_data) {
+                                       complex_type*       thread_data) {
         const unsigned int stride = stride_size();
         unsigned int       index  = threadIdx.x;
         for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
@@ -976,8 +985,8 @@ struct io {
 
     // this may benefit from asynchronous execution
     static inline __device__ void load(const complex_type* input,
-                                        complex_type*       thread_data,
-                                        int                 last_index_to_load) {
+                                       complex_type*       thread_data,
+                                       int                 last_index_to_load) {
         const unsigned int stride = stride_size();
         unsigned int       index  = threadIdx.x;
         for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
@@ -985,6 +994,31 @@ struct io {
             else thread_data[i] = complex_type(0.0f, 0.0f);
             index += stride;
         }
+    }
+
+    //  TODO: set pre_op_lambda to default=false and get rid of other load
+    template<class FunctionType>                 
+    static inline __device__ void  load(const complex_type* input,
+                                        complex_type*       thread_data,
+                                        int                 last_index_to_load,
+                                        FunctionType        pre_op_lambda) {
+        const unsigned int stride = stride_size();
+        unsigned int       index  = threadIdx.x;                                            
+        if constexpr (std::is_same<FunctionType, bool>::value) {
+            for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
+                if (index < last_index_to_load) thread_data[i] = input[index];
+                else thread_data[i] = complex_type(0.0f, 0.0f);
+                index += stride;
+            }
+        }
+        else {
+            for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
+                if (index < last_index_to_load) thread_data[i] = pre_op_lambda(input[index]);
+                else thread_data[i] = pre_op_lambda(complex_type(0.0f, 0.0f));
+                index += stride;
+            }         
+        }
+
     }
   
     static inline __device__ void store_and_swap_quadrants(const complex_type* thread_data,
@@ -1023,14 +1057,23 @@ struct io {
     }
 
 
-
+    template<class FunctionType = bool>
     static inline __device__ void store(const complex_type* thread_data,
-                                        complex_type*       output) {
+                                        complex_type*       output,
+                                        FunctionType        post_op_lambda = false) {
         const unsigned int stride = stride_size();
         unsigned int       index  = threadIdx.x;
-        for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
-            output[index] = thread_data[i];
-            index += stride;
+        if constexpr (std::is_same_v<FunctionType, bool>) {
+            for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
+                output[index] = thread_data[i];
+                index += stride;
+            }
+        }
+        else {
+            for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
+                output[index] = post_op_lambda(thread_data[i]);
+                index += stride;
+            }
         }
     } 
 

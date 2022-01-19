@@ -226,8 +226,9 @@ public:
             printf("%f\n", in);
         };
     */
-    template<class FunctionType>
-    void Generic_Fwd_Op_Inv(float2* data, FunctionType user_lambda);
+    // could float2* be replaced with decltype(DevicePointers.momentum_space)
+    template<class PreOpType = bool, class IntraOpType = bool, class PostOpType = bool>
+    void Generic_Fwd_Image_Inv(float2* data, PreOpType pre_op_lambda = false, IntraOpType intra_op_lambda = false, PostOpType post_op_lambda = false);
 
     void ClipIntoTopLeft();
     void ClipIntoReal(int wanted_coordinate_of_box_center_x, int wanted_coordinate_of_box_center_y, int wanted_coordinate_of_box_center_z);
@@ -574,25 +575,23 @@ private:
   template<class FFT, class invFFT> void FFT_C2C_WithPadding_ConjMul_C2C_t(float2* image_to_search, bool swap_real_space_quadrants);
   template<class FFT, class invFFT> void FFT_C2C_decomposed_ConjMul_C2C_t(float2* image_to_search, bool swap_real_space_quadrants);
 
-    // auto x = [](const auto&) { return true; }
-    // template<typename T, typename U = decltype(x)> void f(U u = x);
+
 
   // 1. 
   // First call passed from a public transform function, selects block or thread and the transform precision.
-  template <bool use_thread_method = false, class FunctionType = double> // bool is just used as a dummy type
-  void SetPrecisionAndExectutionMethod(KernelType kernel_type, bool do_forward_transform = true, FunctionType user_lambda = ([]__device__ ()->double{ return double(0.0); })());
+  template <bool use_thread_method = false, class PreOpType = bool, class IntraOpType = bool, class PostOpType = bool> // bool is just used as a dummy type
+  void SetPrecisionAndExectutionMethod(KernelType kernel_type, bool do_forward_transform = true, PreOpType pre_op_lambda = false, IntraOpType intra_op_lambda = false, PostOpType post_op_lambda = false);     
 
   // 2.
   // Second call, sets size of the transform kernel, selects the appropriate GPU arch
-  template <class FFT_base, class FunctionType = double>
-  void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, FunctionType user_lambda = ([]__device__ ()->double { return double(0.0); })());
-
+  template <class FFT_base, class PreOpType = bool, class IntraOpType = bool, class PostOpType = bool>
+  void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda = false, IntraOpType intra_op_lambda = false, PostOpType post_op_lambda = false);     
 //   template <class FFT_base, class FunctionType>
 //   void SelectSizeAndType_3d(KernelType kernel_type, FunctionType  user_lambda = default_lambda, bool do_forward_transform);
   // 3.
   // Third call, sets the input and output dimensions and type
-  template <class FFT_base_arch, class FunctionType = double, bool use_thread_method = false>
-  void SetAndLaunchKernel(KernelType kernel_type, bool do_forward_transform, FunctionType user_lambda = ([]__device__ ()->double { return double(0.0); })());
+  template <class FFT_base_arch, class PreOpType = bool, class IntraOpType = bool, class PostOpType = bool>
+  void SetAndLaunchKernel(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda = false, IntraOpType intra_op_lambda = false, PostOpType post_op_lambda = false);     
 
 
 
