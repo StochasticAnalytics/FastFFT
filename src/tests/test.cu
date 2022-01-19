@@ -5,6 +5,13 @@
 
 #define MyTestPrintAndExit(...)	{std::cerr << __VA_ARGS__  << " From: " << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1);}
 
+#ifndef FFT_DEBUG_LEVEL
+#error "FFT_DEBUG_LEVEL not defined"
+#endif
+
+#ifndef DEBUG_FFT_STAGE
+#error "DEBUG_FFT_STAGE not defined"
+#endif
 
 void PrintArray( float2* array, short NX, short NY, short NZ, int line_wrapping = 34)
 {
@@ -78,6 +85,8 @@ void PrintArray_XZ( float2* array, short NX, short NY, short NZ, int line_wrappi
 
 // The Fourier transform of a constant should be a unit impulse, and on back fft, without normalization, it should be a constant * N.
 // It is assumed the input/output have the same dimension (i.e. no padding)
+
+template<int Rank>
 bool const_image_test(std::vector<int> size, bool do_3d = false) {
 
   bool all_passed = true;
@@ -117,7 +126,7 @@ bool const_image_test(std::vector<int> size, bool do_3d = false) {
 
     // We just make one instance of the FourierTransformer class, with calc type float.
     // For the time being input and output are also float. TODO calc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
-    FastFFT::FourierTransformer<float, float, float> FT;
+    FastFFT::FourierTransformer<float, float, float, Rank> FT;
     
     // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
     FT.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, output_size.x,output_size.y,output_size.z, true, false);
@@ -145,7 +154,7 @@ bool const_image_test(std::vector<int> size, bool do_3d = false) {
 
       
     // Set our input host memory to a constant. Then FFT[0] = host_input_memory_allocated
-    FT.SetToConstant<float>(host_output.real_values, host_output.real_memory_allocated, 1.0f);
+    FT.SetToConstant(host_output.real_values, host_output.real_memory_allocated, 1.0f);
 
       
 
@@ -175,7 +184,7 @@ bool const_image_test(std::vector<int> size, bool do_3d = false) {
     // MyFFTDebugAssertTestTrue( test_passed, "FFTW unit impulse forward FFT");
     
     // Just to make sure we don't get a false positive, set the host memory to some undesired value.
-    FT.SetToConstant<float>(host_output.real_values, host_output.real_memory_allocated, 2.0f);
+    FT.SetToConstant(host_output.real_values, host_output.real_memory_allocated, 2.0f);
 
     // This method will call the regular FFT kernels given the input/output dimensions are equal when the class is instantiated.
     bool swap_real_space_quadrants = false;
@@ -209,7 +218,7 @@ bool const_image_test(std::vector<int> size, bool do_3d = false) {
 
     if (test_passed == false) {all_passed = false; FastFFT_forward_passed[n] = false;}
     // MyFFTDebugAssertTestTrue( test_passed, "FastFFT unit impulse forward FFT");
-    FT.SetToConstant<float>(host_input.real_values, host_input.real_memory_allocated, 2.0f);
+    FT.SetToConstant(host_input.real_values, host_input.real_memory_allocated, 2.0f);
     
 
     FT.InvFFT();
@@ -262,6 +271,7 @@ bool const_image_test(std::vector<int> size, bool do_3d = false) {
   return all_passed;
 }
 
+template<int Rank>
 bool random_image_test(std::vector<int> size, bool do_3d = false) {
 
   bool all_passed = true;
@@ -302,7 +312,7 @@ bool random_image_test(std::vector<int> size, bool do_3d = false) {
 
     // We just make one instance of the FourierTransformer class, with calc type float.
     // For the time being input and output are also float. TODO calc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
-    FastFFT::FourierTransformer<float, float, float> FT;
+    FastFFT::FourierTransformer<float, float, float, Rank> FT;
     
     // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
     FT.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, output_size.x,output_size.y,output_size.z, true, false);
@@ -333,7 +343,7 @@ bool random_image_test(std::vector<int> size, bool do_3d = false) {
 
       
     // Set our input host memory to a constant. Then FFT[0] = host_input_memory_allocated
-    FT.SetToRandom<float>(host_output.real_values, host_output.real_memory_allocated, 0.0f, 1.0f);
+    FT.SetToRandom(host_output.real_values, host_output.real_memory_allocated, 0.0f, 1.0f);
 
     
     // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
@@ -392,7 +402,7 @@ bool random_image_test(std::vector<int> size, bool do_3d = false) {
     exit(0);
     if (test_passed == false) {all_passed = false; FastFFT_forward_passed[n] = false;}
     // MyFFTDebugAssertTestTrue( test_passed, "FastFFT unit impulse forward FFT");
-    FT.SetToConstant<float>(host_input.real_values, host_input.real_memory_allocated, 2.0f);
+    FT.SetToConstant(host_input.real_values, host_input.real_memory_allocated, 2.0f);
     
 
     FT.InvFFT();
@@ -445,6 +455,7 @@ bool random_image_test(std::vector<int> size, bool do_3d = false) {
   return all_passed;
 }
 
+template<int Rank>
 bool unit_impulse_test(std::vector<int>size, bool do_3d, bool do_increase_size) {
 
   bool all_passed = true;
@@ -502,7 +513,7 @@ bool unit_impulse_test(std::vector<int>size, bool do_3d, bool do_increase_size) 
 
   // We just make one instance of the FourierTransformer class, with calc type float.
   // For the time being input and output are also float. TODO calc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
-  FastFFT::FourierTransformer<float, float, float> FT;
+  FastFFT::FourierTransformer<float, float, float, Rank> FT;
   // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
   FT.SetForwardFFTPlan(input_size.x,input_size.y,input_size.z, output_size.x,output_size.y,output_size.z, true, false);
   FT.SetInverseFFTPlan(output_size.x,output_size.y,output_size.z, output_size.x,output_size.y,output_size.z, true); 
@@ -533,15 +544,15 @@ bool unit_impulse_test(std::vector<int>size, bool do_3d, bool do_increase_size) 
   FT.SetInputPointer(host_input.real_values, false);
   
   // Set a unit impulse at the center of the input array.
-  FT.SetToConstant<float>(host_input.real_values, host_input.real_memory_allocated, 0.0f);
-  FT.SetToConstant<float>(host_output.real_values, host_output.real_memory_allocated, 0.0f);
+  FT.SetToConstant(host_input.real_values, host_input.real_memory_allocated, 0.0f);
+  FT.SetToConstant(host_output.real_values, host_output.real_memory_allocated, 0.0f);
 
   sum = ReturnSumOfReal(host_output.real_values, dims_out);
   // host_input.real_values[ dims_in.y/2 * (dims_in.x+host_input.padding_jump_value) + dims_in.x/2] = 1.0f;
   // short4 wanted_center = make_short4(0,0,0,0);
   // ClipInto(host_input.real_values, host_output.real_values, dims_in ,  dims_out,  wanted_center, 0.f);
 
-  // FT.SetToConstant<float>(host_input.real_values, host_input.real_memory_allocated, 0.0f);
+  // FT.SetToConstant(host_input.real_values, host_input.real_memory_allocated, 0.0f);
   host_input.real_values[0] = 1.0f;
   host_output.real_values[0] = 1.0f;
 
@@ -565,7 +576,7 @@ bool unit_impulse_test(std::vector<int>size, bool do_3d, bool do_increase_size) 
   // MyFFTDebugAssertTestTrue( std::abs(host_output.fftw_epsilon) < 1e-8 , "FFTW unit impulse forward FFT");
   
   // Just to make sure we don't get a false positive, set the host memory to some undesired value.
-  FT.SetToConstant<float>(host_output.real_values, host_output.real_memory_allocated, 2.0f);
+  FT.SetToConstant(host_output.real_values, host_output.real_memory_allocated, 2.0f);
   
   // This method will call the regular FFT kernels given the input/output dimensions are equal when the class is instantiated.
   bool swap_real_space_quadrants = true;
@@ -633,7 +644,7 @@ bool unit_impulse_test(std::vector<int>size, bool do_3d, bool do_increase_size) 
   if (abs(sum) > 1e-8) {all_passed = false; FastFFT_forward_passed[iSize] = false;}
 
   // MyFFTDebugAssertTestTrue( abs(sum - host_output.fftw_epsilon) < 1e-8, "FastFFT unit impulse forward FFT");
-  FT.SetToConstant<float>(host_output.real_values, host_output.real_memory_allocated, 2.0f);
+  FT.SetToConstant(host_output.real_values, host_output.real_memory_allocated, 2.0f);
   
 
   FT.InvFFT();
@@ -686,6 +697,7 @@ bool unit_impulse_test(std::vector<int>size, bool do_3d, bool do_increase_size) 
   return all_passed;
 }
 
+template<int Rank>
 void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
 
   bool skip_cufft_for_profiling = false;
@@ -774,10 +786,10 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
 
       // We just make one instance of the FourierTransformer class, with calc type float.
       // For the time being input and output are also float. TODO calc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
-      FastFFT::FourierTransformer<float, float, float> FT;
+      FastFFT::FourierTransformer<float, float, float, Rank> FT;
         // Create an instance to copy memory also for the cufft tests.
-      FastFFT::FourierTransformer<float, float, float> cuFFT;
-      FastFFT::FourierTransformer<float, float, float> targetFT;
+      FastFFT::FourierTransformer<float, float, float, Rank> cuFFT;
+      FastFFT::FourierTransformer<float, float, float, Rank> targetFT;
 
       if ( is_size_change_decrease )
       {
@@ -841,12 +853,12 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
 
       // Set a unit impulse at the center of the input array.
       // For now just considering the real space image to have been implicitly quadrant swapped so the center is at the origin.
-      FT.SetToConstant<float>(FT_input.real_values, FT_input.real_memory_allocated, 0.0f);
-      FT.SetToConstant<float>(cuFFT_input.real_values, cuFFT_input.real_memory_allocated, 0.0f);
-      FT.SetToConstant<float>(FT_output.real_values, FT_output.real_memory_allocated, 0.0f);
-      FT.SetToConstant<float>(cuFFT_output.real_values, cuFFT_output.real_memory_allocated, 0.0f);
-      FT.SetToConstant<float>(target_search_image.real_values, target_search_image.real_memory_allocated, 0.0f);
-      FT.SetToConstant<float>(positive_control.real_values, target_search_image.real_memory_allocated, 0.0f);
+      FT.SetToConstant(FT_input.real_values, FT_input.real_memory_allocated, 0.0f);
+      FT.SetToConstant(cuFFT_input.real_values, cuFFT_input.real_memory_allocated, 0.0f);
+      FT.SetToConstant(FT_output.real_values, FT_output.real_memory_allocated, 0.0f);
+      FT.SetToConstant(cuFFT_output.real_values, cuFFT_output.real_memory_allocated, 0.0f);
+      FT.SetToConstant(target_search_image.real_values, target_search_image.real_memory_allocated, 0.0f);
+      FT.SetToConstant(positive_control.real_values, target_search_image.real_memory_allocated, 0.0f);
 
   
       // Place these values at the origin of the image and after convolution, should be at 0,0,0.
@@ -1267,6 +1279,7 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
 
 }
 
+template<int Rank>
 void run_oned(std::vector<int> size)
 {
 
@@ -1287,7 +1300,7 @@ void run_oned(std::vector<int> size)
 
     // We just make one instance of the FourierTransformer class, with calc type float.
     // For the time being input and output are also float. TODO calc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
-    FastFFT::FourierTransformer<float, float, float> FT;
+    FastFFT::FourierTransformer<float, float, float, Rank> FT;
     FastFFT::FourierTransformer<float, float2, float2> FT_complex;
 
     // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
@@ -1320,10 +1333,10 @@ void run_oned(std::vector<int> size)
     FT_complex.SetInputPointer(FT_input_complex.complex_values, false);
 
 
-    FT.SetToConstant<float>(FT_input.real_values, FT_input.real_memory_allocated, 1.f);
+    FT.SetToConstant(FT_input.real_values, FT_input.real_memory_allocated, 1.f);
 
     // Set a unit impulse at the center of the input array.
-    // FT.SetToConstant<float>(FT_input.real_values, FT_input.real_memory_allocated, 1.0f);
+    // FT.SetToConstant(FT_input.real_values, FT_input.real_memory_allocated, 1.0f);
     float2 const_val = make_float2(1.0f,0.0f);
     FT_complex.SetToConstant<float2>(FT_input_complex.complex_values, FT_input.real_memory_allocated, const_val);
     for (int i=0; i<10; i++)
@@ -1337,7 +1350,7 @@ void run_oned(std::vector<int> size)
     cudaErr(cudaStreamSynchronize(cudaStreamPerThread));  
 
         // Set the outputs to a clearly wrong answer.
-        FT.SetToConstant<float>(FT_output.real_values, FT_input.real_memory_allocated, 2.0f);
+        FT.SetToConstant(FT_output.real_values, FT_input.real_memory_allocated, 2.0f);
         const_val = make_float2(2.0f,2.0f);
         FT_complex.SetToConstant<float2>(FT_output_complex.complex_values, FT_output.real_memory_allocated, const_val);
 
@@ -1446,12 +1459,12 @@ int main(int argc, char** argv) {
     }   
 
     if (run_2d_unit_tests) {
-        if (! const_image_test (test_size, false)) return 1;
-        if (! unit_impulse_test(test_size, false, true)) return 1;
+        if (! const_image_test<2>(test_size, false)) return 1;
+        if (! unit_impulse_test<2>(test_size, false, true)) return 1;
     }
 
     if (run_3d_unit_tests) {
-        if (! const_image_test (test_size_3d, true)) return 1;
+        if (! const_image_test<3>(test_size_3d, true)) return 1;
         // if (! unit_impulse_test(test_size_3d, true, true)) return 1;
     }
 
@@ -1466,13 +1479,13 @@ int main(int argc, char** argv) {
         bool do_3d = false;
     
         size_change_type = 0; // no change
-        compare_libraries(test_size, do_3d, size_change_type);
+        compare_libraries<2>(test_size, do_3d, size_change_type);
     
         size_change_type = 1; // increase
-        compare_libraries(test_size, do_3d, size_change_type);
+        compare_libraries<2>(test_size, do_3d, size_change_type);
     
         size_change_type = -1; // decrease
-        compare_libraries(test_size, do_3d, size_change_type);
+        compare_libraries<2>(test_size, do_3d, size_change_type);
     }
 
     if (run_3d_performance_tests) {
@@ -1486,7 +1499,7 @@ int main(int argc, char** argv) {
         bool do_3d = true;
     
         size_change_type = 0; // no change
-        compare_libraries(test_size, do_3d, size_change_type);
+        compare_libraries<3>(test_size, do_3d, size_change_type);
     
         // TODO: These are not yet completed.
         // size_change_type = 1; // increase

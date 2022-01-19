@@ -138,7 +138,7 @@ namespace FastFFT {
 
   
 
-template <class ComputeType = float, class InputType = float, class OutputType = float>
+template <class ComputeType = float, class InputType = float, class OutputType = float, int Rank = 2>
 class FourierTransformer {
 
 public:
@@ -525,6 +525,17 @@ private:
     }
     else return false;
   }
+
+    inline bool IsRank3(KernelType kernel_type) {
+        if (kernel_type == r2c_none_XZ || kernel_type == r2c_increase_XZ ||
+            kernel_type == c2c_fwd_increase_Z || kernel_type == c2c_inv_none_XZ ||
+            kernel_type == c2c_fwd_none_Z || kernel_type == c2c_inv_none_Z)
+        {
+            return true;
+        }
+        else return false;
+    }
+
 
   inline void AssertDivisibleAndFactorOf2( int full_size_transform, int number_non_zero_inputs_or_outputs)
   {
