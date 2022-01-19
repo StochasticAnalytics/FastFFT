@@ -2195,50 +2195,50 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SelectSizeAnd
 
         // Only re-enter if < 3d transform.
         if constexpr( Rank < 3) {
-        switch (transform_size.P) {
-            case 1024: {
-                elements_per_thread_complex = elements_per_thread_1024;
-                switch (device_properties.device_arch) {
-                    case 700: { using FFT = decltype(FFT_base()  + Size<1024>()  + SM<700>() + ElementsPerThread<elements_per_thread_1024>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
-                    case 750: { using FFT = decltype(FFT_base()  + Size<1024>()  + SM<750>() + ElementsPerThread<elements_per_thread_1024>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
-                    case 800: { using FFT = decltype(FFT_base()  + Size<1024>()  + SM<800>() + ElementsPerThread<elements_per_thread_1024>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
-                    case 860: { using FFT = decltype(FFT_base()  + Size<1024>()  + SM<700>() + ElementsPerThread<elements_per_thread_1024>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
+            switch (transform_size.P) {
+                case 1024: {
+                    elements_per_thread_complex = elements_per_thread_1024;
+                    switch (device_properties.device_arch) {
+                        case 700: { using FFT = decltype(FFT_base()  + Size<1024>()  + SM<700>() + ElementsPerThread<elements_per_thread_1024>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
+                        case 750: { using FFT = decltype(FFT_base()  + Size<1024>()  + SM<750>() + ElementsPerThread<elements_per_thread_1024>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
+                        case 800: { using FFT = decltype(FFT_base()  + Size<1024>()  + SM<800>() + ElementsPerThread<elements_per_thread_1024>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
+                        case 860: { using FFT = decltype(FFT_base()  + Size<1024>()  + SM<700>() + ElementsPerThread<elements_per_thread_1024>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
+                    }
+                    break; 
+                } 
+                case 2048: {
+                    elements_per_thread_complex = elements_per_thread_2048;
+                    switch (device_properties.device_arch) {
+                        case 700: { using FFT = decltype(FFT_base()  + Size<2048>()  + SM<700>() + ElementsPerThread<elements_per_thread_2048>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
+                        case 750: { using FFT = decltype(FFT_base()  + Size<2048>()  + SM<750>() + ElementsPerThread<elements_per_thread_2048>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
+                        case 800: { using FFT = decltype(FFT_base()  + Size<2048>()  + SM<800>() + ElementsPerThread<elements_per_thread_2048>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
+                        case 860: { using FFT = decltype(FFT_base()  + Size<2048>()  + SM<700>() + ElementsPerThread<elements_per_thread_2048>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
+                    }
+                    break; 
+                } 
+                case 4096: {
+                    elements_per_thread_complex = elements_per_thread_4096;
+                    switch (device_properties.device_arch) {
+                        case 700: { using FFT = decltype(FFT_base()  + Size<4096>()  + SM<700>() + ElementsPerThread<elements_per_thread_4096>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
+                        // case 750: { using FFT = decltype(FFT_base()  + Size<4096>()  + SM<750>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
+                        case 800: { using FFT = decltype(FFT_base()  + Size<4096>()  + SM<800>() + ElementsPerThread<elements_per_thread_4096>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
+                        case 860: { using FFT = decltype(FFT_base()  + Size<4096>()  + SM<700>() + ElementsPerThread<elements_per_thread_4096>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
+                    }
+                    break; 
+                }  
+                case 8192: {
+                    elements_per_thread_complex = elements_per_thread_8192;
+                    switch (device_properties.device_arch) {
+                        case 700: { using FFT = decltype(FFT_base()  + Size<8192>()  + SM<700>() + ElementsPerThread<elements_per_thread_8192>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
+                        case 800: { using FFT = decltype(FFT_base()  + Size<8192>()  + SM<800>() + ElementsPerThread<elements_per_thread_8192>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
+                        case 860: { using FFT = decltype(FFT_base()  + Size<8192>()  + SM<700>() + ElementsPerThread<elements_per_thread_8192>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
+                    }
+                    break; 
+                } 
+                default: {
+                    MyFFTRunTimeAssertTrue(false, "FFT size not supported" + std::to_string(transform_size.P));
                 }
-                break; 
-            } 
-            case 2048: {
-                elements_per_thread_complex = elements_per_thread_2048;
-                switch (device_properties.device_arch) {
-                    case 700: { using FFT = decltype(FFT_base()  + Size<2048>()  + SM<700>() + ElementsPerThread<elements_per_thread_2048>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
-                    case 750: { using FFT = decltype(FFT_base()  + Size<2048>()  + SM<750>() + ElementsPerThread<elements_per_thread_2048>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
-                    case 800: { using FFT = decltype(FFT_base()  + Size<2048>()  + SM<800>() + ElementsPerThread<elements_per_thread_2048>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
-                    case 860: { using FFT = decltype(FFT_base()  + Size<2048>()  + SM<700>() + ElementsPerThread<elements_per_thread_2048>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
-                }
-                break; 
-            } 
-            case 4096: {
-                elements_per_thread_complex = elements_per_thread_4096;
-                switch (device_properties.device_arch) {
-                    case 700: { using FFT = decltype(FFT_base()  + Size<4096>()  + SM<700>() + ElementsPerThread<elements_per_thread_4096>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
-                    // case 750: { using FFT = decltype(FFT_base()  + Size<4096>()  + SM<750>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
-                    case 800: { using FFT = decltype(FFT_base()  + Size<4096>()  + SM<800>() + ElementsPerThread<elements_per_thread_4096>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
-                    case 860: { using FFT = decltype(FFT_base()  + Size<4096>()  + SM<700>() + ElementsPerThread<elements_per_thread_4096>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
-                }
-                break; 
-            }  
-            case 8192: {
-                elements_per_thread_complex = elements_per_thread_8192;
-                switch (device_properties.device_arch) {
-                    case 700: { using FFT = decltype(FFT_base()  + Size<8192>()  + SM<700>() + ElementsPerThread<elements_per_thread_8192>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
-                    case 800: { using FFT = decltype(FFT_base()  + Size<8192>()  + SM<800>() + ElementsPerThread<elements_per_thread_8192>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
-                    case 860: { using FFT = decltype(FFT_base()  + Size<8192>()  + SM<700>() + ElementsPerThread<elements_per_thread_8192>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
-                }
-                break; 
-            } 
-            default: {
-                MyFFTRunTimeAssertTrue(false, "FFT size not supported");
-            }
-        } // switch on transform size
+            } // switch on transform size
         } // constexpr < 3d
     } // constexpr else block
 }
@@ -2619,7 +2619,7 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetAndLaunchK
                 }  
                 default: {
                     if (IsRank3(kernel_type)) {MyFFTRunTimeAssertTrue(false, "This appears to be a rank 3 FFT, but no kernel is defined for this rank.");}
-                    else {MyFFTRunTimeAssertTrue(false, "This appears to be a rank 2 FFT, but it is called in the 3d constexpr block?.");}
+                    else {MyFFTRunTimeAssertTrue(false, "This appears to be a rank 2 FFT, but it is called in the 3d constexpr block?. " + KernelName[kernel_type]);}
                     break;
                 }                           
             } // switch on kernel_type for 3d 
