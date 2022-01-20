@@ -598,12 +598,15 @@ private:
 
     // template <class FFT_base, class PreOpType, class IntraOpType, class PostOpType>
     // void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda);
-
-    template <class FFT_base, class PreOpType, class IntraOpType, class PostOpType, unsigned int SizeValue>
+    // This allows us to iterate through a set of constexpr sizes passed as a template parameter pack. The value is in providing a means to have different size packs
+    // for different fft configurations, eg. 2d vs 3d
+    template <class FFT_base, class PreOpType, class IntraOpType, class PostOpType>
     void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda, bool size_is_found);
 
-    template <class FFT_base, class PreOpType, class IntraOpType, class PostOpType, unsigned int SizeValue, unsigned int ... OtherSizes>
+    template <class FFT_base, class PreOpType, class IntraOpType, class PostOpType, unsigned int SizeValue, unsigned int Ept, unsigned int ... OtherValues>
     void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda, bool size_is_found);
+
+
 
   // 3.
   // Third call, sets the input and output dimensions and type
