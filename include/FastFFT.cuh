@@ -334,7 +334,7 @@ __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul( const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, 
                                                 Offsets mem_offsets, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv);
 
-template<class FFT, class invFFT, class ComplexType = typename FFT::value_type, class PreOpType = bool, class IntraOpType = bool, class PostOpType = bool>
+template<class FFT, class invFFT, class ComplexType = typename FFT::value_type, class PreOpType, class IntraOpType, class PostOpType>
 __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_C2C_FWD_INCREASE_OP_INV_NONE( const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, 
                                                     Offsets mem_offsets, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv, 
@@ -736,10 +736,10 @@ struct io {
     template<class FunctionType>
     static inline __device__ void load_shared(const complex_type*  image_to_search,
                                               complex_type*        thread_data,
-                                              FunctionType         intra_op_lambda) {
+                                              FunctionType         intra_op_lambda = nullptr) {
         const unsigned int stride = stride_size();
         unsigned int       index  = threadIdx.x;
-        if constexpr (std::is_same<FunctionType, bool>::value) {
+        if constexpr (std::is_same<FunctionType, std::nullptr_t>::value) {
             for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
                 // a * conj b
                 thread_data[i] = thread_data[i], image_to_search[index];//ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
@@ -1003,10 +1003,10 @@ struct io {
     static inline __device__ void  load(const complex_type* input,
                                         complex_type*       thread_data,
                                         int                 last_index_to_load,
-                                        FunctionType        pre_op_lambda) {
+                                        FunctionType        pre_op_lambda = nullptr) {
         const unsigned int stride = stride_size();
         unsigned int       index  = threadIdx.x;                                            
-        if constexpr (std::is_same<FunctionType, bool>::value) {
+        if constexpr (std::is_same<FunctionType, std::nullptr_t>::value) {
             for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
                 if (index < last_index_to_load) thread_data[i] = input[index];
                 else thread_data[i] = complex_type(0.0f, 0.0f);
@@ -1059,13 +1059,13 @@ struct io {
     }
 
 
-    template<class FunctionType = bool>
+    template<class FunctionType = std::nullptr_t>
     static inline __device__ void store(const complex_type* thread_data,
                                         complex_type*       output,
-                                        FunctionType        post_op_lambda = false) {
+                                        FunctionType        post_op_lambda = nullptr) {
         const unsigned int stride = stride_size();
         unsigned int       index  = threadIdx.x;
-        if constexpr (std::is_same_v<FunctionType, bool>) {
+        if constexpr (std::is_same_v<FunctionType, std::nullptr_t>) {
             for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
                 output[index] = thread_data[i];
                 index += stride;

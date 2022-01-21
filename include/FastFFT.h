@@ -227,8 +227,8 @@ public:
         };
     */
     // could float2* be replaced with decltype(DevicePointers.momentum_space)
-    template<class PreOpType = bool, class IntraOpType = bool, class PostOpType = bool>
-    void Generic_Fwd_Image_Inv(float2* data, PreOpType pre_op_lambda = false, IntraOpType intra_op_lambda = false, PostOpType post_op_lambda = false);
+    template<class PreOpType, class IntraOpType, class PostOpType>
+    void Generic_Fwd_Image_Inv(float2* data, PreOpType pre_op_lambda = nullptr, IntraOpType intra_op_lambda = nullptr, PostOpType post_op_lambda = nullptr);
 
     void ClipIntoTopLeft();
     void ClipIntoReal(int wanted_coordinate_of_box_center_x, int wanted_coordinate_of_box_center_y, int wanted_coordinate_of_box_center_z);
@@ -425,7 +425,7 @@ private:
                     xcorr_fwd_none_inv_decrease, // (e.g. movie/particle translational search)
                     xcorr_fwd_decrease_inv_decrease, // (e.g. bandlimit, xcorr, translational search)
                     xcorr_decomposed,
-                    generic_fwd_none_op_inv_decrease }; 
+                    generic_fwd_increase_op_inv_none }; 
   // WARNING this is flimsy and prone to breaking, you must ensure the order matches the KernelType enum.
   std::vector<std::string> 
         KernelName{ "r2c_decomposed", 
@@ -443,7 +443,7 @@ private:
                     "xcorr_fwd_none_inv_decrease",
                     "xcorr_fwd_decrease_inv_decrease",
                     "xcorr_decomposed",
-                    "generic_fwd_none_op_inv_decrease" };
+                    "generic_fwd_increase_op_inv_none" };
 
   inline bool IsThreadType(KernelType kernel_type)
   {
@@ -463,7 +463,7 @@ private:
              kernel_type == c2c_inv_decrease || kernel_type == c2c_inv_increase ||
              kernel_type == c2r_none || kernel_type == c2r_none_XY || kernel_type == c2r_decrease || kernel_type == c2r_increase ||
              kernel_type == xcorr_fwd_increase_inv_none || kernel_type == xcorr_fwd_decrease_inv_none || kernel_type == xcorr_fwd_none_inv_decrease || kernel_type == xcorr_fwd_decrease_inv_decrease ||
-             kernel_type == generic_fwd_none_op_inv_decrease)
+             kernel_type == generic_fwd_increase_op_inv_none)
     { 
       return false;
     }
@@ -507,7 +507,7 @@ private:
           kernel_type == c2c_fwd_decrease || 
           kernel_type == c2c_fwd_increase || 
           kernel_type == xcorr_fwd_decrease_inv_none || kernel_type == xcorr_fwd_increase_inv_none ||
-          kernel_type == generic_fwd_none_op_inv_decrease)
+          kernel_type == generic_fwd_increase_op_inv_none)
 
     {
       return true;
@@ -590,8 +590,8 @@ private:
 
   // 1. 
   // First call passed from a public transform function, selects block or thread and the transform precision.
-  template <bool use_thread_method = false, class PreOpType = bool, class IntraOpType = bool, class PostOpType = bool> // bool is just used as a dummy type
-  void SetPrecisionAndExectutionMethod(KernelType kernel_type, bool do_forward_transform = true, PreOpType pre_op_lambda = false, IntraOpType intra_op_lambda = false, PostOpType post_op_lambda = false);     
+  template <bool use_thread_method = false, class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t> // bool is just used as a dummy type
+  void SetPrecisionAndExectutionMethod(KernelType kernel_type, bool do_forward_transform = true, PreOpType pre_op_lambda = nullptr, IntraOpType intra_op_lambda = nullptr, PostOpType post_op_lambda = nullptr);     
 
   // 2.
   // Second call, sets size of the transform kernel, selects the appropriate GPU arch
@@ -601,17 +601,17 @@ private:
     // This allows us to iterate through a set of constexpr sizes passed as a template parameter pack. The value is in providing a means to have different size packs
     // for different fft configurations, eg. 2d vs 3d
     template <class FFT_base, class PreOpType, class IntraOpType, class PostOpType>
-    void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda, bool size_is_found);
+    void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda);
 
     template <class FFT_base, class PreOpType, class IntraOpType, class PostOpType, unsigned int SizeValue, unsigned int Ept, unsigned int ... OtherValues>
-    void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda, bool size_is_found);
+    void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda);
 
 
 
   // 3.
   // Third call, sets the input and output dimensions and type
-  template <class FFT_base_arch, class PreOpType = bool, class IntraOpType = bool, class PostOpType = bool>
-  void SetAndLaunchKernel(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda = false, IntraOpType intra_op_lambda = false, PostOpType post_op_lambda = false);     
+  template <class FFT_base_arch, class PreOpType, class IntraOpType, class PostOpType>
+  void SetAndLaunchKernel(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda);     
 
 
 

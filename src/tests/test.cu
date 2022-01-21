@@ -943,6 +943,7 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
 
       // Create a no capture lambda function. Target FFT is the pre-transformed image to search.
       // template FFT will come from *this.
+      // NEEDS TO BE COMPUTE TYPE
       auto conj_mul_lambda = [] __device__ (float2 template_fft, float2 target_fft) noexcept {
           // Is there a better way than declaring this variable each time?
           float tmp  = (template_fft.x * target_fft.x + template_fft.y * target_fft.y); 
@@ -959,7 +960,7 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
       {
         // FT.CrossCorrelate(targetFT.d_ptr.momentum_space, false);
             // Will type deduction work here?
-        FT.Generic_Fwd_Image_Inv(targetFT.d_ptr.momentum_space, false, conj_mul_lambda);
+        FT.Generic_Fwd_Image_Inv(targetFT.d_ptr.momentum_space, nullptr, conj_mul_lambda, nullptr);
       }
       else
       {
@@ -1165,7 +1166,7 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
         {
         //   FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
         // Will type deduction work here?
-        FT.Generic_Fwd_Image_Inv(targetFT.d_ptr.momentum_space, false, conj_mul_lambda);
+        FT.Generic_Fwd_Image_Inv(targetFT.d_ptr.momentum_space, nullptr, conj_mul_lambda, nullptr);
         }
         else
         {
@@ -1406,7 +1407,6 @@ void print_options(char** argv) {
 
 int main(int argc, char** argv) {
 
-    bool this_test_failed = false;
     
     if (argc != 2) {
         print_options(argv);
@@ -1414,7 +1414,7 @@ int main(int argc, char** argv) {
     }
 
     std::string test_name = argv[1];
-    std::printf("Standard is %i\n\n",__cplusplus);
+    std::printf("Standard is %li\n\n",__cplusplus);
 
     // Input size vectors to be tested.
     std::vector<int> test_size = {  32, 64, 128, 256, 512, 1024, 2048, 4096};
@@ -1478,8 +1478,8 @@ int main(int argc, char** argv) {
         int size_change_type; 
         bool do_3d = false;
     
-        size_change_type = 0; // no change
-        compare_libraries<2>(test_size, do_3d, size_change_type);
+        // size_change_type = 0; // no change
+        // compare_libraries<2>(test_size, do_3d, size_change_type);
     
         size_change_type = 1; // increase
         compare_libraries<2>(test_size, do_3d, size_change_type);
