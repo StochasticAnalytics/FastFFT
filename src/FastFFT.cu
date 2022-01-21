@@ -47,9 +47,9 @@ void block_fft_kernel_C2C_FWD_INCREASE_OP_INV_NONE( const ComplexType* __restric
         io<invFFT>::store(thread_data, &output_values[Return1DFFTAddress(size_of<FFT>::value)], post_op_lambda);  
     #else
         // Do not do the post op lambda if the invFFT is not used.
-        io<invFFT>::store(thread_data, &output_values[Return1DFFTAddress(size_of<FFT>::value)], false);  
-    #endif                                                 
-
+        io<invFFT>::store(thread_data, &output_values[Return1DFFTAddress(size_of<FFT>::value)]);  
+    #endif               
+    
 }                                                        
 
 
@@ -861,13 +861,11 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Fwd_I
                     break;
                 } // case fwd no change
                 case increase: { 
-                    MyFFTPrintWithDetails("FourierTransformer::Generic_Fwd_Image_Inv: fwd increase");
                     SetDimensions(FwdTransform);
                     SetPrecisionAndExectutionMethod(r2c_increase,   true);
                     switch (inv_size_change_type) {
                         case no_change: {
-                            MyFFTPrintWithDetails("FourierTransformer::Generic_Fwd_Image_Inv: inv no change");
-                            SetPrecisionAndExectutionMethod<false, PreOpType, IntraOpType, PostOpType>(generic_fwd_increase_op_inv_none, true);
+                            SetPrecisionAndExectutionMethod<false, PreOpType, IntraOpType, PostOpType>(generic_fwd_increase_op_inv_none, true, pre_op_lambda, intra_op_lambda, post_op_lambda);
                             SetPrecisionAndExectutionMethod(c2r_none_XY,   false);
                             transform_stage_completed = TransformStageCompleted::inv;
                             break;
@@ -2905,10 +2903,10 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetAndLaunchK
 
                 // Right now, because of the n_threads == size_of<FFT> requirement, we are explicitly zero padding, so we need to send an "apparent Q" to know the input size.
                 // Could send the actual size, but later when converting to use the transform decomp with different sized FFTs this will be a more direct conversion.
-                int apperent_Q = size_of<FFT>::value / fwd_dims_in.y;
+                int apparent_Q = size_of<FFT>::value / fwd_dims_in.y;
 
                 block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul<FFT, invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-                ( (complex_type *)d_ptr.image_to_search, complex_input, complex_output , LP.mem_offsets,apperent_Q, workspace_fwd, workspace_inv);
+                ( (complex_type *)d_ptr.image_to_search, complex_input, complex_output , LP.mem_offsets,apparent_Q, workspace_fwd, workspace_inv);
                 postcheck
                 }
             #else
@@ -2970,13 +2968,12 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetAndLaunchK
             break; 
         } // end case xcorr_fwd_none_inv_decrease   
         case generic_fwd_increase_op_inv_none: {
-            
+    
+            // For convenience, we are explicitly zero-padding. This is lazy. FIXME
             using FFT    = decltype( FFT_base_arch() + Type<fft_type::c2c>() + Direction<fft_direction::forward>() ); 
             using invFFT = decltype( FFT_base_arch() + Type<fft_type::c2c>() + Direction<fft_direction::inverse>() ); 
                 
-            
             LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, generic_fwd_increase_op_inv_none);
-            // LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, xcorr_fwd_none_inv_decrease);
 
             cudaError_t error_code = cudaSuccess;
             auto workspace_fwd = make_workspace<FFT>(error_code); // presumably larger of the two
@@ -2985,28 +2982,29 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetAndLaunchK
             auto workspace_inv = make_workspace<invFFT>(error_code); // presumably larger of the two
             cudaErr(error_code);
 
-            // Max shared memory needed to store the full 1d fft remaining on the forward transform
-            unsigned int shared_memory = FFT::shared_memory_size + (unsigned int)sizeof(complex_type) * LP.mem_offsets.physical_x_input;
-            // shared_memory = std::max( shared_memory, std::max( invFFT::shared_memory_size * LP.threadsPerBlock.z, (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input/32) * (unsigned int)sizeof(complex_type)));
-
+            int shared_memory = invFFT::shared_memory_size;
             CheckSharedMemory(shared_memory, device_properties);
-            MyFFTPrintWithDetails("shared_memory");
-            if constexpr (std::is_same_v<std::nullptr_t, PreOpType>) MyFFTPrintWithDetails("PreOpType is bool");
-            if constexpr (std::is_same_v<std::nullptr_t, IntraOpType>) MyFFTPrintWithDetails("Intra Op is bool");
-            if constexpr (std::is_same_v<std::nullptr_t, PostOpType>) MyFFTPrintWithDetails("PostOpType is bool");
 
-            if constexpr (! std::is_same_v<std::nullptr_t, IntraOpType>) {
-                MyFFTPrintWithDetails("const expr");
+            auto conj_mul_lambda = [] __device__ (float& template_fft_x, float& template_fft_y, const float& target_fft_x, const float& target_fft_y) {
+                // Is there a better way than declaring this variable each time?
+                float tmp  = (template_fft_x * target_fft_x + template_fft_y * target_fft_y); 
+                template_fft_y =  (template_fft_y * target_fft_x - template_fft_x * target_fft_y) ;
+                template_fft_x = tmp;
+            };
+
+            // __nv_is_extended_device_lambda_closure_type(type);
+            // __nv_is_extended_host_device_lambda_closure_type(type)
+            if constexpr (! std::is_same_v<std::nullptr_t, decltype(conj_mul_lambda)>) {
                 // FIXME
                 #if DEBUG_FFT_STAGE > 2
-                    MyFFTPrintWithDetails("DEBUG_FFT_STAGE > 2");
-                    cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_FWD_INCREASE_OP_INV_NONE<FFT, invFFT,complex_type, PreOpType, IntraOpType, PostOpType>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
                     // Right now, because of the n_threads == size_of<FFT> requirement, we are explicitly zero padding, so we need to send an "apparent Q" to know the input size.
                     // Could send the actual size, but later when converting to use the transform decomp with different sized FFTs this will be a more direct conversion.
-                    int apparent_Q = size_of<FFT>::value / inv_dims_out.y;
+                    int apparent_Q = size_of<FFT>::value / fwd_dims_in.y;
+
+                    cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_FWD_INCREASE_OP_INV_NONE<FFT, invFFT, complex_type, PreOpType, decltype(conj_mul_lambda), PostOpType>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
                     precheck
-                    block_fft_kernel_C2C_FWD_INCREASE_OP_INV_NONE<FFT, invFFT, complex_type, PreOpType, IntraOpType, PostOpType><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-                    ( (complex_type *)d_ptr.image_to_search, complex_input, complex_output , LP.mem_offsets, LP.twiddle_in, apparent_Q, workspace_fwd, workspace_inv, pre_op_lambda, intra_op_lambda, post_op_lambda);
+                    block_fft_kernel_C2C_FWD_INCREASE_OP_INV_NONE<FFT, invFFT, complex_type, PreOpType, decltype(conj_mul_lambda), PostOpType><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+                    ( (complex_type *)d_ptr.image_to_search, complex_input, complex_output , LP.mem_offsets, apparent_Q, workspace_fwd, workspace_inv, pre_op_lambda, conj_mul_lambda, post_op_lambda);
                     postcheck
                     
                     // FIXME: this is set in the public method calls for other functions. Since it will be changed to 0-7 to match FFT_DEBUG_STAGE, fix it then.
@@ -3064,7 +3062,7 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::GetTransformS
       {
         case 1: { AssertDivisibleAndFactorOf2( std::max(fwd_dims_in.x, fwd_dims_out.x),  std::min(fwd_dims_in.x, fwd_dims_out.x) ); break; }
         case 2: { 
-          if (kernel_type == xcorr_fwd_increase_inv_none)
+          if (kernel_type == xcorr_fwd_increase_inv_none || kernel_type == generic_fwd_increase_op_inv_none)
           {
             // FIXME
             AssertDivisibleAndFactorOf2( std::max(fwd_dims_in.y, fwd_dims_out.y),  std::max(fwd_dims_in.y, fwd_dims_out.y) ); 
@@ -3368,7 +3366,7 @@ LaunchParams FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetLa
 
   // FIXME
   // Some xcorr overrides TODO try the DECREASE approcae
-  if (kernel_type == xcorr_fwd_increase_inv_none)
+  if (kernel_type == xcorr_fwd_increase_inv_none || kernel_type == generic_fwd_increase_op_inv_none)
   {
     // FIXME not correct for 3D
     L.threadsPerBlock = dim3(transform_size.N/ept, 1, 1);

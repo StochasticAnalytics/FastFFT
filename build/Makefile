@@ -2,11 +2,11 @@
 NVCC=nvcc
 
 # TODO: test with gcc and clang
-NVCC_FLAGS=-ccbin=g++ -t 8 
+NVCC_FLAGS=-ccbin=icpc -t 8 
 
 # TODO: static may need to be added later or independently just for benchmarks, while libs to link through python are probably going to need to be dynamic.
 NVCC_FLAGS+=--cudart=static
-NVCC_FLAGS+=--default-stream per-thread -m64 -O3 --use_fast_math --extra-device-vectorization --extended-lambda -std=c++17 -Xptxas --warn-on-local-memory-usage,--warn-on-spills, --generate-line-info -Xcompiler=-std=c++17
+NVCC_FLAGS+=--default-stream per-thread -m64 -O3 --use_fast_math --extra-device-vectorization --extended-lambda --Wext-lambda-captures-this -std=c++17 -Xptxas --warn-on-local-memory-usage,--warn-on-spills, --generate-line-info -Xcompiler=-std=c++17
 # Experimental flag to allow relaxed constexpr host call in device code
 NVCC_FLAGS+=--expt-relaxed-constexpr
 # For testing, particularly until the cufftdx::BlockDim() operator is enabled
@@ -15,7 +15,7 @@ NVCC_FLAGS+=-DCUFFTDX_DISABLE_RUNTIME_ASSERTS
 # Gencode arguments, only supporting Volta or newer
 # SMS ?= 70 75 80 86
 # In initial dev, only compile for 70 or 86 depending on which workstation I'm on, b/c it is faster.
-SMS ?= 70 86
+SMS ?= 70
 
 
 
@@ -169,6 +169,8 @@ $(TEST_OBJS): $(TEST_SRCS)
 # remove all but the executables.
 clean:
 	rm -f $(TESTS_BUILD_DIR)/*.*
+	rm -f $(TESTS_BUILD_DIR)/$(TEST_TARGETS)
+
 
 # clean out everything.
 clobber:

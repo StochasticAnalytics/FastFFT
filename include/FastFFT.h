@@ -330,7 +330,7 @@ public:
   }; // PrintState()
 
 
-private:
+// private:
 
   DeviceProps device_properties;
   OriginType input_origin_type;

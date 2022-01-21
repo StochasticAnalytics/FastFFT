@@ -749,7 +749,8 @@ struct io {
         else {
             for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
                 // a * conj b
-                thread_data[i] = intra_op_lambda(thread_data[i], image_to_search[index]);//ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
+                // TODO: can't convert from cufftdx::detail::complex_type to float2
+                intra_op_lambda(thread_data[i].x,thread_data[i].y, image_to_search[index].x,image_to_search[index].y );//ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
                 index += stride;
             }
         }

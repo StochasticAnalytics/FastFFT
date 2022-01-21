@@ -944,11 +944,11 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
       // Create a no capture lambda function. Target FFT is the pre-transformed image to search.
       // template FFT will come from *this.
       // NEEDS TO BE COMPUTE TYPE
-      auto conj_mul_lambda = [] __device__ (float2 template_fft, float2 target_fft) noexcept {
+      auto conj_mul_lambda = [] __device__ (float& template_fft_x, float& template_fft_y, const float& target_fft_x, const float& target_fft_y) noexcept {
           // Is there a better way than declaring this variable each time?
-          float tmp  = (template_fft.x * target_fft.x + template_fft.y * target_fft.y); 
-          template_fft.y =  (template_fft.y * target_fft.x - template_fft.x * target_fft.y) ;
-          template_fft.x = tmp;
+          float tmp  = (template_fft_x * target_fft_x + template_fft_y * target_fft_y); 
+          template_fft_y =  (template_fft_y * target_fft_x - template_fft_x * target_fft_y) ;
+          template_fft_x = tmp;
       };
 
 
@@ -960,7 +960,7 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
       {
         // FT.CrossCorrelate(targetFT.d_ptr.momentum_space, false);
             // Will type deduction work here?
-        FT.Generic_Fwd_Image_Inv(targetFT.d_ptr.momentum_space, nullptr, conj_mul_lambda, nullptr);
+        FT.Generic_Fwd_Image_Inv(targetFT.d_ptr.momentum_space, nullptr, nullptr, nullptr);
       }
       else
       {
@@ -1166,7 +1166,7 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
         {
         //   FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
         // Will type deduction work here?
-        FT.Generic_Fwd_Image_Inv(targetFT.d_ptr.momentum_space, nullptr, conj_mul_lambda, nullptr);
+        FT.Generic_Fwd_Image_Inv(targetFT.d_ptr.momentum_space, nullptr, nullptr, nullptr);
         }
         else
         {
