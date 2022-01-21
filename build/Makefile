@@ -2,7 +2,7 @@
 NVCC=nvcc
 
 # TODO: test with gcc and clang
-NVCC_FLAGS=-ccbin=icpc -t 8 
+NVCC_FLAGS=-ccbin=g++ -t 8 
 
 # TODO: static may need to be added later or independently just for benchmarks, while libs to link through python are probably going to need to be dynamic.
 NVCC_FLAGS+=--cudart=static

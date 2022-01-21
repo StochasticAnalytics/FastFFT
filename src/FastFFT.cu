@@ -2204,14 +2204,19 @@ template <class FFT_base, class PreOpType, class IntraOpType, class PostOpType, 
 void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda) {
     // Use recursion to step through the allowed sizes.
     GetTransformSize(kernel_type);
-
+    auto conj_mul_lambda = [] __device__ (float& template_fft_x, float& template_fft_y, const float& target_fft_x, const float& target_fft_y) {
+        // Is there a better way than declaring this variable each time?
+        float tmp  = (template_fft_x * target_fft_x + template_fft_y * target_fft_y); 
+        template_fft_y =  (template_fft_y * target_fft_x - template_fft_x * target_fft_y) ;
+        template_fft_x = tmp;
+    };
     if (SizeValue == transform_size.P) {
         elements_per_thread_complex = Ept;
         switch (device_properties.device_arch) {
-            case 700: { using FFT = decltype(FFT_base()  + Size<SizeValue>()  + SM<700>() + ElementsPerThread<8>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
-            case 750: { if constexpr (SizeValue <= 4096) { using FFT = decltype(FFT_base()  + Size<SizeValue>()  + SM<750>() + ElementsPerThread<8>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda);} break;}
-            case 800: { using FFT = decltype(FFT_base()  + Size<SizeValue>()  + SM<800>() + ElementsPerThread<8>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
-            case 860: { using FFT = decltype(FFT_base()  + Size<SizeValue>()  + SM<700>() + ElementsPerThread<8>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
+            case 700: { using FFT = decltype(FFT_base()  + Size<SizeValue>()  + SM<700>() + ElementsPerThread<8>());  SetAndLaunchKernel<FFT, PreOpType, decltype(conj_mul_lambda), PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, conj_mul_lambda, post_op_lambda); break;}
+            case 750: { if constexpr (SizeValue <= 4096) { using FFT = decltype(FFT_base()  + Size<SizeValue>()  + SM<750>() + ElementsPerThread<8>());  SetAndLaunchKernel<FFT, PreOpType, decltype(conj_mul_lambda), PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, conj_mul_lambda, post_op_lambda);} break;}
+            case 800: { using FFT = decltype(FFT_base()  + Size<SizeValue>()  + SM<800>() + ElementsPerThread<8>());  SetAndLaunchKernel<FFT, PreOpType, decltype(conj_mul_lambda), PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, conj_mul_lambda, post_op_lambda); break;}
+            case 860: { using FFT = decltype(FFT_base()  + Size<SizeValue>()  + SM<700>() + ElementsPerThread<8>());  SetAndLaunchKernel<FFT, PreOpType, decltype(conj_mul_lambda), PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, conj_mul_lambda, post_op_lambda); break;}
             default:  { MyFFTRunTimeAssertTrue(false, "Unsupported architecture" + std::to_string(device_properties.device_arch)); break;}
         }
     }
@@ -2985,26 +2990,26 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetAndLaunchK
             int shared_memory = invFFT::shared_memory_size;
             CheckSharedMemory(shared_memory, device_properties);
 
-            auto conj_mul_lambda = [] __device__ (float& template_fft_x, float& template_fft_y, const float& target_fft_x, const float& target_fft_y) {
-                // Is there a better way than declaring this variable each time?
-                float tmp  = (template_fft_x * target_fft_x + template_fft_y * target_fft_y); 
-                template_fft_y =  (template_fft_y * target_fft_x - template_fft_x * target_fft_y) ;
-                template_fft_x = tmp;
-            };
+            // auto conj_mul_lambda = [] __device__ (float& template_fft_x, float& template_fft_y, const float& target_fft_x, const float& target_fft_y) {
+            //     // Is there a better way than declaring this variable each time?
+            //     float tmp  = (template_fft_x * target_fft_x + template_fft_y * target_fft_y); 
+            //     template_fft_y =  (template_fft_y * target_fft_x - template_fft_x * target_fft_y) ;
+            //     template_fft_x = tmp;
+            // };
 
             // __nv_is_extended_device_lambda_closure_type(type);
             // __nv_is_extended_host_device_lambda_closure_type(type)
-            if constexpr (! std::is_same_v<std::nullptr_t, decltype(conj_mul_lambda)>) {
+            if constexpr (IS_EXT_LAMBDA(IntraOpType)) {
                 // FIXME
                 #if DEBUG_FFT_STAGE > 2
                     // Right now, because of the n_threads == size_of<FFT> requirement, we are explicitly zero padding, so we need to send an "apparent Q" to know the input size.
                     // Could send the actual size, but later when converting to use the transform decomp with different sized FFTs this will be a more direct conversion.
                     int apparent_Q = size_of<FFT>::value / fwd_dims_in.y;
 
-                    cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_FWD_INCREASE_OP_INV_NONE<FFT, invFFT, complex_type, PreOpType, decltype(conj_mul_lambda), PostOpType>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
+                    cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_FWD_INCREASE_OP_INV_NONE<FFT, invFFT, complex_type, PreOpType, IntraOpType, PostOpType>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));        
                     precheck
-                    block_fft_kernel_C2C_FWD_INCREASE_OP_INV_NONE<FFT, invFFT, complex_type, PreOpType, decltype(conj_mul_lambda), PostOpType><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-                    ( (complex_type *)d_ptr.image_to_search, complex_input, complex_output , LP.mem_offsets, apparent_Q, workspace_fwd, workspace_inv, pre_op_lambda, conj_mul_lambda, post_op_lambda);
+                    block_fft_kernel_C2C_FWD_INCREASE_OP_INV_NONE<FFT, invFFT, complex_type, PreOpType, IntraOpType, PostOpType><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+                    ( (complex_type *)d_ptr.image_to_search, complex_input, complex_output , LP.mem_offsets, apparent_Q, workspace_fwd, workspace_inv, pre_op_lambda, intra_op_lambda, post_op_lambda);
                     postcheck
                     
                     // FIXME: this is set in the public method calls for other functions. Since it will be changed to 0-7 to match FFT_DEBUG_STAGE, fix it then.

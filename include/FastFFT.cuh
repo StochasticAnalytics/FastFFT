@@ -14,6 +14,9 @@
 // Various levels of debuging conditions and prints
 // #define FFT_DEBUG_LEVEL 0
 
+#define IS_EXT_LAMBDA( type )  __nv_is_extended_device_lambda_closure_type( type ) 
+
+
 #if FFT_DEBUG_LEVEL < 1
 
 #define MyFFTDebugPrintWithDetails(...)  
@@ -739,18 +742,16 @@ struct io {
                                               FunctionType         intra_op_lambda = nullptr) {
         const unsigned int stride = stride_size();
         unsigned int       index  = threadIdx.x;
-        if constexpr (std::is_same<FunctionType, std::nullptr_t>::value) {
+        if constexpr ( IS_EXT_LAMBDA(FunctionType)) {
             for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
-                // a * conj b
-                thread_data[i] = thread_data[i], image_to_search[index];//ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
+                intra_op_lambda(thread_data[i].x,thread_data[i].y, image_to_search[index].x,image_to_search[index].y );//ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
                 index += stride;
             }
         }
         else {
             for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
                 // a * conj b
-                // TODO: can't convert from cufftdx::detail::complex_type to float2
-                intra_op_lambda(thread_data[i].x,thread_data[i].y, image_to_search[index].x,image_to_search[index].y );//ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
+                thread_data[i] = thread_data[i], image_to_search[index];//ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
                 index += stride;
             }
         }
@@ -1007,17 +1008,17 @@ struct io {
                                         FunctionType        pre_op_lambda = nullptr) {
         const unsigned int stride = stride_size();
         unsigned int       index  = threadIdx.x;                                            
-        if constexpr (std::is_same<FunctionType, std::nullptr_t>::value) {
+        if constexpr (IS_EXT_LAMBDA(FunctionType)) {
             for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
-                if (index < last_index_to_load) thread_data[i] = input[index];
-                else thread_data[i] = complex_type(0.0f, 0.0f);
+                if (index < last_index_to_load) thread_data[i] = pre_op_lambda(input[index]);
+                else thread_data[i] = pre_op_lambda(complex_type(0.0f, 0.0f));
                 index += stride;
             }
         }
         else {
             for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
-                if (index < last_index_to_load) thread_data[i] = pre_op_lambda(input[index]);
-                else thread_data[i] = pre_op_lambda(complex_type(0.0f, 0.0f));
+                if (index < last_index_to_load) thread_data[i] = input[index];
+                else thread_data[i] = complex_type(0.0f, 0.0f);
                 index += stride;
             }         
         }
@@ -1066,15 +1067,15 @@ struct io {
                                         FunctionType        post_op_lambda = nullptr) {
         const unsigned int stride = stride_size();
         unsigned int       index  = threadIdx.x;
-        if constexpr (std::is_same_v<FunctionType, std::nullptr_t>) {
+        if constexpr (IS_EXT_LAMBDA(FunctionType)) {
             for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
-                output[index] = thread_data[i];
+                output[index] = post_op_lambda(thread_data[i]);
                 index += stride;
             }
         }
         else {
             for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
-                output[index] = post_op_lambda(thread_data[i]);
+                output[index] = thread_data[i];
                 index += stride;
             }
         }

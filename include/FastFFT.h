@@ -17,7 +17,27 @@
 // #include "/groups/himesb/git/cufftdx/example/block_io.hpp"
 // #include "/groups/himesb/git/cufftdx/example/common.hpp"
 // #include <iostream>
+/*
 
+Some of the more relevant notes about extended lambdas.
+https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#extended-lambda
+
+The enclosing function for the extended lambda must be named and its address can be taken. If the enclosing function is a class member, then the following conditions must be satisfied:
+
+    All classes enclosing the member function must have a name.
+    The member function must not have private or protected access within its parent class.
+    All enclosing classes must not have private or protected access within their respective parent classes.
+
+
+If the enclosing function is an instantiation of a function template or a member function template, and/or the function is a member of a class template, the template(s) must satisfy the following constraints:
+
+    The template must have at most one variadic parameter, and it must be listed last in the template parameter list.
+    The template parameters must be named.
+    The template instantiation argument types cannot involve types that are either local to a function (except for closure types for extended lambdas), or are private or protected class members.
+#define IS_EXT_LAMBDA( type )  __nv_is_extended_device_lambda_closure_type( type ) 
+
+
+*/
 namespace FastFFT {
 
     // For debugging
