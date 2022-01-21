@@ -1472,7 +1472,7 @@ int main(int argc, char** argv) {
         #ifdef HEAVYERRORCHECKING_FFT
         std::cout << "Running performance tests with heavy error checking.\n";
         std::cout << "This doesn't make sense as the synchronizations are invalidating.\n";
-        exit(1);
+        // exit(1);
         #endif
 
         int size_change_type; 

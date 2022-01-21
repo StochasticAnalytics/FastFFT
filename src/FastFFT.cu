@@ -1975,30 +1975,28 @@ void thread_fft_kernel_C2R_decomposed_transposed(const ComplexType*  __restrict_
 
 }
 
-// FIXME assumed FWD 
+
+
 template <class ComputeType, class InputType, class OutputType, int Rank>
 void FourierTransformer<ComputeType, InputType, OutputType, Rank>::ClipIntoTopLeft()
 {
   // TODO add some checks and logic.
 
   // Assuming we are calling this from R2C_Transposed and that the launch bounds are not set.
-  dim3 threadsPerBlock;
-  dim3 gridDims;
-
-  threadsPerBlock = dim3(512,1,1);
-  gridDims = dim3( (fwd_dims_out.x + threadsPerBlock.x - 1) / threadsPerBlock.x, 1, 1);
+  dim3 local_threadsPerBlock = dim3(512,1,1);
+  dim3 local_gridDims = dim3( (fwd_dims_out.x + local_threadsPerBlock.x - 1) / local_threadsPerBlock.x, 1, 1);
 
   const short4 area_to_clip_from = make_short4(fwd_dims_in.x, fwd_dims_in.y, fwd_dims_in.w*2, fwd_dims_out.w*2);
 
   precheck
-  clip_into_top_left_kernel<float, float><< < gridDims, threadsPerBlock, 0, cudaStreamPerThread >> >
+  clip_into_top_left_kernel<InputType, InputType><< < local_gridDims, local_threadsPerBlock, 0, cudaStreamPerThread >> >
   (d_ptr.position_space, d_ptr.position_space, area_to_clip_from);
   postcheck
 }
 
 // FIXME assumed FWD 
-template<typename InputType, typename OutputType>
-__global__ void clip_into_top_left_kernel(InputType*  input_values, OutputType* output_values, short4 dims )
+template<class InputType, class OutputType> 
+__global__ void clip_into_top_left_kernel(InputType*  input_values, OutputType* output_values, const short4 dims )
 {
 
   int x = blockIdx.x*blockDim.x + threadIdx.x;
@@ -2014,7 +2012,7 @@ __global__ void clip_into_top_left_kernel(InputType*  input_values, OutputType* 
     output_values[blockIdx.y * dims.w + x] = input_values[blockIdx.y * dims.z + x];
     return;
   }
-} // end of clip_into_top_left_kernel
+} 
 
 template <class ComputeType, class InputType, class OutputType, int Rank>
 void FourierTransformer<ComputeType, InputType, OutputType, Rank>::ClipIntoReal(int wanted_coordinate_of_box_center_x, int wanted_coordinate_of_box_center_y, int wanted_coordinate_of_box_center_z)
@@ -2937,7 +2935,7 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetAndLaunchK
                     int apparent_Q = size_of<FFT>::value / inv_dims_out.y;
                     precheck
                     block_fft_kernel_C2C_FWD_INCREASE_OP_INV_NONE<FFT, invFFT, complex_type, PreOpType, IntraOpType, PostOpType><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-                    ( (complex_type *)d_ptr.image_to_search, complex_input, complex_output , LP.mem_offsets, LP.twiddle_in, apparent_Q, workspace_fwd, workspace_inv, intra_op_lambda);
+                    ( (complex_type *)d_ptr.image_to_search, complex_input, complex_output , LP.mem_offsets, LP.twiddle_in, apparent_Q, workspace_fwd, workspace_inv, pre_op_lambda, intra_op_lambda, post_op_lambda);
                     postcheck
                     
                     // FIXME: this is set in the public method calls for other functions. Since it will be changed to 0-7 to match FFT_DEBUG_STAGE, fix it then.

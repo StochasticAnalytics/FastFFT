@@ -68,6 +68,10 @@ debug_stage=${DEBUG_STAGE}
 $(info $$debug_stage is  [${DEBUG_STAGE}])
 endif
 
+ifneq (${HEAVYERRORCHECKING_FFT},)
+NVCC_FLAGS+=-DHEAVYERRORCHECKING_FFT
+endif
+
 # Track what the last build did so that the pre-commit hook can skip re-building if there is no debug included.
 remove_debug_file=0
 ifeq (${debug_stage}, 8) 
@@ -76,7 +80,10 @@ ifeq (${debug_stage}, 8)
 	endif
 else
 	remove_debug_file=1
+ifeq (${HEAVYERRORCHECKING_FFT},)
+# If HEAVYERRORCHECKING_FFT is not already asked for, then add it anytime debug_stage < 8 (partial FFTs)
 	NVCC_FLAGS+=-DHEAVYERRORCHECKING_FFT
+endif
 endif
 
 
