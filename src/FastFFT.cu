@@ -2163,7 +2163,12 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetPrecisionA
     static const bool is_half = std::is_same_v<ComputeType, __half>;
     static const bool is_float = std::is_same_v<ComputeType, float>;
     static_assert( is_half || is_float , "FourierTransformer::SetPrecisionAndExectutionMethod: Unsupported ComputeType");
-
+    auto conj_mul_lambda = [] __device__ (float& template_fft_x, float& template_fft_y, const float& target_fft_x, const float& target_fft_y) {
+        // Is there a better way than declaring this variable each time?
+        float tmp  = (template_fft_x * target_fft_x + template_fft_y * target_fft_y); 
+        template_fft_y =  (template_fft_y * target_fft_x - template_fft_x * target_fft_y) ;
+        template_fft_x = tmp;
+    };
     if constexpr (use_thread_method) {
         using FFT = decltype( Thread() + Size<32>() + Precision<ComputeType>() );
         // SelectSizeAndType<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); 
@@ -2171,11 +2176,11 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetPrecisionA
     else {
         using FFT = decltype( Block() + Precision<ComputeType>() + FFTsPerBlock<1>() );
         if constexpr (Rank == 3) {
-            SelectSizeAndType<FFT, PreOpType, IntraOpType, PostOpType, 16,4 , 32,8 , 64,8 , 128,8 , 256,8 , 512,8>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); 
+            SelectSizeAndType<FFT, PreOpType, decltype(conj_mul_lambda), PostOpType, 16,4 , 32,8 , 64,8 , 128,8 , 256,8 , 512,8>(kernel_type, do_forward_transform, pre_op_lambda, conj_mul_lambda, post_op_lambda); 
         }
         else {
             // TODO: 8192 will fail for sm75 if wanted need some extra logic
-            SelectSizeAndType<FFT, PreOpType, IntraOpType, PostOpType, 16,4 , 32,8 , 64,8 , 128,8 , 256,8 , 512,8 , 1024,8 , 2048,8 , 4096,8 , 8192,16>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda);
+            SelectSizeAndType<FFT, PreOpType, decltype(conj_mul_lambda), PostOpType, 16,4 , 32,8 , 64,8 , 128,8 , 256,8 , 512,8 , 1024,8 , 2048,8 , 4096,8 , 8192,16>(kernel_type, do_forward_transform, pre_op_lambda, conj_mul_lambda, post_op_lambda);
         }
     }
   
@@ -2204,19 +2209,14 @@ template <class FFT_base, class PreOpType, class IntraOpType, class PostOpType, 
 void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda) {
     // Use recursion to step through the allowed sizes.
     GetTransformSize(kernel_type);
-    auto conj_mul_lambda = [] __device__ (float& template_fft_x, float& template_fft_y, const float& target_fft_x, const float& target_fft_y) {
-        // Is there a better way than declaring this variable each time?
-        float tmp  = (template_fft_x * target_fft_x + template_fft_y * target_fft_y); 
-        template_fft_y =  (template_fft_y * target_fft_x - template_fft_x * target_fft_y) ;
-        template_fft_x = tmp;
-    };
+
     if (SizeValue == transform_size.P) {
         elements_per_thread_complex = Ept;
         switch (device_properties.device_arch) {
-            case 700: { using FFT = decltype(FFT_base()  + Size<SizeValue>()  + SM<700>() + ElementsPerThread<8>());  SetAndLaunchKernel<FFT, PreOpType, decltype(conj_mul_lambda), PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, conj_mul_lambda, post_op_lambda); break;}
-            case 750: { if constexpr (SizeValue <= 4096) { using FFT = decltype(FFT_base()  + Size<SizeValue>()  + SM<750>() + ElementsPerThread<8>());  SetAndLaunchKernel<FFT, PreOpType, decltype(conj_mul_lambda), PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, conj_mul_lambda, post_op_lambda);} break;}
-            case 800: { using FFT = decltype(FFT_base()  + Size<SizeValue>()  + SM<800>() + ElementsPerThread<8>());  SetAndLaunchKernel<FFT, PreOpType, decltype(conj_mul_lambda), PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, conj_mul_lambda, post_op_lambda); break;}
-            case 860: { using FFT = decltype(FFT_base()  + Size<SizeValue>()  + SM<700>() + ElementsPerThread<8>());  SetAndLaunchKernel<FFT, PreOpType, decltype(conj_mul_lambda), PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, conj_mul_lambda, post_op_lambda); break;}
+            case 700: { using FFT = decltype(FFT_base()  + Size<SizeValue>()  + SM<700>() + ElementsPerThread<8>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
+            case 750: { if constexpr (SizeValue <= 4096) { using FFT = decltype(FFT_base()  + Size<SizeValue>()  + SM<750>() + ElementsPerThread<8>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda);} break;}
+            case 800: { using FFT = decltype(FFT_base()  + Size<SizeValue>()  + SM<800>() + ElementsPerThread<8>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
+            case 860: { using FFT = decltype(FFT_base()  + Size<SizeValue>()  + SM<700>() + ElementsPerThread<8>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
             default:  { MyFFTRunTimeAssertTrue(false, "Unsupported architecture" + std::to_string(device_properties.device_arch)); break;}
         }
     }
