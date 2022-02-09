@@ -823,7 +823,7 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::CrossCorrelat
 
 template <class ComputeType, class InputType, class OutputType, int Rank>
 template<class PreOpType, class IntraOpType, class PostOpType>
-void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Fwd_Image_Inv(float2* image_to_search, PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda) {
+void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Fwd_Image_Inv(float2* image_to_search) {
 
     // Set the member pointer to the passed pointer
     d_ptr.image_to_search = image_to_search;
@@ -865,7 +865,7 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Fwd_I
                     SetPrecisionAndExectutionMethod(r2c_increase,   true);
                     switch (inv_size_change_type) {
                         case no_change: {
-                            SetPrecisionAndExectutionMethod<false, PreOpType, IntraOpType, PostOpType>(generic_fwd_increase_op_inv_none, true, pre_op_lambda, intra_op_lambda, post_op_lambda);
+                            SetPrecisionAndExectutionMethod<false, PreOpType, IntraOpType, PostOpType>(generic_fwd_increase_op_inv_none, true);
                             SetPrecisionAndExectutionMethod(c2r_none_XY,   false);
                             transform_stage_completed = TransformStageCompleted::inv;
                             break;
@@ -1473,44 +1473,40 @@ void thread_fft_kernel_C2C_decomposed_ConjMul(const ComplexType* __restrict__ im
 template<class FFT, class invFFT, class ComplexType>
 __launch_bounds__(invFFT::max_threads_per_block) __global__
 void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul(const ComplexType* __restrict__ image_to_search, const ComplexType*  __restrict__ input_values, ComplexType*  __restrict__ output_values, 
-                                                        Offsets mem_offsets, int apparent_Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv)
-{
+                                                        Offsets mem_offsets, int apparent_Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv) {
 
-  //	// Initialize the shared memory, assuming everyting matches the input data X size in
-  using complex_type = ComplexType;
+    //	// Initialize the shared memory, assuming everyting matches the input data X size in
+    using complex_type = ComplexType;
 
 	// __shared__ complex_type shared_mem[invFFT::shared_memory_size/sizeof(complex_type)]; // Storage for the input data that is re-used each blcok
 	extern __shared__ complex_type shared_mem[]; // Storage for the input data that is re-used each blcok
 
-  complex_type thread_data[FFT::storage_size];
+    complex_type thread_data[FFT::storage_size];
 
-  // For simplicity, we explicitly zeropad the input data to the size of the FFT.
-  // It may be worth trying to use threadIdx.z as in the DECREASE methods.
-  // Until then, this 
-  io<FFT>::load(&input_values[Return1DFFTAddress(size_of<FFT>::value / apparent_Q)], thread_data, size_of<FFT>::value / apparent_Q);
+    // For simplicity, we explicitly zeropad the input data to the size of the FFT.
+    // It may be worth trying to use threadIdx.z as in the DECREASE methods.
+    // Until then, this 
+    io<FFT>::load(&input_values[Return1DFFTAddress(size_of<FFT>::value / apparent_Q)], thread_data, size_of<FFT>::value / apparent_Q);
 
-  // In the first FFT the modifying twiddle factor is 1 so the data are reeal
-  FFT().execute(thread_data, shared_mem, workspace_fwd);
+    // In the first FFT the modifying twiddle factor is 1 so the data are reeal
+    FFT().execute(thread_data, shared_mem, workspace_fwd);
 
-  #if DEBUG_FFT_STAGE > 3
+    #if DEBUG_FFT_STAGE > 3
     //  * apparent_Q
     io<invFFT>::load_shared_and_conj_multiply(&image_to_search[Return1DFFTAddress(size_of<FFT>::value)], thread_data);
-  #endif
+    #endif
 
-  #if DEBUG_FFT_STAGE > 4
+    #if DEBUG_FFT_STAGE > 4
     invFFT().execute(thread_data, shared_mem, workspace_inv);
-  #endif
+    #endif
 
-  //  * apparent_Q
-  io<invFFT>::store(thread_data, &output_values[Return1DFFTAddress(size_of<FFT>::value)]);
-
-
+    //  * apparent_Q
+    io<invFFT>::store(thread_data, &output_values[Return1DFFTAddress(size_of<FFT>::value)]);
 } 
 
 template<class FFT, class invFFT, class ComplexType>
 __launch_bounds__(invFFT::max_threads_per_block) __global__
-void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul_SwapRealSpaceQuadrants(const ComplexType* __restrict__ image_to_search, const ComplexType*  __restrict__ input_values, ComplexType*  __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv)
-{
+void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul_SwapRealSpaceQuadrants(const ComplexType* __restrict__ image_to_search, const ComplexType*  __restrict__ input_values, ComplexType*  __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv) {
 
   //	// Initialize the shared memory, assuming everyting matches the input data X size in
   using complex_type = ComplexType;
@@ -2146,44 +2142,46 @@ __global__ void clip_into_real_kernel(InputType* real_values_gpu,
 
 } // end of ClipIntoRealKernel
 
-//         GetTransformSize_thread(kernel_type, size_of<FFT_base>::value);
-//         switch (device_properties.device_arch) {
-//             case 700: { using FFT = decltype(FFT_base() + SM<700>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
-//             case 750: { using FFT = decltype(FFT_base() + SM<750>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
-//             case 800: { using FFT = decltype(FFT_base() + SM<800>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
-//             case 860: { using FFT = decltype(FFT_base() + SM<700>());  SetAndLaunchKernel<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); break;}
-//             default:  { MyFFTDebugAssertTrue(false, "Device Arch not recognized."); }
-//         }
+
 
 template <class ComputeType, class InputType, class OutputType, int Rank>
 template <bool use_thread_method, class PreOpType, class IntraOpType, class PostOpType>
-void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetPrecisionAndExectutionMethod(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda) {
+void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetPrecisionAndExectutionMethod(KernelType kernel_type, bool do_forward_transform) {
     // For kernels with fwd and inv transforms, we want to not set the direction yet.
 
     static const bool is_half = std::is_same_v<ComputeType, __half>;
     static const bool is_float = std::is_same_v<ComputeType, float>;
     static_assert( is_half || is_float , "FourierTransformer::SetPrecisionAndExectutionMethod: Unsupported ComputeType");
-    auto conj_mul_lambda = [] __device__ (float& template_fft_x, float& template_fft_y, const float& target_fft_x, const float& target_fft_y) {
-        // Is there a better way than declaring this variable each time?
-        float tmp  = (template_fft_x * target_fft_x + template_fft_y * target_fft_y); 
-        template_fft_y =  (template_fft_y * target_fft_x - template_fft_x * target_fft_y) ;
-        template_fft_x = tmp;
-    };
+
     if constexpr (use_thread_method) {
         using FFT = decltype( Thread() + Size<32>() + Precision<ComputeType>() );
-        // SelectSizeAndType<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); 
+        SetIntraKernelFunctions<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, nullptr, nullptr, nullptr);
     }
     else {
         using FFT = decltype( Block() + Precision<ComputeType>() + FFTsPerBlock<1>() );
+        SetIntraKernelFunctions<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, nullptr, nullptr, nullptr);
+    }
+  
+}
+
+template <class ComputeType, class InputType, class OutputType, int Rank>
+template <class FFT_base, class PreOpType, class IntraOpType, class PostOpType>
+void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetIntraKernelFunctions(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda) {
+
+
+    if constexpr (! detail::has_any_block_operator<FFT_base>::value) {
+        // SelectSizeAndType<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); 
+    }
+    else {
         if constexpr (Rank == 3) {
-            SelectSizeAndType<FFT, PreOpType, decltype(conj_mul_lambda), PostOpType, 16,4 , 32,8 , 64,8 , 128,8 , 256,8 , 512,8>(kernel_type, do_forward_transform, pre_op_lambda, conj_mul_lambda, post_op_lambda); 
+            SelectSizeAndType<FFT_base, PreOpType, IntraOpType, PostOpType, 16,4 , 32,8 , 64,8 , 128,8 , 256,8 , 512,8>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda); 
         }
         else {
             // TODO: 8192 will fail for sm75 if wanted need some extra logic
-            SelectSizeAndType<FFT, PreOpType, decltype(conj_mul_lambda), PostOpType, 16,4 , 32,8 , 64,8 , 128,8 , 256,8 , 512,8 , 1024,8 , 2048,8 , 4096,8 , 8192,16>(kernel_type, do_forward_transform, pre_op_lambda, conj_mul_lambda, post_op_lambda);
-        }
+            SelectSizeAndType<FFT_base, PreOpType, IntraOpType, PostOpType, 16,4 , 32,8 , 64,8 , 128,8 , 256,8 , 512,8 , 1024,8 , 2048,8 , 4096,8 , 8192,16>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda);
+        }    
     }
-  
+
 }
 
 

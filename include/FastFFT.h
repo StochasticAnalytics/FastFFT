@@ -247,8 +247,8 @@ public:
         };
     */
     // could float2* be replaced with decltype(DevicePointers.momentum_space)
-    template<class PreOpType, class IntraOpType, class PostOpType>
-    void Generic_Fwd_Image_Inv(float2* data, PreOpType pre_op_lambda = nullptr, IntraOpType intra_op_lambda = nullptr, PostOpType post_op_lambda = nullptr);
+    template<class PreOpType = nullptr_t, class IntraOpType = nullptr_t, class PostOpType = nullptr_t>
+    void Generic_Fwd_Image_Inv(float2* data);
 
     void ClipIntoTopLeft();
     void ClipIntoReal(int wanted_coordinate_of_box_center_x, int wanted_coordinate_of_box_center_y, int wanted_coordinate_of_box_center_z);
@@ -608,13 +608,19 @@ public:
 
 
 
-  // 1. 
-  // First call passed from a public transform function, selects block or thread and the transform precision.
-  template <bool use_thread_method = false, class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t> // bool is just used as a dummy type
-  void SetPrecisionAndExectutionMethod(KernelType kernel_type, bool do_forward_transform = true, PreOpType pre_op_lambda = nullptr, IntraOpType intra_op_lambda = nullptr, PostOpType post_op_lambda = nullptr);     
+    // 1. 
+    // First call passed from a public transform function, selects block or thread and the transform precision.
+    template <bool use_thread_method = false, class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t> // bool is just used as a dummy type
+    void SetPrecisionAndExectutionMethod(KernelType kernel_type, bool do_forward_transform = true);     
 
-  // 2.
-  // Second call, sets size of the transform kernel, selects the appropriate GPU arch
+    // 2.
+    // Check to see if any intra kernel functions are wanted, and if so set the appropriate device pointers. 
+    template <class FFT_base, class PreOpType, class IntraOpType, class PostOpType>
+    void SetIntraKernelFunctions(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda);
+
+
+    // 3.
+    // Second call, sets size of the transform kernel, selects the appropriate GPU arch
 
     // template <class FFT_base, class PreOpType, class IntraOpType, class PostOpType>
     // void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda);
