@@ -2,11 +2,11 @@
 NVCC=nvcc
 
 # TODO: test with gcc and clang
-NVCC_FLAGS=-ccbin=icpc -t 4 
+NVCC_FLAGS=-ccbin=g++ -t 8 
 
 # TODO: static may need to be added later or independently just for benchmarks, while libs to link through python are probably going to need to be dynamic.
 NVCC_FLAGS+=--cudart=static
-NVCC_FLAGS+=--default-stream per-thread -m64 -O3 --use_fast_math --extra-device-vectorization --extended-lambda -std=c++17 -Xptxas --warn-on-local-memory-usage,--warn-on-spills, --generate-line-info -Xcompiler=-std=c++17
+NVCC_FLAGS+=--default-stream per-thread -m64 -O3 --use_fast_math --extra-device-vectorization --extended-lambda --Wext-lambda-captures-this -std=c++17 -Xptxas --warn-on-local-memory-usage,--warn-on-spills, --generate-line-info -Xcompiler=-std=c++17
 # Experimental flag to allow relaxed constexpr host call in device code
 NVCC_FLAGS+=--expt-relaxed-constexpr
 # For testing, particularly until the cufftdx::BlockDim() operator is enabled
@@ -15,9 +15,11 @@ NVCC_FLAGS+=-DCUFFTDX_DISABLE_RUNTIME_ASSERTS
 # Gencode arguments, only supporting Volta or newer
 # SMS ?= 70 75 80 86
 # In initial dev, only compile for 70 or 86 depending on which workstation I'm on, b/c it is faster.
-SMS ?= 70 86
+SMS ?=  80 86
 
-
+# Need to 
+# GENCODE_FLAGS := -gencode arch=compute_86,code=lto_86
+# GENCODE_FLAGS := -gencode arch=compute_86,code=lto_86
 
 ifeq ($(GENCODE_FLAGS),)
 # Generate SASS code for each SM architecture listed in $(SMS)
@@ -27,7 +29,7 @@ $(foreach sm,$(SMS),$(eval GENCODE_FLAGS += -gencode arch=compute_$(sm),code=sm_
 # Generate PTX code from the highest SM architecture in $(SMS) to guarantee forward-compatibility
 HIGHEST_SM := $(lastword $(sort $(SMS)))
 ifneq ($(HIGHEST_SM),)
-GENCODE_FLAGS += -gencode arch=compute_$(HIGHEST_SM),code=compute_$(HIGHEST_SM)
+GENCODE_FLAGS += -gencode arch=compute_$(HIGHEST_SM),code=sm_$(HIGHEST_SM)
 endif
 endif # GENCODE_FLAGS
 
@@ -68,6 +70,10 @@ debug_stage=${DEBUG_STAGE}
 $(info $$debug_stage is  [${DEBUG_STAGE}])
 endif
 
+ifneq (${HEAVYERRORCHECKING_FFT},)
+NVCC_FLAGS+=-DHEAVYERRORCHECKING_FFT
+endif
+
 # Track what the last build did so that the pre-commit hook can skip re-building if there is no debug included.
 remove_debug_file=0
 ifeq (${debug_stage}, 8) 
@@ -76,7 +82,10 @@ ifeq (${debug_stage}, 8)
 	endif
 else
 	remove_debug_file=1
+ifeq (${HEAVYERRORCHECKING_FFT},)
+# If HEAVYERRORCHECKING_FFT is not already asked for, then add it anytime debug_stage < 8 (partial FFTs)
 	NVCC_FLAGS+=-DHEAVYERRORCHECKING_FFT
+endif
 endif
 
 
@@ -162,6 +171,8 @@ $(TEST_OBJS): $(TEST_SRCS)
 # remove all but the executables.
 clean:
 	rm -f $(TESTS_BUILD_DIR)/*.*
+	rm -f $(TESTS_BUILD_DIR)/$(TEST_TARGETS)
+
 
 # clean out everything.
 clobber:

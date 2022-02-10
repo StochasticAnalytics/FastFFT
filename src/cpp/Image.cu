@@ -205,11 +205,11 @@ void Image<wanted_real_type, wanted_complex_type>::MakeCufftPlan()
   onembed[1] = size.w;
 
   (cufftXtMakePlanMany(cuda_plan_forward, rank, fftDims,
-    NULL, NULL, NULL, CUDA_R_32F,
-    NULL, NULL, NULL, CUDA_C_32F, iBatch, &cuda_plan_worksize_forward, CUDA_C_32F));
+    NULL, 1, 1, CUDA_R_32F,
+    NULL, 1, 1, CUDA_C_32F, iBatch, &cuda_plan_worksize_forward, CUDA_C_32F));
     (cufftXtMakePlanMany(cuda_plan_inverse, rank, fftDims,
-    NULL, NULL, NULL, CUDA_C_32F,
-    NULL, NULL, NULL, CUDA_R_32F, iBatch, &cuda_plan_worksize_inverse, CUDA_R_32F));
+    NULL, 1, 1, CUDA_C_32F,
+    NULL, 1, 1, CUDA_R_32F, iBatch, &cuda_plan_worksize_inverse, CUDA_R_32F));
 
     delete [] fftDims;
     delete [] inembed;
@@ -249,11 +249,11 @@ void Image<wanted_real_type, wanted_complex_type>::MakeCufftPlan3d()
 
 
   (cufftXtMakePlanMany(cuda_plan_forward, rank, fftDims,
-    NULL, NULL, NULL, CUDA_R_32F,
-    NULL, NULL, NULL, CUDA_C_32F, iBatch, &cuda_plan_worksize_forward, CUDA_C_32F));
+    NULL, 1, 1, CUDA_R_32F,
+    NULL, 1, 1, CUDA_C_32F, iBatch, &cuda_plan_worksize_forward, CUDA_C_32F));
     (cufftXtMakePlanMany(cuda_plan_inverse, rank, fftDims,
-    NULL, NULL, NULL, CUDA_C_32F,
-    NULL, NULL, NULL, CUDA_R_32F, iBatch, &cuda_plan_worksize_inverse, CUDA_R_32F));
+    NULL, 1, 1, CUDA_C_32F,
+    NULL, 1, 1, CUDA_R_32F, iBatch, &cuda_plan_worksize_inverse, CUDA_R_32F));
 
     delete [] fftDims;
     delete [] inembed;

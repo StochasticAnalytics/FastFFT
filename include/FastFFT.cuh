@@ -14,6 +14,12 @@
 // Various levels of debuging conditions and prints
 // #define FFT_DEBUG_LEVEL 0
 
+// #define forceforce( type )  __nv_is_extended_device_lambda_closure_type( type ) 
+//FIXME: change to constexpr func
+template <typename K>
+constexpr inline bool IS_IKF_t( )  { if constexpr ( std::is_final_v< K > ) { return true; } else { return false; } } ;
+
+
 #if FFT_DEBUG_LEVEL < 1
 
 #define MyFFTDebugPrintWithDetails(...)  
@@ -255,7 +261,44 @@ constexpr const int elements_per_thread_2048 = 8;
 constexpr const int elements_per_thread_4096 = 8;
 constexpr const int elements_per_thread_8192 = 16;
 
+namespace KernelFunction {
 
+    // Intra Kernel Function Type
+    enum IKF_t : int { NONE, CONJ_MUL };
+
+    // Maybe a better way to check , but using keyword final to statically check for non NONE types
+    template < class T, int N_ARGS, IKF_t U >
+    class my_functor { };
+
+    template < class T >
+    class my_functor<T, 0, IKF_t::NONE> {
+    public:        
+        __device__ __forceinline__
+        T operator()() {
+            printf("really specific NONE\n");
+            return 0;
+        }
+    };
+
+    template < class T >
+    class my_functor<T, 2, IKF_t::CONJ_MUL> final {
+    public:
+    
+        __device__ __forceinline__
+        T operator() (float& template_fft_x, float& template_fft_y, const float& target_fft_x, const float& target_fft_y) {
+            // Is there a better way than declaring this variable each time?
+            float tmp  = (template_fft_x * target_fft_x + template_fft_y * target_fft_y); 
+            template_fft_y =  (template_fft_y * target_fft_x - template_fft_x * target_fft_y) ;
+            template_fft_x = tmp;
+        }
+    };
+
+}
+
+
+// constexpr const std::map<unsigned int, unsigned int> elements_per_thread = { 
+//     {16, 4}, {"GPU", 15}, {"RAM", 20}, 
+// };
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // FFT kernels
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -332,7 +375,7 @@ __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul( const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, 
                                                 Offsets mem_offsets, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv);
 
-template<class FFT, class invFFT, class ComplexType = typename FFT::value_type, class PreOpType = bool, class IntraOpType = bool, class PostOpType = bool>
+template<class FFT, class invFFT, class ComplexType = typename FFT::value_type, class PreOpType, class IntraOpType, class PostOpType>
 __launch_bounds__(FFT::max_threads_per_block) __global__
 void block_fft_kernel_C2C_FWD_INCREASE_OP_INV_NONE( const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__  input_values, ComplexType* __restrict__  output_values, 
                                                     Offsets mem_offsets, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv, 
@@ -734,20 +777,19 @@ struct io {
     template<class FunctionType>
     static inline __device__ void load_shared(const complex_type*  image_to_search,
                                               complex_type*        thread_data,
-                                              FunctionType         intra_op_lambda) {
+                                              FunctionType         intra_op_lambda = nullptr) {
         const unsigned int stride = stride_size();
         unsigned int       index  = threadIdx.x;
-        if constexpr (std::is_same<FunctionType, bool>::value) {
+        if constexpr ( IS_IKF_t<FunctionType>()) {
             for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
-                // a * conj b
-                thread_data[i] = thread_data[i], image_to_search[index];//ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
+                intra_op_lambda(thread_data[i].x,thread_data[i].y, image_to_search[index].x,image_to_search[index].y );//ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
                 index += stride;
             }
         }
         else {
             for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
                 // a * conj b
-                thread_data[i] = intra_op_lambda(thread_data[i], image_to_search[index]);//ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
+                thread_data[i] = thread_data[i], image_to_search[index];//ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
                 index += stride;
             }
         }
@@ -1001,20 +1043,20 @@ struct io {
     static inline __device__ void  load(const complex_type* input,
                                         complex_type*       thread_data,
                                         int                 last_index_to_load,
-                                        FunctionType        pre_op_lambda) {
+                                        FunctionType        pre_op_lambda = nullptr) {
         const unsigned int stride = stride_size();
         unsigned int       index  = threadIdx.x;                                            
-        if constexpr (std::is_same<FunctionType, bool>::value) {
+        if constexpr (IS_IKF_t<FunctionType>()) {
             for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
-                if (index < last_index_to_load) thread_data[i] = input[index];
-                else thread_data[i] = complex_type(0.0f, 0.0f);
+                if (index < last_index_to_load) thread_data[i] = pre_op_lambda(input[index]);
+                else thread_data[i] = pre_op_lambda(complex_type(0.0f, 0.0f));
                 index += stride;
             }
         }
         else {
             for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
-                if (index < last_index_to_load) thread_data[i] = pre_op_lambda(input[index]);
-                else thread_data[i] = pre_op_lambda(complex_type(0.0f, 0.0f));
+                if (index < last_index_to_load) thread_data[i] = input[index];
+                else thread_data[i] = complex_type(0.0f, 0.0f);
                 index += stride;
             }         
         }
@@ -1057,21 +1099,21 @@ struct io {
     }
 
 
-    template<class FunctionType = bool>
+    template<class FunctionType = std::nullptr_t>
     static inline __device__ void store(const complex_type* thread_data,
                                         complex_type*       output,
-                                        FunctionType        post_op_lambda = false) {
+                                        FunctionType        post_op_lambda = nullptr) {
         const unsigned int stride = stride_size();
         unsigned int       index  = threadIdx.x;
-        if constexpr (std::is_same_v<FunctionType, bool>) {
+        if constexpr (IS_IKF_t<FunctionType>()) {
             for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
-                output[index] = thread_data[i];
+                output[index] = post_op_lambda(thread_data[i]);
                 index += stride;
             }
         }
         else {
             for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
-                output[index] = post_op_lambda(thread_data[i]);
+                output[index] = thread_data[i];
                 index += stride;
             }
         }
