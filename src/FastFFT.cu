@@ -823,7 +823,7 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::CrossCorrelat
 
 template <class ComputeType, class InputType, class OutputType, int Rank>
 template<class PreOpType, class IntraOpType, class PostOpType>
-void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Fwd_Image_Inv(float2* image_to_search) {
+void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Fwd_Image_Inv(float2* image_to_search, PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda) {
 
     // Set the member pointer to the passed pointer
     d_ptr.image_to_search = image_to_search;
@@ -865,7 +865,8 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Fwd_I
                     SetPrecisionAndExectutionMethod(r2c_increase,   true);
                     switch (inv_size_change_type) {
                         case no_change: {
-                            SetPrecisionAndExectutionMethod<false, PreOpType, IntraOpType, PostOpType>(generic_fwd_increase_op_inv_none, true);
+                       
+                            SetPrecisionAndExectutionMethod<false, PreOpType, IntraOpType, PostOpType>(generic_fwd_increase_op_inv_none, true, pre_op_lambda, intra_op_lambda, post_op_lambda);
                             SetPrecisionAndExectutionMethod(c2r_none_XY,   false);
                             transform_stage_completed = TransformStageCompleted::inv;
                             break;
@@ -2146,7 +2147,7 @@ __global__ void clip_into_real_kernel(InputType* real_values_gpu,
 
 template <class ComputeType, class InputType, class OutputType, int Rank>
 template <bool use_thread_method, class PreOpType, class IntraOpType, class PostOpType>
-void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetPrecisionAndExectutionMethod(KernelType kernel_type, bool do_forward_transform) {
+void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetPrecisionAndExectutionMethod(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda) {
     // For kernels with fwd and inv transforms, we want to not set the direction yet.
 
     static const bool is_half = std::is_same_v<ComputeType, __half>;
@@ -2155,11 +2156,11 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetPrecisionA
 
     if constexpr (use_thread_method) {
         using FFT = decltype( Thread() + Size<32>() + Precision<ComputeType>() );
-        SetIntraKernelFunctions<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, nullptr, nullptr, nullptr);
+        SetIntraKernelFunctions<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda);
     }
     else {
         using FFT = decltype( Block() + Precision<ComputeType>() + FFTsPerBlock<1>() );
-        SetIntraKernelFunctions<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, nullptr, nullptr, nullptr);
+        SetIntraKernelFunctions<FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda);
     }
   
 }
@@ -2988,16 +2989,11 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetAndLaunchK
             int shared_memory = invFFT::shared_memory_size;
             CheckSharedMemory(shared_memory, device_properties);
 
-            // auto conj_mul_lambda = [] __device__ (float& template_fft_x, float& template_fft_y, const float& target_fft_x, const float& target_fft_y) {
-            //     // Is there a better way than declaring this variable each time?
-            //     float tmp  = (template_fft_x * target_fft_x + template_fft_y * target_fft_y); 
-            //     template_fft_y =  (template_fft_y * target_fft_x - template_fft_x * target_fft_y) ;
-            //     template_fft_x = tmp;
-            // };
 
             // __nv_is_extended_device_lambda_closure_type(type);
             // __nv_is_extended_host_device_lambda_closure_type(type)
-            if constexpr (IS_EXT_LAMBDA(IntraOpType)) {
+            if constexpr ( IS_IKF_t<IntraOpType>() ) {
+
                 // FIXME
                 #if DEBUG_FFT_STAGE > 2
                     // Right now, because of the n_threads == size_of<FFT> requirement, we are explicitly zero padding, so we need to send an "apparent Q" to know the input size.

@@ -15,9 +15,11 @@ NVCC_FLAGS+=-DCUFFTDX_DISABLE_RUNTIME_ASSERTS
 # Gencode arguments, only supporting Volta or newer
 # SMS ?= 70 75 80 86
 # In initial dev, only compile for 70 or 86 depending on which workstation I'm on, b/c it is faster.
-SMS ?= 70
+SMS ?=  80 86
 
-
+# Need to 
+# GENCODE_FLAGS := -gencode arch=compute_86,code=lto_86
+# GENCODE_FLAGS := -gencode arch=compute_86,code=lto_86
 
 ifeq ($(GENCODE_FLAGS),)
 # Generate SASS code for each SM architecture listed in $(SMS)
@@ -27,7 +29,7 @@ $(foreach sm,$(SMS),$(eval GENCODE_FLAGS += -gencode arch=compute_$(sm),code=sm_
 # Generate PTX code from the highest SM architecture in $(SMS) to guarantee forward-compatibility
 HIGHEST_SM := $(lastword $(sort $(SMS)))
 ifneq ($(HIGHEST_SM),)
-GENCODE_FLAGS += -gencode arch=compute_$(HIGHEST_SM),code=compute_$(HIGHEST_SM)
+GENCODE_FLAGS += -gencode arch=compute_$(HIGHEST_SM),code=sm_$(HIGHEST_SM)
 endif
 endif # GENCODE_FLAGS
 

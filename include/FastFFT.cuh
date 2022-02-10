@@ -14,7 +14,10 @@
 // Various levels of debuging conditions and prints
 // #define FFT_DEBUG_LEVEL 0
 
-#define IS_EXT_LAMBDA( type )  __nv_is_extended_device_lambda_closure_type( type ) 
+// #define forceforce( type )  __nv_is_extended_device_lambda_closure_type( type ) 
+//FIXME: change to constexpr func
+template <typename K>
+constexpr inline bool IS_IKF_t( )  { if constexpr ( std::is_final_v< K > ) { return true; } else { return false; } } ;
 
 
 #if FFT_DEBUG_LEVEL < 1
@@ -257,6 +260,41 @@ constexpr const int elements_per_thread_1024 = 8;
 constexpr const int elements_per_thread_2048 = 8;
 constexpr const int elements_per_thread_4096 = 8;
 constexpr const int elements_per_thread_8192 = 16;
+
+namespace KernelFunction {
+
+    // Intra Kernel Function Type
+    enum IKF_t : int { NONE, CONJ_MUL };
+
+    // Maybe a better way to check , but using keyword final to statically check for non NONE types
+    template < class T, int N_ARGS, IKF_t U >
+    class my_functor { };
+
+    template < class T >
+    class my_functor<T, 0, IKF_t::NONE> {
+    public:        
+        __device__ __forceinline__
+        T operator()() {
+            printf("really specific NONE\n");
+            return 0;
+        }
+    };
+
+    template < class T >
+    class my_functor<T, 2, IKF_t::CONJ_MUL> final {
+    public:
+    
+        __device__ __forceinline__
+        T operator() (float& template_fft_x, float& template_fft_y, const float& target_fft_x, const float& target_fft_y) {
+            // Is there a better way than declaring this variable each time?
+            float tmp  = (template_fft_x * target_fft_x + template_fft_y * target_fft_y); 
+            template_fft_y =  (template_fft_y * target_fft_x - template_fft_x * target_fft_y) ;
+            template_fft_x = tmp;
+        }
+    };
+
+}
+
 
 // constexpr const std::map<unsigned int, unsigned int> elements_per_thread = { 
 //     {16, 4}, {"GPU", 15}, {"RAM", 20}, 
@@ -742,7 +780,7 @@ struct io {
                                               FunctionType         intra_op_lambda = nullptr) {
         const unsigned int stride = stride_size();
         unsigned int       index  = threadIdx.x;
-        if constexpr ( IS_EXT_LAMBDA(FunctionType)) {
+        if constexpr ( IS_IKF_t<FunctionType>()) {
             for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
                 intra_op_lambda(thread_data[i].x,thread_data[i].y, image_to_search[index].x,image_to_search[index].y );//ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
                 index += stride;
@@ -1008,7 +1046,7 @@ struct io {
                                         FunctionType        pre_op_lambda = nullptr) {
         const unsigned int stride = stride_size();
         unsigned int       index  = threadIdx.x;                                            
-        if constexpr (IS_EXT_LAMBDA(FunctionType)) {
+        if constexpr (IS_IKF_t<FunctionType>()) {
             for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
                 if (index < last_index_to_load) thread_data[i] = pre_op_lambda(input[index]);
                 else thread_data[i] = pre_op_lambda(complex_type(0.0f, 0.0f));
@@ -1067,7 +1105,7 @@ struct io {
                                         FunctionType        post_op_lambda = nullptr) {
         const unsigned int stride = stride_size();
         unsigned int       index  = threadIdx.x;
-        if constexpr (IS_EXT_LAMBDA(FunctionType)) {
+        if constexpr (IS_IKF_t<FunctionType>()) {
             for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
                 output[index] = post_op_lambda(thread_data[i]);
                 index += stride;

@@ -941,7 +941,8 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
 
       std::cout << "Test lambda" << std::endl;
 
-
+      FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::NONE> noop;
+      FastFFT::KernelFunction::my_functor<float, 2, FastFFT::KernelFunction::CONJ_MUL> conj_mul;
 
       //////////////////////////////////////////
       //////////////////////////////////////////
@@ -950,7 +951,7 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
       {
         // FT.CrossCorrelate(targetFT.d_ptr.momentum_space, false);
             // Will type deduction work here?
-        FT.Generic_Fwd_Image_Inv(targetFT.d_ptr.momentum_space);
+        FT.Generic_Fwd_Image_Inv(targetFT.d_ptr.momentum_space, noop, conj_mul, noop);
       }
       else
       {
@@ -1006,6 +1007,7 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
           PrintArray(FT_output.real_values, fwd_dims_in.x, fwd_dims_in.y, fwd_dims_in.z, fwd_dims_in.w);
           MyTestPrintAndExit(" Stage 0");
         #elif DEBUG_FFT_STAGE == 1
+        
           PrintArray(FT_output.complex_values, fwd_dims_in.y, fwd_dims_in.z, fwd_dims_out.w);
           FastFFT::PrintVectorType(fwd_dims_in);
           FastFFT::PrintVectorType(fwd_dims_out);
@@ -1014,10 +1016,10 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
           PrintArray(FT_output.complex_values, fwd_dims_in.y, fwd_dims_out.z, fwd_dims_out.w);
           MyTestPrintAndExit(" Stage 2");          
         #elif DEBUG_FFT_STAGE == 3
-          PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.z, fwd_dims_out.w);
+            PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.w, fwd_dims_out.z);
           MyTestPrintAndExit(" Stage 3");
         #elif DEBUG_FFT_STAGE == 4
-          PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.z, fwd_dims_out.w);
+          PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.w, fwd_dims_out.z);
           MyTestPrintAndExit(" Stage 4");
         #elif DEBUG_FFT_STAGE == 5
           PrintArray(FT_output.complex_values, inv_dims_out.y, inv_dims_in.z, inv_dims_out.w);
@@ -1151,21 +1153,18 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
         else { n_loops = 1000; }
     }
 
-      cuFFT_output.record_start();
-      for (int i = 0; i < n_loops; ++i)
-      {
-        if (set_conjMult_callback || is_size_change_decrease )
-        {
-        //   FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
-        // Will type deduction work here?
-        FT.Generic_Fwd_Image_Inv(targetFT.d_ptr.momentum_space);
+    cuFFT_output.record_start();
+    for (int i = 0; i < n_loops; ++i) {
+        if (set_conjMult_callback || is_size_change_decrease ) {
+            //   FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
+            // Will type deduction work here?
+            FT.Generic_Fwd_Image_Inv(targetFT.d_ptr.momentum_space, noop, conj_mul, noop);
         }
-        else
-        {
-          FT.FwdFFT();
-          FT.InvFFT();
+        else {
+            FT.FwdFFT();
+            FT.InvFFT();
         }
-      }
+    }
       cuFFT_output.record_stop();
       cuFFT_output.synchronize();
       cuFFT_output.print_time("FastFFT", print_out_time);
@@ -1470,7 +1469,7 @@ int main(int argc, char** argv) {
         int size_change_type; 
         bool do_3d = false;
     
-        // size_change_type = 0; // no change
+        // size_change_type = 0; // no 
         // compare_libraries<2>(test_size, do_3d, size_change_type);
     
         size_change_type = 1; // increase
