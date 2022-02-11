@@ -231,24 +231,28 @@ public:
   void CopyDeviceToHost(OutputType* output_pointer, bool free_gpu_memory = true, bool unpin_host_memory = true, int n_elements_to_copy = 0);
   // FFT calls
 
-  void FwdFFT(bool swap_real_space_quadrants = false, bool transpose_output = true);
-  void InvFFT(bool transpose_output = true);
+//   void FwdFFT(bool swap_real_space_quadrants = false, bool transpose_output = true);
+//   void InvFFT(bool transpose_output = true);
   void CrossCorrelate(float2* image_to_search, bool swap_real_space_quadrants);
   void CrossCorrelate(__half2* image_to_search, bool swap_real_space_quadrants);
 
-    /*
-    Could be Generic_op_Fwd_op_Inv_op, where Fwd/Inv refer to the FFT/IFFT. and op refers to a user defined operation defined in a lambda.
 
-    For the time being, this is assumed to not capture anything (stateless).
-    TODO: verify statelessness.
-    
-            auto test_lambda = [] __device__ (float in) {
-            printf("%f\n", in);
-        };
-    */
     // could float2* be replaced with decltype(DevicePointers.momentum_space)
-    template<class PreOpType = nullptr_t, class IntraOpType = nullptr_t, class PostOpType = nullptr_t>
+    template<class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t>
     void Generic_Fwd_Image_Inv(float2* data, PreOpType pre_op = nullptr, IntraOpType intra_op = nullptr, PostOpType post_op = nullptr);
+
+    template<class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t>
+    void Generic_Fwd(PreOpType pre_op = nullptr, IntraOpType intra_op = nullptr);
+
+    template<class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t>
+    void Generic_Inv(IntraOpType intra_op = nullptr, PostOpType post_op = nullptr);
+
+    // Alias for FwdFFT, is there any overhead?
+    template<class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t>
+    void FwdFFT(PreOpType pre_op = nullptr, IntraOpType intra_op = nullptr) { Generic_Fwd<PreOpType, IntraOpType>(pre_op, intra_op); }
+
+    template<class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t>
+    void InvFFT(IntraOpType intra_op = nullptr, PostOpType post_op = nullptr) { Generic_Inv<IntraOpType, PostOpType>(intra_op, post_op); }
 
     void ClipIntoTopLeft();
     void ClipIntoReal(int wanted_coordinate_of_box_center_x, int wanted_coordinate_of_box_center_y, int wanted_coordinate_of_box_center_z);
