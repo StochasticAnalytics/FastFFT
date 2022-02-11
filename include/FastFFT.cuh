@@ -1099,7 +1099,7 @@ struct io {
     }
 
 
-    template<class FunctionType = std::nullptr_t>
+    template<class FunctionType = std::nullptr_t >
     static inline __device__ void store(const complex_type* thread_data,
                                         complex_type*       output,
                                         FunctionType        post_op_lambda = nullptr) {

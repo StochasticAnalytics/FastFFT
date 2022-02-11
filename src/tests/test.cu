@@ -188,7 +188,7 @@ bool const_image_test(std::vector<int> size, bool do_3d = false) {
 
     // This method will call the regular FFT kernels given the input/output dimensions are equal when the class is instantiated.
     bool swap_real_space_quadrants = false;
-    FT.FwdFFT(swap_real_space_quadrants);
+    FT.FwdFFT();
     
     // in buffer, do not deallocate, do not unpin memory
     FT.CopyDeviceToHost( false, false);
@@ -365,7 +365,7 @@ bool random_image_test(std::vector<int> size, bool do_3d = false) {
 
     // This method will call the regular FFT kernels given the input/output dimensions are equal when the class is instantiated.
     bool swap_real_space_quadrants = false;
-    FT.FwdFFT(swap_real_space_quadrants);
+    FT.FwdFFT();
     
     // in buffer, do not deallocate, do not unpin memory
     FT.CopyDeviceToHost( false, false);
@@ -581,7 +581,7 @@ bool unit_impulse_test(std::vector<int>size, bool do_3d, bool do_increase_size) 
   // This method will call the regular FFT kernels given the input/output dimensions are equal when the class is instantiated.
   bool swap_real_space_quadrants = true;
   
-  FT.FwdFFT(swap_real_space_quadrants);
+  FT.FwdFFT();
 
   if (do_increase_size)
   {
@@ -1354,8 +1354,8 @@ void run_oned(std::vector<int> size)
 
     bool transpose_output = false;
     bool swap_real_space_quadrants = false;
-    FT.FwdFFT(swap_real_space_quadrants, transpose_output);
-    FT_complex.FwdFFT(swap_real_space_quadrants, transpose_output);
+    FT.FwdFFT();
+    FT_complex.FwdFFT();
 
     FT.CopyDeviceToHost(FT_output.real_values, false, false);
     FT_complex.CopyDeviceToHost(FT_output_complex.real_values, false, false);
@@ -1371,8 +1371,8 @@ void run_oned(std::vector<int> size)
 
 
 
-    FT.InvFFT(transpose_output);
-    FT_complex.InvFFT(transpose_output);
+    FT.InvFFT();
+    FT_complex.InvFFT();
     FT.CopyDeviceToHost(FT_output.real_values, true, true);
     FT_complex.CopyDeviceToHost(FT_output_complex.real_values, true, true);
 

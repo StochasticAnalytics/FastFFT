@@ -384,242 +384,214 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::CopyDeviceToH
 }
 
 
-
 template <class ComputeType, class InputType, class OutputType, int Rank>
-void FourierTransformer<ComputeType, InputType, OutputType, Rank>::FwdFFT(bool swap_real_space_quadrants, bool transpose_output) {
+template<class PreOpType, class IntraOpType>
+void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Fwd(PreOpType pre_op, IntraOpType intra_op) {
+
     SetDimensions(FwdTransform);
-    static constexpr bool use_thread_method = false;
-    bool do_forward_transform = true;
-
    
-  // SetPrecisionAndExectutionMethod(KernelType kernel_type, bool do_forward_transform, bool use_thread_method)
-  switch (transform_dimension)
-  {
-    case 1: {
-        // FIXME there is some redundancy in specifying _decomposed and use_thread_method
-        // Note: the only time the non-transposed method should be used is for 1d data.
-        if constexpr (use_thread_method)
-        {
-          if (is_real_valued_input) SetPrecisionAndExectutionMethod<true>(r2c_decomposed, do_forward_transform); //FFT_R2C_decomposed(transpose_output);
-          else SetPrecisionAndExectutionMethod<true>(c2c_decomposed, do_forward_transform);
-          transform_stage_completed = TransformStageCompleted::fwd;
-
-        }
-        else
-        {
-          if (is_real_valued_input) 
-          {
-            switch (fwd_size_change_type)
-            {
-              case SizeChangeType::no_change:{ SetPrecisionAndExectutionMethod(r2c_none_XY); break; }
-              case SizeChangeType::decrease: { SetPrecisionAndExectutionMethod(r2c_decrease); break; }
-              case SizeChangeType::increase: { SetPrecisionAndExectutionMethod(r2c_increase); break; }
-              default: { MyFFTDebugAssertTrue(false, "Invalid size change type"); }
+    // All placeholders
+    constexpr bool use_thread_method = false;
+    const bool do_forward_transform = true;
+    const bool swap_real_space_quadrants = false;
+    const bool transpose_output = true;
+   
+    // SetPrecisionAndExectutionMethod(KernelType kernel_type, bool do_forward_transform, bool use_thread_method)
+    switch (transform_dimension) {
+        case 1: {
+            // FIXME there is some redundancy in specifying _decomposed and use_thread_method
+            // Note: the only time the non-transposed method should be used is for 1d data.
+            if constexpr (use_thread_method) {
+                if (is_real_valued_input) SetPrecisionAndExectutionMethod<true>(r2c_decomposed, do_forward_transform); //FFT_R2C_decomposed(transpose_output);
+                else SetPrecisionAndExectutionMethod<true>(c2c_decomposed, do_forward_transform);
+                transform_stage_completed = TransformStageCompleted::fwd;
             }
-          }
-          else
-          {
-            switch (fwd_size_change_type)
-            {
-              case SizeChangeType::no_change:{ SetPrecisionAndExectutionMethod(c2c_fwd_none); break; }
-              case SizeChangeType::decrease: { SetPrecisionAndExectutionMethod(c2c_fwd_decrease); break; }
-              case SizeChangeType::increase: { SetPrecisionAndExectutionMethod(c2c_fwd_increase); break; }
-              default: { MyFFTDebugAssertTrue(false, "Invalid size change type"); }
+            else {
+                if (is_real_valued_input) {
+                    switch (fwd_size_change_type) {
+                        case SizeChangeType::no_change:{ SetPrecisionAndExectutionMethod(r2c_none_XY); break; }
+                        case SizeChangeType::decrease: { SetPrecisionAndExectutionMethod(r2c_decrease); break; }
+                        case SizeChangeType::increase: { SetPrecisionAndExectutionMethod(r2c_increase); break; }
+                        default: { MyFFTDebugAssertTrue(false, "Invalid size change type"); }
+                    }
+                }
+                else {
+                    switch (fwd_size_change_type) {
+                        case SizeChangeType::no_change:{ SetPrecisionAndExectutionMethod(c2c_fwd_none); break; }
+                        case SizeChangeType::decrease: { SetPrecisionAndExectutionMethod(c2c_fwd_decrease); break; }
+                        case SizeChangeType::increase: { SetPrecisionAndExectutionMethod(c2c_fwd_increase); break; }
+                        default: { MyFFTDebugAssertTrue(false, "Invalid size change type"); }
+                    }
+                }
+                transform_stage_completed = TransformStageCompleted::fwd;
             }
-          }
-          transform_stage_completed = TransformStageCompleted::fwd;
+            break;
         }
-
-        break;
+        case 2: {
+            switch (fwd_size_change_type) {
+                case no_change: {
+                    // FIXME there is some redundancy in specifying _decomposed and use_thread_method
+                    // Note: the only time the non-transposed method should be used is for 1d data.
+                    if (use_thread_method) {
+                        SetPrecisionAndExectutionMethod<true>(r2c_decomposed_transposed, do_forward_transform);
+                        transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
+                        SetPrecisionAndExectutionMethod<true>(c2c_decomposed, do_forward_transform);
+                    }
+                    else {
+                        SetPrecisionAndExectutionMethod(r2c_none_XY);
+                        transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
+                        SetPrecisionAndExectutionMethod(c2c_fwd_none);
+                    }
+                    break;
+                }
+                case increase: {
+                    SetPrecisionAndExectutionMethod(r2c_increase);
+                    transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
+                    SetPrecisionAndExectutionMethod(c2c_fwd_increase);   
+                    break;
+                }
+                case decrease: {
+                    SetPrecisionAndExectutionMethod(r2c_decrease);
+                    transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
+                    SetPrecisionAndExectutionMethod(c2c_fwd_decrease); 
+                    break;
+                }
+            }
+            break; // case 2
+        }
+        case 3: {
+            switch (fwd_size_change_type) {
+                case no_change: {
+                    SetPrecisionAndExectutionMethod(r2c_none_XZ);
+                    transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
+                    SetPrecisionAndExectutionMethod(c2c_fwd_none_Z);
+                    SetPrecisionAndExectutionMethod(c2c_fwd_none);
+                    break;
+                }
+                case increase: {
+                    SetPrecisionAndExectutionMethod(r2c_increase_XZ);
+                    transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
+                    SetPrecisionAndExectutionMethod(c2c_fwd_increase_Z);
+                    SetPrecisionAndExectutionMethod(c2c_fwd_increase);
+                    // SetPrecisionAndExectutionMethod(c2c_fwd_increase_Z);   
+                    break;
+                }
+                case decrease: {
+                    // Not yet supported
+                    MyFFTRunTimeAssertTrue(false, "3D FFT fwd no change not yet supported");
+                    break;
+                }
+            } 
+        }
     }
-    case 2: {
-      switch (fwd_size_change_type)
-      {
-        case no_change: {
-          // FIXME there is some redundancy in specifying _decomposed and use_thread_method
-          // Note: the only time the non-transposed method should be used is for 1d data.
-          if (use_thread_method)
-          {
-            SetPrecisionAndExectutionMethod<true>(r2c_decomposed_transposed, do_forward_transform);
-            transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
-            SetPrecisionAndExectutionMethod<true>(c2c_decomposed, do_forward_transform);
-          }
-          else
-          {
-            SetPrecisionAndExectutionMethod(r2c_none_XY);
-            transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
-            SetPrecisionAndExectutionMethod(c2c_fwd_none);
-          }
-          break;
-        }
-        case increase: {
-          SetPrecisionAndExectutionMethod(r2c_increase);
-          transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
-          SetPrecisionAndExectutionMethod(c2c_fwd_increase);   
-
-          break;
-        }
-        case decrease: {
-
-          SetPrecisionAndExectutionMethod(r2c_decrease);
-
-          transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
-          SetPrecisionAndExectutionMethod(c2c_fwd_decrease); 
- 
-          break;
-        }
-      }
-      break; // case 2
-    }
-    case 3: {
-      switch (fwd_size_change_type)
-      {
-        case no_change: {
-          SetPrecisionAndExectutionMethod(r2c_none_XZ);
-          transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
-          SetPrecisionAndExectutionMethod(c2c_fwd_none_Z);
-          SetPrecisionAndExectutionMethod(c2c_fwd_none);
-          break;
-        }
-        case increase: {
-          SetPrecisionAndExectutionMethod(r2c_increase_XZ);
-          transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
-          SetPrecisionAndExectutionMethod(c2c_fwd_increase_Z);
-          SetPrecisionAndExectutionMethod(c2c_fwd_increase);
-          // SetPrecisionAndExectutionMethod(c2c_fwd_increase_Z);   
-          break;
-        }
-        case decrease: {
-          // Not yet supported
-          MyFFTRunTimeAssertTrue(false, "3D FFT fwd no change not yet supported");
-          break;
-        }
-      } 
-    }
-  }
-
-
 }
 
 template <class ComputeType, class InputType, class OutputType, int Rank>
-void FourierTransformer<ComputeType, InputType, OutputType, Rank>::InvFFT(bool transpose_output) {
-  SetDimensions(InvTransform);
-  constexpr const bool use_thread_method = false;
-  bool do_forward_transform = false;
+template<class IntraOpType, class PostOpType >
+void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Inv(IntraOpType intra_op, PostOpType post_op) {
 
-  switch (transform_dimension)
-  {
-    case 1: {
+    SetDimensions(InvTransform);
+   
+    // All placeholders
+    constexpr bool use_thread_method = false;
+    const bool do_forward_transform = false;
+    const bool swap_real_space_quadrants = false;
+    const bool transpose_output = true;
 
-              // FIXME there is some redundancy in specifying _decomposed and use_thread_method
-        // Note: the only time the non-transposed method should be used is for 1d data.
-        if constexpr (use_thread_method)
-        {
-          if (is_real_valued_input) SetPrecisionAndExectutionMethod<true>(c2r_decomposed, do_forward_transform); //FFT_R2C_decomposed(transpose_output);
-          else SetPrecisionAndExectutionMethod<true>(c2c_decomposed, do_forward_transform);
-          transform_stage_completed = TransformStageCompleted::inv;
 
-        }
-        else
-        {
-          if (is_real_valued_input) 
-          {
-            switch (inv_size_change_type)
-            {
-              case SizeChangeType::no_change:{ SetPrecisionAndExectutionMethod(c2r_none_XY); break; }
-              case SizeChangeType::decrease: { SetPrecisionAndExectutionMethod(c2r_decrease); break; }
-              case SizeChangeType::increase: { SetPrecisionAndExectutionMethod(c2r_increase); break; }
-              default: { MyFFTDebugAssertTrue(false, "Invalid size change type"); }
+    switch (transform_dimension) {
+        case 1: {
+            // FIXME there is some redundancy in specifying _decomposed and use_thread_method
+            // Note: the only time the non-transposed method should be used is for 1d data.
+            if constexpr (use_thread_method) {
+                if (is_real_valued_input) SetPrecisionAndExectutionMethod<true>(c2r_decomposed, do_forward_transform); //FFT_R2C_decomposed(transpose_output);
+                else SetPrecisionAndExectutionMethod<true>(c2c_decomposed, do_forward_transform);
+                transform_stage_completed = TransformStageCompleted::inv;
             }
-          }
-          else
-          {
-            switch (inv_size_change_type)
-            {
-              case SizeChangeType::no_change:{ SetPrecisionAndExectutionMethod(c2c_inv_none); break; }
-              case SizeChangeType::decrease: { SetPrecisionAndExectutionMethod(c2c_inv_decrease); break; }
-              case SizeChangeType::increase: { SetPrecisionAndExectutionMethod(c2c_inv_increase); break; }
-              default: { MyFFTDebugAssertTrue(false, "Invalid size change type"); }
+            else {
+                if (is_real_valued_input) {
+                    switch (inv_size_change_type) {
+                        case SizeChangeType::no_change:{ SetPrecisionAndExectutionMethod(c2r_none_XY); break; }
+                        case SizeChangeType::decrease: { SetPrecisionAndExectutionMethod(c2r_decrease); break; }
+                        case SizeChangeType::increase: { SetPrecisionAndExectutionMethod(c2r_increase); break; }
+                        default: { MyFFTDebugAssertTrue(false, "Invalid size change type"); }
+                    }
+                }
+                else {
+                    switch (inv_size_change_type) {
+                        case SizeChangeType::no_change:{ SetPrecisionAndExectutionMethod(c2c_inv_none); break; }
+                        case SizeChangeType::decrease: { SetPrecisionAndExectutionMethod(c2c_inv_decrease); break; }
+                        case SizeChangeType::increase: { SetPrecisionAndExectutionMethod(c2c_inv_increase); break; }
+                        default: { MyFFTDebugAssertTrue(false, "Invalid size change type"); }
+                    }
+                }
+                transform_stage_completed = TransformStageCompleted::inv;
             }
-          }
-          transform_stage_completed = TransformStageCompleted::inv;
+            break;
         }
-
-        break;
+        case 2: {
+            switch (inv_size_change_type) {
+                case no_change: {
+                    // FIXME there is some redundancy in specifying _decomposed and use_thread_method
+                    // Note: the only time the non-transposed method should be used is for 1d data.
+                    if (use_thread_method) {
+                        SetPrecisionAndExectutionMethod<true>(c2c_decomposed,            do_forward_transform);
+                        transform_stage_completed = TransformStageCompleted::inv; // technically not complete, needed for copy on validation of partial fft.
+                        SetPrecisionAndExectutionMethod<true>(c2r_decomposed_transposed, do_forward_transform);  
+                    }
+                    else {
+                        SetPrecisionAndExectutionMethod(c2c_inv_none);
+                        transform_stage_completed = TransformStageCompleted::inv; // technically not complete, needed for copy on validation of partial fft.
+                        SetPrecisionAndExectutionMethod(c2r_none_XY);
+                    }          
+                    break;
+                }
+                case increase: {
+                    SetPrecisionAndExectutionMethod(c2c_inv_increase);
+                    transform_stage_completed = TransformStageCompleted::inv; // technically not complete, needed for copy on validation of partial fft.
+                    SetPrecisionAndExectutionMethod(c2r_increase); 
+                    break;
+                }
+                case decrease: {
+                    SetPrecisionAndExectutionMethod(c2c_inv_decrease);
+                    transform_stage_completed = TransformStageCompleted::inv; // technically not complete, needed for copy on validation of partial fft.
+                    SetPrecisionAndExectutionMethod(c2r_decrease); 
+                    break;
+                }
+                default: {
+                    MyFFTDebugAssertTrue(false, "Invalid size change type");
+                    break;
+                }
+            } // switch on inv size change type
+            break; // case 2
+        }
+        case 3: {
+            switch (inv_size_change_type) {
+                case no_change: {
+                    SetPrecisionAndExectutionMethod(c2c_inv_none_XZ);
+                    transform_stage_completed = TransformStageCompleted::inv; // technically not complete, needed for copy on validation of partial fft.
+                    SetPrecisionAndExectutionMethod(c2c_inv_none_Z);
+                    SetPrecisionAndExectutionMethod(c2r_none);
+                    break;
+                }
+                case increase: {
+                    SetPrecisionAndExectutionMethod(r2c_increase);
+                    transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
+                    // SetPrecisionAndExectutionMethod(c2c_fwd_increase_Z);   
+                    break;
+                }
+                case decrease: {
+                    // Not yet supported
+                    MyFFTRunTimeAssertTrue(false, "3D FFT inv no decrease not yet supported");
+                    break;
+                }
+                default: {
+                    MyFFTDebugAssertTrue(false, "Invalid dimension");
+                    break;
+                }
+            } // switch on inv size change type
+        }
     }
-    case 2: {
-      switch (inv_size_change_type)
-      {
-        case no_change: {
-          // FIXME there is some redundancy in specifying _decomposed and use_thread_method
-          // Note: the only time the non-transposed method should be used is for 1d data.
-          if (use_thread_method)
-          {
-            SetPrecisionAndExectutionMethod<true>(c2c_decomposed,            do_forward_transform);
-            transform_stage_completed = TransformStageCompleted::inv; // technically not complete, needed for copy on validation of partial fft.
-            SetPrecisionAndExectutionMethod<true>(c2r_decomposed_transposed, do_forward_transform);
-
-          }
-          else
-          {
-            SetPrecisionAndExectutionMethod(c2c_inv_none);
-            transform_stage_completed = TransformStageCompleted::inv; // technically not complete, needed for copy on validation of partial fft.
-            SetPrecisionAndExectutionMethod(c2r_none_XY);
-
-          }          
-          break;
-        }
-        case increase: {
-          SetPrecisionAndExectutionMethod(c2c_inv_increase);
-          transform_stage_completed = TransformStageCompleted::inv; // technically not complete, needed for copy on validation of partial fft.
-          SetPrecisionAndExectutionMethod(c2r_increase); 
-          
-          // FFT_C2C(false);
-          // FFT_C2R_Transposed();
-          break;
-        }
-        case decrease: {
-          SetPrecisionAndExectutionMethod(c2c_inv_decrease);
-          transform_stage_completed = TransformStageCompleted::inv; // technically not complete, needed for copy on validation of partial fft.
-          SetPrecisionAndExectutionMethod(c2r_decrease); 
-          break;
-        }
-        default: {
-          MyFFTDebugAssertTrue(false, "Invalid size change type");
-        }
-      } // switch on inv size change type
-      break; // case 2
-    }
-    case 3: {
-      switch (inv_size_change_type) 
-      {
-        case no_change: {
-          SetPrecisionAndExectutionMethod(c2c_inv_none_XZ);
-          transform_stage_completed = TransformStageCompleted::inv; // technically not complete, needed for copy on validation of partial fft.
-          SetPrecisionAndExectutionMethod(c2c_inv_none_Z);
-          SetPrecisionAndExectutionMethod(c2r_none);
-          break;
-        }
-        case increase: {
-          SetPrecisionAndExectutionMethod(r2c_increase);
-          transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
-          // SetPrecisionAndExectutionMethod(c2c_fwd_increase_Z);   
-          break;
-        }
-        case decrease: {
-          // Not yet supported
-          MyFFTRunTimeAssertTrue(false, "3D FFT inv no decrease not yet supported");
-          break;
-        }
-        default: {
-          MyFFTDebugAssertTrue(false, "Invalid dimension");
-          break;
-        }
-      }
-    }
-  }
-
-
 }
 
 template <class ComputeType, class InputType, class OutputType, int Rank>
