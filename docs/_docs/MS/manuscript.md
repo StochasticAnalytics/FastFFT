@@ -24,13 +24,15 @@ Many authors, particularly of earlier papers, use the exact reduction in arithme
 
  By incorporating prior information about specific image processing algorithms, we present optimized two and three dimensional FFT routines that substantially reduce the run-time and power-consumption of image processing algorithms. To increase the utility of the library, we provide a simple mechanism for inlining of user defined operations at three stages: prior to the FFT, after the forward FFT, and following the iFFT. These user defined operations are integrated into the FFT kenrnel, similar to a cuFFT callback, without the overhead required in loading several 64 bit pointers from the CUDA param buffer⚠️.
 
+ ---
+
 ### Background
 
 #### The discrete Fourier Transform
 
-The Fourier Transform is a mathematical operation that converts an input function into a dual space; for example a function of time into a function of frequency. These dual spaces are sometimes referred to as position and momentum space, real and Fourier space, image space and k-space etc. Given that a "real-space" function can be complex valued, we will use the position and momentum space nomenclature to avoid ambiguity.
+The Fourier Transform is a mathematical operation that maps an input function into a dual space; for example a function of time into a function of frequency. These dual spaces are sometimes referred to as position and momentum space, real and Fourier space, image space and k-space etc. Given that a "real-space" function can be complex valued, we will use the position and momentum space nomenclature to avoid ambiguity.
 
-creatinThe discrete Fourier Transform (DFT) extends the operation of the Fourier Transform to a band-limited sequence of evenly spaced samples of a continuous function. In one dimension, it is defined for a sequence of N samples $x(n)$ as: Throughout the text we use lower/upper case to refer to position/momemtum space variables.
+The discrete Fourier Transform (DFT) extends the operation of the Fourier Transform to a band-limited sequence of evenly spaced samples of a continuous function. In one dimension, it is defined for a sequence of N samples $x(n)$ as: Throughout the text we use lower/upper case to refer to position/momemtum space variables.
 
 % This produces a labelled eqution in jupyter book that will at least render the math in vscode preview, just without the label.
 $$ X(k) = \sum_{n=0}^{N-1} x(n) \exp\left( -2\pi i k n \right) $$ (dft-1d-equation)
@@ -43,16 +45,9 @@ From this equation, it should be clear in the most simple case the 2D DFT can be
 
 In addition to being seperable, the DFT has several other important properties:
 
-
-```{TODO} list properties (And brief example with a few citations, preferably specific to cryo-EM where each is capitalized on.)
-- linearity
-- Parsevals
-- Convolution theorem
-- sinc interpolation
-- Fourier Slice theorem
-```
   
 #### The Fast (Discrete) Fourier Transform
+
 
 In looking at [⚠️ DFT equation above] it is clear that the DFT requires $ O(N^2) $
  complex exponential function evaluations, multiplications, and additions. The fast Fourier Transform (FFT) reduces the compuational complexity to $ O(Nlog_2{N}) $
@@ -249,10 +244,11 @@ Pad something like 128 --> 512^3 over X chunks. Far fewer orientations than 2DTM
 
 #### Subtomogram averaging
 
-While the total zero padding is less (1.5x to 2x) than 3D template matching, there are typically many more cross-correlations in a given project. Like movie alignment, subtomogram averaging also benefits in both directions, as the translational search allows for a strictly limited set of output points to find the shifts. These combined lead to X speedup.
+While the total zero padding in any given dimension is smaller in sub-tomogram averaging than the case of 3D template matching, there are typically many more cross-correlations needed in a given project given the finer angular search space, and iterative nature of the pipeline. Similar to movie alignment, sub-tomogram averaging also benefits from sparsity on both the forward and the inverse transforms. The translational search allows for a strictly limited set of output points to find the shifts. These combined lead to X speedup.
 
 
 ## Discussion
+
 
 
 ## Conclusion
