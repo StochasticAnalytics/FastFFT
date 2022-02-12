@@ -249,6 +249,8 @@ While the total zero padding in any given dimension is smaller in sub-tomogram a
 
 ## Discussion
 
+We have created a library for computing multi-dimensional FFTs taking advantage of NVIDIA's cufftdx library. In addition to vastly improving runtimes for a special subset of signal processing tasks by taking advantage of sparsity in the data, we have also incorporated a mechanism for users of the library to easily define inline functinos that are then seamlessly passed into any of the FFT kernels, alleviating additional trips through the memory hierarchy. 
+
 
 
 ## Conclusion
