@@ -698,10 +698,10 @@ bool unit_impulse_test(std::vector<int>size, bool do_3d, bool do_increase_size) 
 }
 
 template<int Rank>
-void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
+void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type, bool do_rectangle) {
 
   bool skip_cufft_for_profiling = false;
-  bool print_out_time = false;
+  bool print_out_time = true;
   // bool set_padding_callback = false; // the padding callback is slower than pasting in b/c the read size of the pointers is larger than the actual data. do not use.
   bool set_conjMult_callback = true;
   bool is_size_change_decrease = false;
@@ -709,6 +709,16 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
   if (size_change_type < 0) { is_size_change_decrease = true; }
   int loop_limit = 1;
   if (size_change_type == 0)  loop_limit = 0;
+
+  int make_rect_x;
+  int make_rect_y = 1;
+  if (do_rectangle) make_rect_x = 2;
+  else make_rect_x = 1;
+
+  if (do_3d && do_rectangle) {
+    std::cout << "ERROR: cannot do 3d and rectangle at the same time" << std::endl;
+    return;
+  }
 
   short4 input_size;
   short4 output_size;
@@ -733,19 +743,19 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
 
       if (is_size_change_decrease)
       {
-        output_size = make_short4(size[iSize],size[iSize],1,0);
-        input_size  = make_short4(size[oSize],size[oSize],1,0);  
+        output_size = make_short4(size[iSize]/make_rect_x,size[iSize]/make_rect_y,1,0);
+        input_size  = make_short4(size[oSize]/make_rect_x,size[oSize]/make_rect_y,1,0);  
         if (do_3d)
         {
           output_size.z = size[iSize];
           input_size.z  = size[oSize];
         }
-
+          
       }
       else
       {
-        input_size  = make_short4(size[iSize],size[iSize],1,0);
-        output_size = make_short4(size[oSize],size[oSize],1,0);  
+        input_size  = make_short4(size[iSize]/make_rect_x,size[iSize]/make_rect_y,1,0);
+        output_size = make_short4(size[oSize]/make_rect_x,size[oSize]/make_rect_y,1,0);  
         if (do_3d)
         {
           input_size.z  = size[iSize];
@@ -753,7 +763,7 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
         }
 
       }
-      if (print_out_time) {std::cout << std::endl << "Testing padding from  " << input_size.x << " to " << output_size.x << std::endl;}
+      if (print_out_time) {printf("Testing padding from %i,%i,%i to %i,%i,%i\n", input_size.x, input_size.y, input_size.z, output_size.x, output_size.y, output_size.z);}
 
 
 
@@ -913,7 +923,7 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
       {
         if (positive_control.real_values[address] == positive_control.size.x*positive_control.size.y*positive_control.size.z*testVal_1*testVal_2)
         {
-          if (print_out_time)  {std::cout << "Test passed for FFTW positive control.\n" << std::endl;}
+          if (print_out_time)  {std::cout << "Test passed for FFTW positive control." << std::endl;}
         }
         else
         {
@@ -1262,7 +1272,7 @@ void compare_libraries(std::vector<int>size, bool do_3d, int size_change_type) {
         cuFFT_output.print_time("cuFFT", print_out_time);
       } // end of if (! skip_cufft_for_profiling)
       std::cout << "For size " << input_size.x << " to "<< output_size.x << ": ";
-      std::cout << "Ratio cuFFT/FastFFT : " << cuFFT_output.elapsed_gpu_ms/FastFFT_time << std::endl;
+      std::cout << "Ratio cuFFT/FastFFT : " << cuFFT_output.elapsed_gpu_ms/FastFFT_time << "\n\n" << std::endl;
 
       oSize++;
       // We don't want to loop if the size is not actually changing.
@@ -1409,6 +1419,7 @@ int main(int argc, char** argv) {
 
     // Input size vectors to be tested.
     std::vector<int> test_size = {  32, 64, 128, 256, 512, 1024, 2048, 4096};
+    std::vector<int> test_size_rectangle = { 64, 128, 256, 512, 1024, 2048, 4096};
     std::vector<int> test_size_3d = {  32, 64, 128, 256, 512};
     // std::vector<int> test_size_3d ={512};
   
@@ -1469,14 +1480,16 @@ int main(int argc, char** argv) {
         int size_change_type; 
         bool do_3d = false;
     
-        // size_change_type = 0; // no 
-        // compare_libraries<2>(test_size, do_3d, size_change_type);
-    
+        size_change_type = 0; // no 
+        compare_libraries<2>(test_size, do_3d, size_change_type, false);
+        // compare_libraries<2>(test_size_rectangle, do_3d, size_change_type, true);
+ 
         size_change_type = 1; // increase
-        compare_libraries<2>(test_size, do_3d, size_change_type);
-    
+        compare_libraries<2>(test_size, do_3d, size_change_type, false);
+        // compare_libraries<2>(test_size_rectangle, do_3d, size_change_type, true);
+        exit(1);
         size_change_type = -1; // decrease
-        compare_libraries<2>(test_size, do_3d, size_change_type);
+        compare_libraries<2>(test_size, do_3d, size_change_type, false);
     }
 
     if (run_3d_performance_tests) {
@@ -1489,14 +1502,14 @@ int main(int argc, char** argv) {
         bool do_3d = true;
     
         size_change_type = 0; // no change
-        compare_libraries<3>(test_size, do_3d, size_change_type);
+        compare_libraries<3>(test_size, do_3d, size_change_type, false);
     
         // TODO: These are not yet completed.
         // size_change_type = 1; // increase
-        // compare_libraries(test_size, do_3d, size_change_type);
+        // compare_libraries(test_size, do_3d, size_change_type, false);
     
         // size_change_type = -1; // decrease
-        // compare_libraries(test_size, do_3d, size_change_type);      
+        // compare_libraries(test_size, do_3d, size_change_type, false);      
     }
 
     // If we get here, all tests passed.
