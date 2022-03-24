@@ -1,6 +1,5 @@
 # TODO: nvc++ ?
 NVCC=nvcc
-
 # TODO: test with gcc and clang
 NVCC_FLAGS=-ccbin=g++ -t 8 
 
@@ -171,7 +170,7 @@ $(TEST_OBJS): $(TEST_SRCS)
 # remove all but the executables.
 clean:
 	rm -f $(TESTS_BUILD_DIR)/*.*
-	rm -f $(TESTS_BUILD_DIR)/$(TEST_TARGETS)
+	rm -f $(TEST_TARGETS)
 
 
 # clean out everything.
