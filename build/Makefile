@@ -95,7 +95,9 @@ BENCHMARK_BUILD_DIR := ./benchmarks
 
 SRC_DIR  := ../src
 
-TEST_SRCS=$(shell find $(SRC_DIR)/tests -name '*.cu' -or -name '*.cpp')
+#TEST_SRCS=$(shell find $(SRC_DIR)/tests -name '*.cu' -or -name '*.cpp')
+# Because I am linking test.cu.cpp -> test.cu as a cheap trick to get auto formatting in vs code, we can't include cpp in the src list
+TEST_SRCS=$(shell find $(SRC_DIR)/tests -name '*.cu')
 EXAMPLE_SRCS=$(shell find $(SRC_DIR)/cpp -name '*.cu' -or -name '*.cpp')
 BENCHMARK_SRCS=$(shell find $(SRC_DIR)/benchmarks -name '*.cu' -or -name '*.cpp')
 
@@ -108,10 +110,10 @@ TEST_OBJS=$(patsubst %,%.o,$(TEST_TARGETS))
 EXAMPLE_OBJS=$(patsubst %,%.o,$(EXAMPLE_TARGETS))
 BENCHMARK_OBJS=$(patsubst %,%.o,$(BENCHMARK_TARGETS))
 
-# printit:
-# 	echo This is $(TEST_SRCS)
-# 	echo $(TEST_TARGETS)
-# 	echo $(TEST_OBJS)
+printit:
+	echo This is $(TEST_SRCS)
+	echo $(TEST_TARGETS)
+	echo $(TEST_OBJS)
 
 
 all: $(TEST_TARGETS)
