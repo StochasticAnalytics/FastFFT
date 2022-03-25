@@ -14,8 +14,6 @@
 // Inv 5, 6, 7 ( original y, z, x)
 // Defined in make by setting environmental variable  DEBUG_FFT_STAGE
 
-// #include "/groups/himesb/git/cufftdx/example/block_io.hpp"
-// #include "/groups/himesb/git/cufftdx/example/common.hpp"
 // #include <iostream>
 /*
 
@@ -62,7 +60,10 @@ inline void PrintVectorType(short4 input) {
     std::cout << "(x,y,z,w) " << input.x << " " << input.y << " " << input.z << " " << input.w << std::endl;
 }
 
+// From cisTEM defines.h This needs to be moved into a namespace protected constant ... easier to hide here. FIXME
+#ifndef _src_core_defines_h_
 constexpr const float PIf = 3.14159275358979323846f;
+#endif
 
 typedef struct __align__(32) _DeviceProps {
     int device_id;

@@ -11,8 +11,7 @@
 #include <cuda_runtime_api.h>
 #include <cufft.h>
 #include <cufftXt.h>
-#include <cufftdx.hpp>
-
+#include "../../../include/cufftdx/include/cufftdx.hpp"
 #include "../../../include/FastFFT.h"
 #include "../../../include/FastFFT.cuh"
 #include "../../FastFFT.cu"

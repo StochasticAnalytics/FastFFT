@@ -4,7 +4,6 @@
 #include <iostream>
 #include <string>
 #include <stdio.h>
-#include <cufftdx.hpp>
 
 #include "../include/FastFFT.cuh"
 
@@ -2049,8 +2048,8 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetIntraKerne
             SelectSizeAndType<FFT_base, PreOpType, IntraOpType, PostOpType, 16, 4, 32, 8, 64, 8, 128, 8, 256, 8, 512, 8>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda);
         }
         else {
-            // TODO: 8192 will fail for sm75 if wanted need some extra logic
-            SelectSizeAndType<FFT_base, PreOpType, IntraOpType, PostOpType, 16, 4, 32, 8, 64, 8, 128, 8, 256, 8, 512, 8, 1024, 8, 2048, 8, 4096, 8, 8192, 16>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda);
+            // TODO: 8192 will fail for sm75 if wanted need some extra logic ... , 8192, 16
+            SelectSizeAndType<FFT_base, PreOpType, IntraOpType, PostOpType, 16, 4, 32, 8, 64, 8, 128, 8, 256, 8, 512, 8, 1024, 8, 2048, 8, 4096, 8>(kernel_type, do_forward_transform, pre_op_lambda, intra_op_lambda, post_op_lambda);
         }
     }
 }

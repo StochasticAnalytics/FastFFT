@@ -4,6 +4,8 @@
 #ifndef Fast_FFT_cuh_
 #define Fast_FFT_cuh_
 
+#include "cufftdx/include/cufftdx.hpp"
+
 // “This software contains source code provided by NVIDIA Corporation.” Much of it is modfied as noted at relevant function definitions.
 
 // When defined Turns on synchronization based checking for all FFT kernels as well as cudaErr macros

@@ -10,7 +10,7 @@
 #include <fftw3.h>
 
 #include <cuda_runtime_api.h>
-#include <cufftdx.hpp>
+#include "../../include/cufftdx/include/cufftdx.hpp"
 #include <cufft.h>
 #include <cufftXt.h>
 
