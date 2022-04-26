@@ -3063,11 +3063,11 @@ LaunchParams FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetLa
     SizeChangeType size_change_type;
     if ( IsForwardType(kernel_type) ) {
         size_change_type = fwd_size_change_type;
-        L.twiddle_in = L.twiddle_in = -2 * PIf / transform_size.N;
+        L.twiddle_in = L.twiddle_in = -2 * pi_v<float> / transform_size.N;
     }
     else {
         size_change_type = inv_size_change_type;
-        L.twiddle_in = L.twiddle_in = 2 * PIf / transform_size.N;
+        L.twiddle_in = L.twiddle_in = 2 * pi_v<float> / transform_size.N;
     }
 
     // Set the thread block dimensions
