@@ -6,6 +6,21 @@
 #include <chrono>
 #include <random>
 
+// #include <cuda_runtime.h>
+// #include <cuda.h>
+#include <cuda_fp16.h>
+
+#if __cplusplus > 201703L
+#include <numbers>
+using namespace std::numbers;
+#else
+// For now we do not have c++20 so we need to define this for constants. Modified from /usr/include/c++/11/numbers
+/// pi
+template <typename _Tp>
+// inline constexpr _Tp pi_v = _Enable_if_floating<_Tp>(3.141592653589793238462643383279502884L);
+inline constexpr _Tp pi_v = 3.141592653589793238462643383279502884L;
+#endif
+
 // For testing/debugging it is convenient to execute and have print functions for partial transforms.
 // These will go directly in the kernels and also in the helper Image.cuh definitions for PrintArray.
 // The number refers to the number of 1d FFTs performed,
@@ -246,8 +261,8 @@ class FourierTransformer {
 
     //   void FwdFFT(bool swap_real_space_quadrants = false, bool transpose_output = true);
     //   void InvFFT(bool transpose_output = true);
-    void CrossCorrelate(float2* image_to_search, bool swap_real_space_quadrants);
-    void CrossCorrelate(__half2* image_to_search, bool swap_real_space_quadrants);
+    // void CrossCorrelate(float2* image_to_search, bool swap_real_space_quadrants);
+    // void CrossCorrelate(__half2* image_to_search, bool swap_real_space_quadrants);
 
     // could float2* be replaced with decltype(DevicePointers.momentum_space)
     template <class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t>
