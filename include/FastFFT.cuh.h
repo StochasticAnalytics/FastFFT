@@ -27,6 +27,8 @@ constexpr inline bool IS_IKF_t( ) {
     }
 };
 
+// clang-format off
+
 #if FFT_DEBUG_LEVEL < 1
 
 #define MyFFTDebugPrintWithDetails(...)
@@ -37,49 +39,15 @@ constexpr inline bool IS_IKF_t( ) {
 
 #else
 // Minimally define asserts that check state variables and setup.
-#define MyFFTDebugAssertTrue(cond, msg, ...)                                                                             \
-    {                                                                                                                    \
-        if ( (cond) != true ) {                                                                                          \
-            std::cerr << msg << std::endl                                                                                \
-                      << " Failed Assert at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; \
-            exit(-1);                                                                                                    \
-        }                                                                                                                \
-    }
-#define MyFFTDebugAssertFalse(cond, msg, ...)                                                                            \
-    {                                                                                                                    \
-        if ( (cond) == true ) {                                                                                          \
-            std::cerr << msg << std::endl                                                                                \
-                      << " Failed Assert at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; \
-            exit(-1);                                                                                                    \
-        }                                                                                                                \
-    }
-
+#define MyFFTDebugAssertTrue(cond, msg, ...) { if ( (cond) != true ) { std::cerr << msg << std::endl << " Failed Assert at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1); } }
+#define MyFFTDebugAssertFalse(cond, msg, ...) { if ( (cond) == true ) { std::cerr << msg << std::endl  << " Failed Assert at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;  exit(-1); } }                                                                                                    
+                                                                                                                    
 #endif
 
 #if FFT_DEBUG_LEVEL > 1
 // Turn on checkpoints in the testing functions.
-#define MyFFTDebugAssertTestTrue(cond, msg, ...)                                                            \
-    {                                                                                                       \
-        if ( (cond) != true ) {                                                                             \
-            std::cerr << "    Test " << msg << " FAILED!" << std::endl                                      \
-                      << "  at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; \
-            exit(-1);                                                                                       \
-        }                                                                                                   \
-        else {                                                                                              \
-            std::cerr << "    Test " << msg << " passed!" << std::endl;                                     \
-        }                                                                                                   \
-    }
-#define MyFFTDebugAssertTestFalse(cond, msg, ...)                                                          \
-    {                                                                                                      \
-        if ( (cond) == true ) {                                                                            \
-            std::cerr << "    Test " << msg << " FAILED!" << std::endl                                     \
-                      << " at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; \
-            exit(-1);                                                                                      \
-        }                                                                                                  \
-        else {                                                                                             \
-            std::cerr << "    Test " << msg << " passed!" << std::endl;                                    \
-        }                                                                                                  \
-    }
+#define MyFFTDebugAssertTestTrue(cond, msg, ...)  { if ( (cond) != true ) { std::cerr << "    Test " << msg << " FAILED!" << std::endl  << "  at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;exit(-1); } else { std::cerr << "    Test " << msg << " passed!" << std::endl; }}
+#define MyFFTDebugAssertTestFalse(cond, msg, ...)  { if ( (cond) == true ) {  std::cerr << "    Test " << msg << " FAILED!" << std::endl   << " at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;   exit(-1);  } else {  std::cerr << "    Test " << msg << " passed!" << std::endl;  } }
 
 #endif
 
@@ -98,16 +66,9 @@ constexpr inline bool IS_IKF_t( ) {
 
 #if FFT_DEBUG_LEVEL == 4
 // More verbose debug info + state info
-#define MyFFTDebugPrint(...)                   \
-    {                                          \
-        PrintState( );                         \
-        std::cerr << __VA_ARGS__ << std::endl; \
-    }
-#define MyFFTDebugPrintWithDetails(...)                                                                                  \
-    {                                                                                                                    \
-        PrintState( );                                                                                                   \
-        std::cerr << __VA_ARGS__ << " From: " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; \
-    }
+#define MyFFTDebugPrint(...) { PrintState( );  std::cerr << __VA_ARGS__ << std::endl; }
+#define MyFFTDebugPrintWithDetails(...)                                                                                  
+    { PrintState( ); std::cerr << __VA_ARGS__ << " From: " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; }
 
 #endif
 
@@ -116,48 +77,33 @@ constexpr inline bool IS_IKF_t( ) {
     { std::cerr << __VA_ARGS__ << std::endl; }
 #define MyFFTPrintWithDetails(...) \
     { std::cerr << __VA_ARGS__ << " From: " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; }
-#define MyFFTRunTimeAssertTrue(cond, msg, ...)                                                                           \
-    {                                                                                                                    \
-        if ( (cond) != true ) {                                                                                          \
-            std::cerr << msg << std::endl                                                                                \
-                      << " Failed Assert at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; \
-            exit(-1);                                                                                                    \
-        }                                                                                                                \
-    }
-#define MyFFTRunTimeAssertFalse(cond, msg, ...)                                                                          \
-    {                                                                                                                    \
-        if ( (cond) == true ) {                                                                                          \
-            std::cerr << msg << std::endl                                                                                \
-                      << " Failed Assert at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; \
-            exit(-1);                                                                                                    \
-        }                                                                                                                \
-    }
+#define MyFFTRunTimeAssertTrue(cond, msg, ...) { if ( (cond) != true ) { std::cerr << msg << std::endl << " Failed Assert at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;exit(-1); }  }
+#define MyFFTRunTimeAssertFalse(cond, msg, ...) { if ( (cond) == true ) {std::cerr << msg << std::endl << " Failed Assert at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;exit(-1);  } }                                                                                                               
 
+
+
+// I use the same things in cisTEM, so check for them. FIXME, get rid of defines and also find a better sharing mechanism.
+#ifndef cudaErr
 // Note we are using std::cerr b/c the wxWidgets apps running in cisTEM are capturing std::cout
 // If I leave cudaErr blank when HEAVYERRORCHECKING_FFT is not defined, I get some reports/warnings about unused or unreferenced variables. I suspect the performance hit is very small so just leave this on.
 // The real cost is in the synchronization of in pre/postcheck.
-#define cudaErr(error)                                          \
-    {                                                           \
-        auto status = static_cast<cudaError_t>(error);          \
-        if ( status != cudaSuccess ) {                          \
-            std::cerr << cudaGetErrorString(status) << " :-> "; \
-            MyFFTPrintWithDetails("");                          \
-        }                                                       \
-    };
-
-#ifndef HEAVYERRORCHECKING_FFT
-#define postcheck
-#define precheck
-#else
-#define postcheck                                                       \
-    {                                                                   \
-        cudaErr(cudaPeekAtLastError( ));                                \
-        cudaError_t error = cudaStreamSynchronize(cudaStreamPerThread); \
-        cudaErr(error);                                                 \
-    };
-#define precheck \
-    { cudaErr(cudaGetLastError( )); }
+#define cudaErr(error) { auto status = static_cast<cudaError_t>(error); if ( status != cudaSuccess ) { std::cerr << cudaGetErrorString(status) << " :-> "; MyFFTPrintWithDetails(""); } };
 #endif
+
+#ifndef postcheck
+    #ifndef precheck
+        #ifndef HEAVYERRORCHECKING_FFT
+            #define postcheck
+            #define precheck
+        #else
+            #define postcheck                                                       
+                { cudaErr(cudaPeekAtLastError( )); cudaError_t error = cudaStreamSynchronize(cudaStreamPerThread); cudaErr(error); };
+            #define precheck { cudaErr(cudaGetLastError( )); }
+        #endif
+    #endif
+#endif  
+
+// clang-format on
 
 inline void checkCudaErr(cudaError_t err) {
     if ( err != cudaSuccess ) {
@@ -291,37 +237,10 @@ static __device__ __host__ inline auto ComplexConjMulAndScale(const ComplexType 
 }
 
 // GetCudaDeviceArch from https://github.com/mnicely/cufft_examples/blob/master/Common/cuda_helper.h
-void GetCudaDeviceProps(DeviceProps& dp) {
-    int major = 0;
-    int minor = 0;
+void GetCudaDeviceProps(DeviceProps& dp);
 
-    cudaErr(cudaGetDevice(&dp.device_id));
-    cudaErr(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, dp.device_id));
-    cudaErr(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, dp.device_id));
-
-    dp.device_arch = major * 100 + minor * 10;
-
-    MyFFTRunTimeAssertTrue(dp.device_arch == 700 || dp.device_arch == 750 || dp.device_arch == 800 || dp.device_arch == 860, "FastFFT currently only supports compute capability [7.0, 7.5, 8.0, 8.6].");
-
-    cudaErr(cudaDeviceGetAttribute(&dp.max_shared_memory_per_block, cudaDevAttrMaxSharedMemoryPerBlock, dp.device_id));
-    cudaErr(cudaDeviceGetAttribute(&dp.max_shared_memory_per_SM, cudaDevAttrMaxSharedMemoryPerMultiprocessor, dp.device_id));
-    cudaErr(cudaDeviceGetAttribute(&dp.max_registers_per_block, cudaDevAttrMaxRegistersPerBlock, dp.device_id));
-    cudaErr(cudaDeviceGetAttribute(&dp.max_persisting_L2_cache_size, cudaDevAttrMaxPersistingL2CacheSize, dp.device_id));
-}
-
-void CheckSharedMemory(int& memory_requested, DeviceProps& dp) {
-    // Depends on GetCudaDeviceProps having been called, which should be happening in the constructor.
-    // Throw an error if requesting more than allowed, otherwise, we'll set to requested and let the rest be L1 Cache.
-    MyFFTRunTimeAssertFalse(memory_requested > dp.max_shared_memory_per_SM, "The shared memory requested is greater than permitted for this arch.");
-    // if (memory_requested > dp.max_shared_memory_per_block) { memory_requested = dp.max_shared_memory_per_block; }
-}
-
-void CheckSharedMemory(unsigned int& memory_requested, DeviceProps& dp) {
-    // Depends on GetCudaDeviceProps having been called, which should be happening in the constructor.
-    // Throw an error if requesting more than allowed, otherwise, we'll set to requested and let the rest be L1 Cache.
-    MyFFTRunTimeAssertFalse(memory_requested > dp.max_shared_memory_per_SM, "The shared memory requested is greater than permitted for this arch.");
-    // if (memory_requested > dp.max_shared_memory_per_block) { memory_requested = dp.max_shared_memory_per_block; }
-}
+void CheckSharedMemory(int& memory_requested, DeviceProps& dp);
+void CheckSharedMemory(unsigned int& memory_requested, DeviceProps& dp);
 
 using namespace cufftdx;
 
@@ -339,21 +258,21 @@ constexpr const int elements_per_thread_8192 = 16;
 
 namespace KernelFunction {
 
-// Intra Kernel Function Type
-enum IKF_t : int { NONE,
-                   CONJ_MUL };
+    // Define an enum for different functors
+    // Intra Kernel Function Type
+    enum IKF_t { NOOP, CONJ_MUL};
 
 // Maybe a better way to check , but using keyword final to statically check for non NONE types
 template <class T, int N_ARGS, IKF_t U>
 class my_functor {};
 
 template <class T>
-class my_functor<T, 0, IKF_t::NONE> {
+class my_functor<T, 0, IKF_t::NOOP> {
   public:
     __device__ __forceinline__
             T
             operator( )( ) {
-        printf("really specific NONE\n");
+        printf("really specific NOOP\n");
         return 0;
     }
 };

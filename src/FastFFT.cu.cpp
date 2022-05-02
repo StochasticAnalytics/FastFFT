@@ -3232,28 +3232,59 @@ LaunchParams FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetLa
     return L;
 }
 
+void GetCudaDeviceProps(DeviceProps& dp) {
+    int major = 0;
+    int minor = 0;
+
+    cudaErr(cudaGetDevice(&dp.device_id));
+    cudaErr(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, dp.device_id));
+    cudaErr(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, dp.device_id));
+
+    dp.device_arch = major * 100 + minor * 10;
+
+    MyFFTRunTimeAssertTrue(dp.device_arch == 700 || dp.device_arch == 750 || dp.device_arch == 800 || dp.device_arch == 860, "FastFFT currently only supports compute capability [7.0, 7.5, 8.0, 8.6].");
+
+    cudaErr(cudaDeviceGetAttribute(&dp.max_shared_memory_per_block, cudaDevAttrMaxSharedMemoryPerBlock, dp.device_id));
+    cudaErr(cudaDeviceGetAttribute(&dp.max_shared_memory_per_SM, cudaDevAttrMaxSharedMemoryPerMultiprocessor, dp.device_id));
+    cudaErr(cudaDeviceGetAttribute(&dp.max_registers_per_block, cudaDevAttrMaxRegistersPerBlock, dp.device_id));
+    cudaErr(cudaDeviceGetAttribute(&dp.max_persisting_L2_cache_size, cudaDevAttrMaxPersistingL2CacheSize, dp.device_id));
+}
+
+void CheckSharedMemory(int& memory_requested, DeviceProps& dp) {
+    // Depends on GetCudaDeviceProps having been called, which should be happening in the constructor.
+    // Throw an error if requesting more than allowed, otherwise, we'll set to requested and let the rest be L1 Cache.
+    MyFFTRunTimeAssertFalse(memory_requested > dp.max_shared_memory_per_SM, "The shared memory requested is greater than permitted for this arch.");
+    // if (memory_requested > dp.max_shared_memory_per_block) { memory_requested = dp.max_shared_memory_per_block; }
+}
+
+void CheckSharedMemory(unsigned int& memory_requested, DeviceProps& dp) {
+    // Depends on GetCudaDeviceProps having been called, which should be happening in the constructor.
+    // Throw an error if requesting more than allowed, otherwise, we'll set to requested and let the rest be L1 Cache.
+    MyFFTRunTimeAssertFalse(memory_requested > dp.max_shared_memory_per_SM, "The shared memory requested is greater than permitted for this arch.");
+    // if (memory_requested > dp.max_shared_memory_per_block) { memory_requested = dp.max_shared_memory_per_block; }
+}
 
 template class FourierTransformer<float, float, float>;
 
-template void FourierTransformer<float, float, float>::Generic_Fwd<FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::NONE>,
-                                                                   FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::NONE>>(
-        FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::NONE>,
-        FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::NONE>);
+template void FourierTransformer<float, float, float>::Generic_Fwd<FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>,
+                                                                   FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>>(
+        FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>,
+        FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>);
 
-template void FourierTransformer<float, float, float>::Generic_Inv<FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::NONE>,
-                                                                   FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::NONE>>(
-        FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::NONE>,
-        FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::NONE>);
+template void FourierTransformer<float, float, float>::Generic_Inv<FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>,
+                                                                   FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>>(
+        FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>,
+        FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>);
 
 template void FourierTransformer<float, float, float>::Generic_Fwd<std::nullptr_t, std::nullptr_t>(std::nullptr_t, std::nullptr_t);
 template void FourierTransformer<float, float, float>::Generic_Inv<std::nullptr_t, std::nullptr_t>(std::nullptr_t, std::nullptr_t);
 
-template void FourierTransformer<float, float, float>::Generic_Fwd_Image_Inv<FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::NONE>,
-                                                                             FastFFT::KernelFunction::my_functor<float, 2, FastFFT::KernelFunction::CONJ_MUL>,
-                                                                             FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::NONE>>(
+template void FourierTransformer<float, float, float>::Generic_Fwd_Image_Inv<FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>,
+                                                                             FastFFT::KernelFunction::my_functor<float, 2, FastFFT::KernelFunction::IKF_t::CONJ_MUL>,
+                                                                             FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>>(
         float2*,
-        FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::NONE>,
-        FastFFT::KernelFunction::my_functor<float, 2, FastFFT::KernelFunction::CONJ_MUL>,
-        FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::NONE>);
+        FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>,
+        FastFFT::KernelFunction::my_functor<float, 2, FastFFT::KernelFunction::IKF_t::CONJ_MUL>,
+        FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>);
 
 } // namespace FastFFT

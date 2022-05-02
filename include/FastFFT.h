@@ -10,6 +10,7 @@
 // #include <cuda.h>
 #include <cuda_fp16.h>
 
+#ifndef ENABLE_FastFFT // ifdef being used in cisTEM that defines these
 #if __cplusplus > 201703L
 #include <numbers>
 using namespace std::numbers;
@@ -19,6 +20,7 @@ using namespace std::numbers;
 template <typename _Tp>
 // inline constexpr _Tp pi_v = _Enable_if_floating<_Tp>(3.141592653589793238462643383279502884L);
 inline constexpr _Tp pi_v = 3.141592653589793238462643383279502884L;
+#endif
 #endif
 
 // For testing/debugging it is convenient to execute and have print functions for partial transforms.

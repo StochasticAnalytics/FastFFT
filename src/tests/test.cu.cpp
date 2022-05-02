@@ -783,7 +783,7 @@ void compare_libraries(std::vector<int> size, bool do_3d, int size_change_type, 
             short4 target_size;
 
             if ( is_size_change_decrease )
-                target_size = input_size; // assuming xcorr_fwd_NONE_inv_DECREASE
+                target_size = input_size; // assuming xcorr_fwd_NOOP_inv_DECREASE
             else
                 target_size = output_size;
 
@@ -932,7 +932,7 @@ void compare_libraries(std::vector<int> size, bool do_3d, int size_change_type, 
 
             std::cout << "Test lambda" << std::endl;
 
-            FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::NONE>     noop;
+            FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::NOOP>     noop;
             FastFFT::KernelFunction::my_functor<float, 2, FastFFT::KernelFunction::CONJ_MUL> conj_mul;
 
             //////////////////////////////////////////
