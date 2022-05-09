@@ -58,23 +58,23 @@ namespace FastFFT {
 // For debugging
 
 inline void PrintVectorType(int3 input) {
-    std::cout << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
+    std::cerr << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
 }
 
 inline void PrintVectorType(int4 input) {
-    std::cout << "(x,y,z,w) " << input.x << " " << input.y << " " << input.z << " " << input.w << std::endl;
+    std::cerr << "(x,y,z,w) " << input.x << " " << input.y << " " << input.z << " " << input.w << std::endl;
 }
 
 inline void PrintVectorType(dim3 input) {
-    std::cout << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
+    std::cerr << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
 }
 
 inline void PrintVectorType(short3 input) {
-    std::cout << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
+    std::cerr << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
 }
 
 inline void PrintVectorType(short4 input) {
-    std::cout << "(x,y,z,w) " << input.x << " " << input.y << " " << input.z << " " << input.w << std::endl;
+    std::cerr << "(x,y,z,w) " << input.x << " " << input.y << " " << input.z << " " << input.w << std::endl;
 }
 
 typedef struct __align__(32) _DeviceProps {
@@ -335,61 +335,61 @@ class FourierTransformer {
     DevicePointers<InputType*, ComputeType*> d_ptr;
 
     void PrintState( ) {
-        std::cout << "================================================================" << std::endl;
-        std::cout << "Device Properties: " << std::endl;
-        std::cout << "================================================================" << std::endl;
+        std::cerr << "================================================================" << std::endl;
+        std::cerr << "Device Properties: " << std::endl;
+        std::cerr << "================================================================" << std::endl;
 
-        std::cout << "Device idx: " << device_properties.device_id << std::endl;
-        std::cout << "max_shared_memory_per_block: " << device_properties.max_shared_memory_per_block << std::endl;
-        std::cout << "max_shared_memory_per_SM: " << device_properties.max_shared_memory_per_SM << std::endl;
-        std::cout << "max_registers_per_block: " << device_properties.max_registers_per_block << std::endl;
-        std::cout << "max_persisting_L2_cache_size: " << device_properties.max_persisting_L2_cache_size << std::endl;
-        std::cout << std::endl;
+        std::cerr << "Device idx: " << device_properties.device_id << std::endl;
+        std::cerr << "max_shared_memory_per_block: " << device_properties.max_shared_memory_per_block << std::endl;
+        std::cerr << "max_shared_memory_per_SM: " << device_properties.max_shared_memory_per_SM << std::endl;
+        std::cerr << "max_registers_per_block: " << device_properties.max_registers_per_block << std::endl;
+        std::cerr << "max_persisting_L2_cache_size: " << device_properties.max_persisting_L2_cache_size << std::endl;
+        std::cerr << std::endl;
 
-        std::cout << "State Variables:\n"
+        std::cerr << "State Variables:\n"
                   << std::endl;
-        std::cout << "is_in_memory_host_pointer " << is_in_memory_host_pointer << std::endl;
-        std::cout << "is_in_memory_device_pointer " << is_in_memory_device_pointer << std::endl;
-        std::cout << "is_in_buffer_memory " << is_in_buffer_memory << std::endl;
-        std::cout << "is_host_memory_pinned " << is_host_memory_pinned << std::endl;
-        std::cout << "is_fftw_padded_input " << is_fftw_padded_input << std::endl;
-        std::cout << "is_fftw_padded_output " << is_fftw_padded_output << std::endl;
-        std::cout << "is_real_valued_input " << is_real_valued_input << std::endl;
-        std::cout << "is_set_input_params " << is_set_input_params << std::endl;
-        std::cout << "is_set_output_params " << is_set_output_params << std::endl;
-        std::cout << "is_size_validated " << is_size_validated << std::endl;
-        std::cout << "is_set_input_pointer " << is_set_input_pointer << std::endl;
-        std::cout << std::endl;
+        std::cerr << "is_in_memory_host_pointer " << is_in_memory_host_pointer << std::endl;
+        std::cerr << "is_in_memory_device_pointer " << is_in_memory_device_pointer << std::endl;
+        std::cerr << "is_in_buffer_memory " << is_in_buffer_memory << std::endl;
+        std::cerr << "is_host_memory_pinned " << is_host_memory_pinned << std::endl;
+        std::cerr << "is_fftw_padded_input " << is_fftw_padded_input << std::endl;
+        std::cerr << "is_fftw_padded_output " << is_fftw_padded_output << std::endl;
+        std::cerr << "is_real_valued_input " << is_real_valued_input << std::endl;
+        std::cerr << "is_set_input_params " << is_set_input_params << std::endl;
+        std::cerr << "is_set_output_params " << is_set_output_params << std::endl;
+        std::cerr << "is_size_validated " << is_size_validated << std::endl;
+        std::cerr << "is_set_input_pointer " << is_set_input_pointer << std::endl;
+        std::cerr << std::endl;
 
-        std::cout << "Size variables:\n"
+        std::cerr << "Size variables:\n"
                   << std::endl;
-        std::cout << "transform_size.N " << transform_size.N << std::endl;
-        std::cout << "transform_size.L " << transform_size.L << std::endl;
-        std::cout << "transform_size.P " << transform_size.P << std::endl;
-        std::cout << "transform_size.Q " << transform_size.Q << std::endl;
-        std::cout << "fwd_dims_in.x,y,z ";
+        std::cerr << "transform_size.N " << transform_size.N << std::endl;
+        std::cerr << "transform_size.L " << transform_size.L << std::endl;
+        std::cerr << "transform_size.P " << transform_size.P << std::endl;
+        std::cerr << "transform_size.Q " << transform_size.Q << std::endl;
+        std::cerr << "fwd_dims_in.x,y,z ";
         PrintVectorType(fwd_dims_in);
-        std::cout << std::endl;
-        std::cout << "fwd_dims_out.x,y,z ";
+        std::cerr << std::endl;
+        std::cerr << "fwd_dims_out.x,y,z ";
         PrintVectorType(fwd_dims_out);
-        std::cout << std::endl;
-        std::cout << "inv_dims_in.x,y,z ";
+        std::cerr << std::endl;
+        std::cerr << "inv_dims_in.x,y,z ";
         PrintVectorType(inv_dims_in);
-        std::cout << std::endl;
-        std::cout << "inv_dims_out.x,y,z ";
+        std::cerr << std::endl;
+        std::cerr << "inv_dims_out.x,y,z ";
         PrintVectorType(inv_dims_out);
-        std::cout << std::endl;
-        std::cout << std::endl;
+        std::cerr << std::endl;
+        std::cerr << std::endl;
 
-        std::cout << "Misc:\n"
+        std::cerr << "Misc:\n"
                   << std::endl;
-        std::cout << "compute_memory_allocated " << compute_memory_allocated << std::endl;
-        std::cout << "memory size to copy " << memory_size_to_copy << std::endl;
-        std::cout << "fwd_size_change_type " << SizeChangeName[fwd_size_change_type] << std::endl;
-        std::cout << "inv_size_change_type " << SizeChangeName[inv_size_change_type] << std::endl;
-        std::cout << "transform stage complete " << TransformStageCompletedName[transform_stage_completed] << std::endl;
-        std::cout << "input_origin_type " << OriginTypeName[input_origin_type] << std::endl;
-        std::cout << "output_origin_type " << OriginTypeName[output_origin_type] << std::endl;
+        std::cerr << "compute_memory_allocated " << compute_memory_allocated << std::endl;
+        std::cerr << "memory size to copy " << memory_size_to_copy << std::endl;
+        std::cerr << "fwd_size_change_type " << SizeChangeName[fwd_size_change_type] << std::endl;
+        std::cerr << "inv_size_change_type " << SizeChangeName[inv_size_change_type] << std::endl;
+        std::cerr << "transform stage complete " << TransformStageCompletedName[transform_stage_completed] << std::endl;
+        std::cerr << "input_origin_type " << OriginTypeName[input_origin_type] << std::endl;
+        std::cerr << "output_origin_type " << OriginTypeName[output_origin_type] << std::endl;
 
     }; // PrintState()
 
@@ -443,6 +443,7 @@ class FourierTransformer {
     std::vector<std::string> DimensionCheckName{"CopyFromHost", "CopyToHost", "FwdTransform", "InvTransform"};
 
     bool is_from_python_call;
+    bool is_owner_of_memory;
 
     SizeChangeType fwd_size_change_type;
     SizeChangeType inv_size_change_type;
@@ -701,17 +702,17 @@ class FourierTransformer {
     void SetAndLaunchKernel(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda);
 
     void PrintLaunchParameters(LaunchParams LP) {
-        std::cout << "Launch parameters: " << std::endl;
-        std::cout << "  Threads per block: ";
+        std::cerr << "Launch parameters: " << std::endl;
+        std::cerr << "  Threads per block: ";
         PrintVectorType(LP.threadsPerBlock);
-        std::cout << "  Grid dimensions: ";
+        std::cerr << "  Grid dimensions: ";
         PrintVectorType(LP.gridDims);
-        std::cout << "  Q: " << LP.Q << std::endl;
-        std::cout << "  Twiddle in: " << LP.twiddle_in << std::endl;
-        std::cout << "  shared input: " << LP.mem_offsets.shared_input << std::endl;
-        std::cout << "  shared output (memlimit in r2c): " << LP.mem_offsets.shared_output << std::endl;
-        std::cout << "  physical_x_input: " << LP.mem_offsets.physical_x_input << std::endl;
-        std::cout << "  physical_x_output: " << LP.mem_offsets.physical_x_output << std::endl;
+        std::cerr << "  Q: " << LP.Q << std::endl;
+        std::cerr << "  Twiddle in: " << LP.twiddle_in << std::endl;
+        std::cerr << "  shared input: " << LP.mem_offsets.shared_input << std::endl;
+        std::cerr << "  shared output (memlimit in r2c): " << LP.mem_offsets.shared_output << std::endl;
+        std::cerr << "  physical_x_input: " << LP.mem_offsets.physical_x_input << std::endl;
+        std::cerr << "  physical_x_output: " << LP.mem_offsets.physical_x_output << std::endl;
     };
 
 }; // class Fourier Transformer

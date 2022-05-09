@@ -67,16 +67,13 @@ constexpr inline bool IS_IKF_t( ) {
 #if FFT_DEBUG_LEVEL == 4
 // More verbose debug info + state info
 #define MyFFTDebugPrint(...) { PrintState( );  std::cerr << __VA_ARGS__ << std::endl; }
-#define MyFFTDebugPrintWithDetails(...)                                                                                  
-    { PrintState( ); std::cerr << __VA_ARGS__ << " From: " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; }
+#define MyFFTDebugPrintWithDetails(...)  { PrintState( ); std::cerr << __VA_ARGS__ << " From: " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; }
 
 #endif
 
 // Always in use
-#define MyFFTPrint(...) \
-    { std::cerr << __VA_ARGS__ << std::endl; }
-#define MyFFTPrintWithDetails(...) \
-    { std::cerr << __VA_ARGS__ << " From: " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; }
+#define MyFFTPrint(...) { std::cerr << __VA_ARGS__ << std::endl; }
+#define MyFFTPrintWithDetails(...) { std::cerr << __VA_ARGS__ << " From: " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; }
 #define MyFFTRunTimeAssertTrue(cond, msg, ...) { if ( (cond) != true ) { std::cerr << msg << std::endl << " Failed Assert at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;exit(-1); }  }
 #define MyFFTRunTimeAssertFalse(cond, msg, ...) { if ( (cond) == true ) {std::cerr << msg << std::endl << " Failed Assert at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;exit(-1);  } }                                                                                                               
 
@@ -96,8 +93,7 @@ constexpr inline bool IS_IKF_t( ) {
             #define postcheck
             #define precheck
         #else
-            #define postcheck                                                       
-                { cudaErr(cudaPeekAtLastError( )); cudaError_t error = cudaStreamSynchronize(cudaStreamPerThread); cudaErr(error); };
+            #define postcheck  { cudaErr(cudaPeekAtLastError( )); cudaError_t error = cudaStreamSynchronize(cudaStreamPerThread); cudaErr(error); };
             #define precheck { cudaErr(cudaGetLastError( )); }
         #endif
     #endif

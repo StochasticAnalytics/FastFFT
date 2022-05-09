@@ -88,13 +88,16 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetDefaults( 
     is_size_validated    = false; // Defaults to false, set after both input/output dimensions are set and checked.
     is_set_input_pointer = false; // May be on the host of the device.
 
+    is_from_python_call = false;
+    is_owner_of_memory  = false;
+
     compute_memory_allocated = 0;
 }
 
 template <class ComputeType, class InputType, class OutputType, int Rank>
 void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Deallocate( ) {
     // TODO: confirm this is NOT called when memory is allocated by external process.
-    if ( is_in_memory_device_pointer ) {
+    if ( is_in_memory_device_pointer && is_owner_of_memory ) {
         precheck
                 cudaErr(cudaFree(d_ptr.position_space));
         postcheck
@@ -138,10 +141,12 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetForwardFFT
     is_fftw_padded_input = is_padded_input; // Note: Must be set before ReturnPaddedMemorySize
     MyFFTRunTimeAssertTrue(is_fftw_padded_input, "Support for input arrays that are not FFTW padded needs to be implemented."); // FIXME
 
+    std::cerr << "In forward fft setup with dims " << fwd_dims_in.x << " " << fwd_dims_in.y << " " << fwd_dims_in.z << " " << fwd_dims_in.w << std::endl;
     // ReturnPaddedMemorySize also sets FFTW padding etc.
     input_memory_allocated      = ReturnPaddedMemorySize(fwd_dims_in);
     fwd_output_memory_allocated = ReturnPaddedMemorySize(fwd_dims_out); // sets .w and also increases compute_memory_allocated if needed.
 
+    std::cerr << "In forward fft setup with input_memory_allocated " << input_memory_allocated << std::endl;
     // The compute memory allocated is the max of all possible sizes.
 
     this->input_origin_type = OriginType::natural;
@@ -171,33 +176,40 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetInverseFFT
 
 template <class ComputeType, class InputType, class OutputType, int Rank>
 void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetInputPointer(InputType* input_pointer, bool is_input_on_device) {
-    MyFFTDebugAssertTrue(is_set_input_params, "Input parameters not set");
+    MyFFTDebugAssertFalse(input_memory_allocated == 0, "There is no input memory allocated.");
+    MyFFTDebugAssertTrue(is_set_output_params, "Output parameters not set");
+    MyFFTRunTimeAssertFalse(is_set_input_pointer, "The input pointer has already been set!");
 
     is_from_python_call = false;
 
     if ( is_input_on_device ) {
         // We'll need a check on compute type, and a conversion if needed prior to this.
         d_ptr.position_space = input_pointer;
+        is_owner_of_memory   = false;
+
+        // We'll assume the host memory is pinned and if not, that is the calling processes problem. We also will not unpin.
     }
     else {
         host_pointer = input_pointer;
+        // arguably this could be set when actually doing the allocation, but I think this also makes sense as there may be multiople allocation
+        // routines, but here we already know the calling process has not done it for us.
+        is_owner_of_memory = true;
+        // Check to see if the host memory is pinned.
+        if ( ! is_host_memory_pinned ) {
+            precheck
+                    cudaErr(cudaHostRegister((void*)host_pointer, sizeof(InputType) * input_memory_allocated, cudaHostRegisterDefault));
+            postcheck
+
+                    precheck
+                            cudaErr(cudaHostGetDevicePointer(&pinnedPtr, host_pointer, 0));
+            postcheck
+
+                    is_host_memory_pinned = true;
+        }
     }
 
-    // Check to see if the host memory is pinned.
-    if ( ! is_host_memory_pinned ) {
-        precheck
-                cudaErr(cudaHostRegister((void*)host_pointer, sizeof(InputType) * input_memory_allocated, cudaHostRegisterDefault));
-        postcheck
-
-                precheck
-                        cudaErr(cudaHostGetDevicePointer(&pinnedPtr, host_pointer, 0));
-        postcheck
-
-                is_host_memory_pinned = true;
-    }
     is_in_memory_host_pointer = true;
-
-    is_set_input_pointer = true;
+    is_set_input_pointer      = true;
 }
 
 template <class ComputeType, class InputType, class OutputType, int Rank>
@@ -211,6 +223,7 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetInputPoint
     d_ptr.position_space        = reinterpret_cast<InputType*>(input_pointer);
     is_set_input_pointer        = true;
     is_in_memory_device_pointer = true;
+    is_owner_of_memory          = false;
 
     is_from_python_call = true;
 
@@ -273,14 +286,16 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::CopyHostToDev
 
         is_in_memory_device_pointer = true;
     }
-
+    std::cerr << "From inside memory to copy is" << memory_size_to_copy << std::endl;
     precheck
-            cudaErr(cudaMemcpyAsync(d_ptr.position_space, pinnedPtr, memory_size_to_copy * sizeof(InputType), cudaMemcpyDeviceToHost, cudaStreamPerThread));
+            cudaErr(cudaMemcpyAsync(d_ptr.position_space, pinnedPtr, memory_size_to_copy * sizeof(InputType), cudaMemcpyHostToDevice, cudaStreamPerThread));
     postcheck
+
             // TODO r/n assuming InputType is _half, _half2, float, or _float2 (real, complex, real, complex) need to handle other types and convert
             bool should_block_until_complete = true; // FIXME after switching to stream ordered malloc this will not be needed.
-    if ( should_block_until_complete )
+    if ( should_block_until_complete ) {
         cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
+    }
 }
 
 template <class ComputeType, class InputType, class OutputType, int Rank>
@@ -802,6 +817,7 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Fwd_I
 
     // Set the member pointer to the passed pointer
     d_ptr.image_to_search = image_to_search;
+    SetDimensions(FwdTransform);
 
     switch ( transform_dimension ) {
         case 1: {
@@ -809,10 +825,9 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Fwd_I
             break;
         }
         case 2: {
+            ;
             switch ( fwd_size_change_type ) {
                 case no_change: {
-
-                    SetDimensions(FwdTransform);
                     SetPrecisionAndExectutionMethod(r2c_none_XY, true);
                     switch ( inv_size_change_type ) {
                         case no_change: {
@@ -836,11 +851,9 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Fwd_I
                     break;
                 } // case fwd no change
                 case increase: {
-                    SetDimensions(FwdTransform);
                     SetPrecisionAndExectutionMethod(r2c_increase, true);
                     switch ( inv_size_change_type ) {
                         case no_change: {
-
                             SetPrecisionAndExectutionMethod<false, PreOpType, IntraOpType, PostOpType>(generic_fwd_increase_op_inv_none, true, pre_op_lambda, intra_op_lambda, post_op_lambda);
                             SetPrecisionAndExectutionMethod(c2r_none_XY, false);
                             transform_stage_completed = TransformStageCompleted::inv;
@@ -869,7 +882,6 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Fwd_I
                 }
                 case decrease: {
 
-                    SetDimensions(FwdTransform);
                     SetPrecisionAndExectutionMethod(r2c_decrease, true);
                     switch ( inv_size_change_type ) {
                         case no_change: {
@@ -970,6 +982,9 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Fwd_I
                 }
             }
         }
+        default: {
+            MyFFTRunTimeAssertTrue(false, "Invalid dimension");
+        }
     } // switch on transform dimension
 }
 
@@ -1062,12 +1077,16 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::ValidateDimen
 template <class ComputeType, class InputType, class OutputType, int Rank>
 void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetDimensions(DimensionCheckType check_op_type) {
     // This should be run inside any public method call to ensure things ar properly setup.
-    if ( ! is_size_validated )
+    if ( ! is_size_validated ) {
         ValidateDimensions( );
+    }
 
     switch ( check_op_type ) {
         case CopyFromHost: {
-            MyFFTDebugAssertTrue(transform_stage_completed == none, "When copying from host, the transform stage should be none, something has gone wrong.");
+            // MyFFTDebugAssertTrue(transform_stage_completed == none, "When copying from host, the transform stage should be none, something has gone wrong.");
+            // FIXME: is this the right thing to do? Maybe this should be explicitly "reset" when the input image is "refereshed."
+            transform_stage_completed = none;
+            std::cerr << "input memory allocate " << input_memory_allocated << std::endl;
             memory_size_to_copy = input_memory_allocated;
             break;
         }
@@ -1253,7 +1272,6 @@ __launch_bounds__(FFT::max_threads_per_block) __global__
             // increment the output mapping.
             output_MAP[i]++;
         }
-
         FFT( ).execute(thread_data, shared_mem, workspace);
 
         io<FFT>::store_r2c_transposed_xy(thread_data, &output_values[ReturnZplane(blockDim.y, mem_offsets.physical_x_output)], output_MAP, gridDim.y);
