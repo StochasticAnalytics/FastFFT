@@ -30,4 +30,4 @@ The library will also be built to be accessible from python and matlab, via the 
 
 
 #### Manuscript:
-The [live development of the manuscript](https://bhimes.github.io/FastFFT/_docs/MS/manuscript.html) is being updated regularly as of late summer 2021.
+The [live development of the manuscript](https://stochasticanalytics.github.io/FastFFT/intro.html) is being updated regularly as of late summer 2021.
