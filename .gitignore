@@ -44,4 +44,5 @@ build/*
 !build/Makefile
 !build/build
 
+include/nvidia-mathdx-*
 
