@@ -61,12 +61,12 @@ NVCC_FLAGS+=-DFFT_DEBUG_LEVEL=${debug_level}
 # 4 intermediate ops, like conj multiplication
 # Inv 5, 6, 7 ( original y, z, x)
 
-ifeq (${DEBUG_STAGE},)
+ifeq (${FFT_DEBUG_STAGE},)
 debug_stage=8
-$(info $$DEBUG_STAGE is not defined, setting to 8)
+$(info $$FFT_DEBUG_STAGE is not defined, setting to 8)
 else
-debug_stage=${DEBUG_STAGE}
-$(info $$debug_stage is  [${DEBUG_STAGE}])
+debug_stage=${FFT_DEBUG_STAGE}
+$(info $$debug_stage is  [${FFT_DEBUG_STAGE}])
 endif
 
 ifneq (${HEAVYERRORCHECKING_FFT},)
@@ -128,7 +128,7 @@ $(TEST_TARGETS): $(TEST_OBJS)
 
 $(TEST_OBJS): $(TEST_SRCS)
 	mkdir -p $(TESTS_BUILD_DIR)
-	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DDEBUG_FFT_STAGE=${debug_stage} -o $@ $<
+	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DFFT_DEBUG_STAGE=${debug_stage} -o $@ $<
 
 # .PHONY: all examples tests benchmarks clean
 
@@ -152,7 +152,7 @@ $(TEST_OBJS): $(TEST_SRCS)
 # 	$(EXEC) cp $@ ../../bin/$(TARGET_ARCH)/$(TARGET_OS)/$(BUILD_TYPE)
 
 # all:
-# 	$(NVCC) -dc $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DDEBUG_FFT_STAGE=${debug_stage} -o test.o -c ../cpp/test.cu
+# 	$(NVCC) -dc $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DFFT_DEBUG_STAGE=${debug_stage} -o test.o -c ../cpp/test.cu
 # 	$(NVCC) $(NVCC_FLAGS) -o test.app test.o -lfftw3f -lcufft_static -lculibos -lcudart_static -lrt
 
 
