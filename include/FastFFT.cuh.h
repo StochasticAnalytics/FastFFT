@@ -6,6 +6,8 @@
 
 #include "cufftdx/include/cufftdx.hpp"
 
+// clang-format off
+
 // “This software contains source code provided by NVIDIA Corporation.” Much of it is modfied as noted at relevant function definitions.
 
 // When defined Turns on synchronization based checking for all FFT kernels as well as cudaErr macros
@@ -17,6 +19,10 @@
 
 // #define forceforce( type )  __nv_is_extended_device_lambda_closure_type( type )
 //FIXME: change to constexpr func
+
+// Make sure we do not mess up our defines
+// clang-format off
+
 template <typename K>
 constexpr inline bool IS_IKF_t( ) {
     if constexpr ( std::is_final_v<K> ) {
@@ -27,7 +33,7 @@ constexpr inline bool IS_IKF_t( ) {
     }
 };
 
-// clang-format off
+
 
 #if FFT_DEBUG_LEVEL < 1
 
@@ -57,17 +63,14 @@ constexpr inline bool IS_IKF_t( ) {
 
 #if FFT_DEBUG_LEVEL == 3
 // More verbose debug info
-#define MyFFTDebugPrint(...) \
-    { std::cerr << __VA_ARGS__ << std::endl; }
-#define MyFFTDebugPrintWithDetails(...) \
-    { std::cerr << __VA_ARGS__ << " From: " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; }
-
+#define MyFFTDebugPrint(...) { std::cerr << __VA_ARGS__ << std::endl; }
+#define MyFFTDebugPrintWithDetails(...) { std::cerr << __VA_ARGS__ << " From: " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; }
 #endif
 
 #if FFT_DEBUG_LEVEL == 4
 // More verbose debug info + state info
-#define MyFFTDebugPrint(...) { PrintState( );  std::cerr << __VA_ARGS__ << std::endl; }
-#define MyFFTDebugPrintWithDetails(...)  { PrintState( ); std::cerr << __VA_ARGS__ << " From: " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; }
+#define MyFFTDebugPrint(...) { FastFFT::FourierTransformer::PrintState( );  std::cerr << __VA_ARGS__ << std::endl; }
+#define MyFFTDebugPrintWithDetails(...)  { FastFFT::FourierTransformer::PrintState( ); std::cerr << __VA_ARGS__ << " From: " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; }
 
 #endif
 
@@ -97,7 +100,7 @@ constexpr inline bool IS_IKF_t( ) {
             #define precheck { cudaErr(cudaGetLastError( )); }
         #endif
     #endif
-#endif  
+#endif
 
 // clang-format on
 
@@ -254,9 +257,10 @@ constexpr const int elements_per_thread_8192 = 16;
 
 namespace KernelFunction {
 
-    // Define an enum for different functors
-    // Intra Kernel Function Type
-    enum IKF_t { NOOP, CONJ_MUL};
+// Define an enum for different functors
+// Intra Kernel Function Type
+enum IKF_t { NOOP,
+             CONJ_MUL };
 
 // Maybe a better way to check , but using keyword final to statically check for non NONE types
 template <class T, int N_ARGS, IKF_t U>
@@ -1484,5 +1488,7 @@ struct io_thread {
 }; // struct thread_io
 
 } // namespace FastFFT
+
+// clang-format on
 
 #endif // Fast_FFT_cuh_

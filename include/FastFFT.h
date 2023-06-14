@@ -29,7 +29,7 @@ inline constexpr _Tp pi_v = 3.141592653589793238462643383279502884L;
 // Fwd 0, 1, 2, 3( none, x, z, original y)
 // 4 intermediate ops, like conj multiplication
 // Inv 5, 6, 7 ( original y, z, x)
-// Defined in make by setting environmental variable  DEBUG_FFT_STAGE
+// Defined in make by setting environmental variable  FFT_DEBUG_STAGE
 
 // #include <iostream>
 /*

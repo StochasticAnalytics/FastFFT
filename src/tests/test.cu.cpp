@@ -20,8 +20,8 @@ enum class Enum { decrease,
 #error "FFT_DEBUG_LEVEL not defined"
 #endif
 
-#ifndef DEBUG_FFT_STAGE
-#error "DEBUG_FFT_STAGE not defined"
+#ifndef FFT_DEBUG_STAGE
+#error "FFT_DEBUG_STAGE not defined"
 #endif
 
 void PrintArray(float2* array, short NX, short NY, short NZ, int line_wrapping = 34) {
@@ -210,10 +210,10 @@ bool const_image_test(std::vector<int> size, bool do_3d = false) {
         if ( host_output.complex_values[0].x != (float)dims_out.x * (float)dims_out.y * (float)dims_out.z )
             test_passed = false;
 
-#if DEBUG_FFT_STAGE == 0
+#if FFT_DEBUG_STAGE == 0
         PrintArray(host_output.real_values, dims_out.x, dims_in.y, dims_in.z, dims_out.w);
         MyTestPrintAndExit("stage 0 ");
-#elif DEBUG_FFT_STAGE == 1
+#elif FFT_DEBUG_STAGE == 1
         if ( do_3d ) {
             std::cout << " in 3d print " << std::endl;
             PrintArray(host_output.complex_values, dims_in.z, dims_in.y, dims_out.w);
@@ -221,10 +221,10 @@ bool const_image_test(std::vector<int> size, bool do_3d = false) {
         else
             PrintArray(host_output.complex_values, dims_in.y, dims_out.w, dims_in.z);
         MyTestPrintAndExit("stage 1 ");
-#elif DEBUG_FFT_STAGE == 2
+#elif FFT_DEBUG_STAGE == 2
         PrintArray(host_output.complex_values, dims_in.y, dims_out.w, dims_out.z);
         MyTestPrintAndExit("stage 2 ");
-#elif DEBUG_FFT_STAGE == 3
+#elif FFT_DEBUG_STAGE == 3
         PrintArray(host_output.complex_values, dims_in.y, dims_out.w, dims_out.z);
         MyTestPrintAndExit("stage 3 ");
 #endif
@@ -239,13 +239,13 @@ bool const_image_test(std::vector<int> size, bool do_3d = false) {
         FT.InvFFT( );
         FT.CopyDeviceToHost(true, true);
 
-#if DEBUG_FFT_STAGE == 4
+#if FFT_DEBUG_STAGE == 4
         PrintArray(host_output.complex_values, dims_out.y, dims_out.w, dims_out.z);
         MyTestPrintAndExit("stage 4 ");
-#elif DEBUG_FFT_STAGE == 5
+#elif FFT_DEBUG_STAGE == 5
         PrintArray(host_output.complex_values, dims_out.y, dims_out.w, dims_out.z);
         MyTestPrintAndExit("stage 5 ");
-#elif DEBUG_FFT_STAGE == 6
+#elif FFT_DEBUG_STAGE == 6
         if ( do_3d ) {
             std::cout << " in 3d print inv " << dims_out.w << "w" << std::endl;
             PrintArray(host_output.complex_values, dims_out.w, dims_out.y, dims_out.z);
@@ -253,13 +253,13 @@ bool const_image_test(std::vector<int> size, bool do_3d = false) {
         else
             PrintArray(host_output.complex_values, dims_out.y, dims_out.w, dims_out.z);
         MyTestPrintAndExit("stage 6 ");
-#elif DEBUG_FFT_STAGE == 7
+#elif FFT_DEBUG_STAGE == 7
         PrintArray(host_output.real_values, dims_out.x, dims_out.y, dims_out.z, dims_out.w);
         MyTestPrintAndExit("stage 7 ");
-#elif DEBUG_FFT_STAGE > 7
+#elif FFT_DEBUG_STAGE > 7
         // No debug, keep going
 #else
-        MyTestPrintAndExit(" This block is only valid for DEBUG_FFT_STAGE == 4, 5, 7 ");
+        MyTestPrintAndExit(" This block is only valid for FFT_DEBUG_STAGE == 4, 5, 7 ");
 #endif
 
         // Assuming the outputs are always even dimensions, padding_jump_val is always 2.
@@ -367,7 +367,7 @@ bool random_image_test(std::vector<int> size, bool do_3d = false) {
         // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
         FT.CopyHostToDevice( );
 
-#if DEBUG_FFT_STAGE > 0
+#if FFT_DEBUG_STAGE > 0
         host_output.FwdFFT( );
 #endif
 
@@ -383,17 +383,17 @@ bool random_image_test(std::vector<int> size, bool do_3d = false) {
         FT.CopyDeviceToHost(false, false);
         bool test_passed = true;
 
-#if DEBUG_FFT_STAGE == 0
+#if FFT_DEBUG_STAGE == 0
         PrintArray(host_output.real_values, dims_out.x, dims_in.y, dims_in.z, dims_out.w);
         PrintArray(host_copy.real_values, dims_out.x, dims_in.y, dims_in.z, dims_out.w);
         MyTestPrintAndExit("stage 0 ");
-#elif DEBUG_FFT_STAGE == 1
+#elif FFT_DEBUG_STAGE == 1
         std::cout << " For random_image_test partial transforms aren't supported, b/c we need to compare to the cpu output." << std::endl;
         MyTestPrintAndExit("stage 1 ");
-#elif DEBUG_FFT_STAGE == 2
+#elif FFT_DEBUG_STAGE == 2
         std::cout << " For random_image_test partial transforms aren't supported, b/c we need to compare to the cpu output." << std::endl;
         MyTestPrintAndExit("stage 2 ");
-#elif DEBUG_FFT_STAGE == 3
+#elif FFT_DEBUG_STAGE == 3
         PrintArray(host_output.complex_values, dims_in.y, dims_out.w, dims_out.z);
         PrintArray(host_copy.complex_values, dims_in.y, dims_out.w, dims_out.z);
 
@@ -420,13 +420,13 @@ bool random_image_test(std::vector<int> size, bool do_3d = false) {
         FT.InvFFT( );
         FT.CopyDeviceToHost(true, true);
 
-#if DEBUG_FFT_STAGE == 4
+#if FFT_DEBUG_STAGE == 4
         PrintArray(host_output.complex_values, dims_out.y, dims_out.w, dims_out.z);
         MyTestPrintAndExit("stage 4 ");
-#elif DEBUG_FFT_STAGE == 5
+#elif FFT_DEBUG_STAGE == 5
         PrintArray(host_output.complex_values, dims_out.y, dims_out.w, dims_out.z);
         MyTestPrintAndExit("stage 5 ");
-#elif DEBUG_FFT_STAGE == 6
+#elif FFT_DEBUG_STAGE == 6
         if ( do_3d ) {
             std::cout << " in 3d print inv " << dims_out.w << "w" << std::endl;
             PrintArray(host_output.complex_values, dims_out.w, dims_out.y, dims_out.z);
@@ -434,13 +434,13 @@ bool random_image_test(std::vector<int> size, bool do_3d = false) {
         else
             PrintArray(host_output.complex_values, dims_out.y, dims_out.w, dims_out.z);
         MyTestPrintAndExit("stage 6 ");
-#elif DEBUG_FFT_STAGE == 7
+#elif FFT_DEBUG_STAGE == 7
         PrintArray(host_output.real_values, dims_out.x, dims_out.y, dims_out.z, dims_out.w);
         MyTestPrintAndExit("stage 7 ");
-#elif DEBUG_FFT_STAGE > 7
+#elif FFT_DEBUG_STAGE > 7
         // No debug, keep going
 #else
-        MyTestPrintAndExit(" This block is only valid for DEBUG_FFT_STAGE == 4, 5, 7 ");
+        MyTestPrintAndExit(" This block is only valid for FFT_DEBUG_STAGE == 4, 5, 7 ");
 #endif
 
         // Assuming the outputs are always even dimensions, padding_jump_val is always 2.
@@ -595,10 +595,10 @@ bool unit_impulse_test(std::vector<int> size, bool do_3d, bool do_increase_size)
             if ( do_increase_size ) {
                 FT.CopyDeviceToHost(host_output.real_values, false, false);
 
-#if DEBUG_FFT_STAGE == 0
+#if FFT_DEBUG_STAGE == 0
                 PrintArray(host_output.real_values, dims_in.x, dims_in.y, dims_in.z, dims_in.w);
                 MyTestPrintAndExit("stage 0 ");
-#elif DEBUG_FFT_STAGE == 1
+#elif FFT_DEBUG_STAGE == 1
                 // If we are doing a fwd increase, the data will have only been expanded along the (transposed) X dimension at this point
                 // So the (apparent) X is dims_in.y not dims_out.y
                 if ( do_3d ) {
@@ -609,12 +609,12 @@ bool unit_impulse_test(std::vector<int> size, bool do_3d, bool do_increase_size)
                     PrintArray(host_output.complex_values, dims_in.y, dims_in.z, dims_out.w);
 
                 MyTestPrintAndExit("stage 1 ");
-#elif DEBUG_FFT_STAGE == 2
+#elif FFT_DEBUG_STAGE == 2
                 // If we are doing a fwd increase, the data will have only been expanded along the (transposed) X dimension at this point
                 // So the (apparent) X is dims_in.y not dims_out.y
                 PrintArray(host_output.complex_values, dims_in.y, dims_out.z, dims_out.w);
                 MyTestPrintAndExit("stage 2 ");
-#elif DEBUG_FFT_STAGE == 3
+#elif FFT_DEBUG_STAGE == 3
                 // Now the array is fully expanded to dims_out, but still transposed
                 PrintArray(host_output.complex_values, dims_out.y, dims_out.z, dims_out.w);
                 MyTestPrintAndExit("stage 3 ");
@@ -623,20 +623,20 @@ bool unit_impulse_test(std::vector<int> size, bool do_3d, bool do_increase_size)
             }
             else {
                 FT.CopyDeviceToHost(false, false, FT.ReturnInputMemorySize( ));
-#if DEBUG_FFT_STAGE == 0
+#if FFT_DEBUG_STAGE == 0
                 PrintArray(host_input.real_values, dims_in.x, dims_in.y, dims_in.z, dims_in.w);
                 MyTestPrintAndExit("stage 0 ");
-#elif DEBUG_FFT_STAGE == 1
+#elif FFT_DEBUG_STAGE == 1
                 // If we are doing a fwd increase, the data will have only been expanded along the (transposed) X dimension at this point
                 // So the (apparent) X is dims_in.y not dims_out.y
                 PrintArray(host_input.complex_values, dims_in.y, dims_in.z, dims_out.w);
                 MyTestPrintAndExit("stage 1 ");
-#elif DEBUG_FFT_STAGE == 2
+#elif FFT_DEBUG_STAGE == 2
                 // If we are doing a fwd increase, the data will have only been expanded along the (transposed) X dimension at this point
                 // So the (apparent) X is dims_in.y not dims_out.y
                 PrintArray(host_input.complex_values, dims_in.y, dims_out.z, dims_out.w);
                 MyTestPrintAndExit("stage 2 ");
-#elif DEBUG_FFT_STAGE == 3
+#elif FFT_DEBUG_STAGE == 3
                 // Now the array is fully expanded to dims_out, but still transposed
                 PrintArray(host_input.complex_values, dims_out.y, dims_out.z, dims_out.w);
                 MyTestPrintAndExit("stage 3 ");
@@ -660,20 +660,20 @@ bool unit_impulse_test(std::vector<int> size, bool do_3d, bool do_increase_size)
             FT.InvFFT( );
             FT.CopyDeviceToHost(host_output.real_values, true, true);
 
-#if DEBUG_FFT_STAGE == 5
+#if FFT_DEBUG_STAGE == 5
             PrintArray(host_output.complex_values, dims_out.y, dims_out.z, dims_out.w);
             MyTestPrintAndExit("stage 5 ");
 #endif
-#if DEBUG_FFT_STAGE == 6
+#if FFT_DEBUG_STAGE == 6
             PrintArray(host_output.complex_values, dims_out.y, dims_out.z, dims_out.w);
             MyTestPrintAndExit("stage 6 ");
-#elif DEBUG_FFT_STAGE == 7
+#elif FFT_DEBUG_STAGE == 7
             PrintArray(host_output.real_values, dims_out.x, dims_out.y, dims_out.z, dims_out.w);
             MyTestPrintAndExit("stage 7 ");
-#elif DEBUG_FFT_STAGE > 7
+#elif FFT_DEBUG_STAGE > 7
             // No debug, keep going
 #else
-            MyTestPrintAndExit(" This block is only valid for DEBUG_FFT_STAGE == 3 || 4 ");
+            MyTestPrintAndExit(" This block is only valid for FFT_DEBUG_STAGE == 3 || 4 ");
 #endif
 
             sum = ReturnSumOfReal(host_output.real_values, dims_out);
@@ -731,7 +731,8 @@ void compare_libraries(std::vector<int> size, bool do_3d, SizeChangeType::Enum s
     if ( size_change_type == SCT::no_change )
         loop_limit = 0;
 
-    // Only testing a rectangular image by altering the X dimension if at all.
+    // Currently, to test a non-square input, the fixed input sizes are used
+    // and the input x size is reduced by input_x / make_rect_x
     int make_rect_x;
     int make_rect_y = 1;
     if ( do_rectangle )
@@ -749,6 +750,7 @@ void compare_libraries(std::vector<int> size, bool do_3d, SizeChangeType::Enum s
     for ( int iSize = 0; iSize < size.size( ) - loop_limit; iSize++ ) {
         int oSize;
         int loop_size;
+        // TODO: the logic here is confusing, clean it up
         if ( size_change_type != SCT::no_change ) {
             oSize     = iSize + 1;
             loop_size = size.size( );
@@ -888,6 +890,7 @@ void compare_libraries(std::vector<int> size, bool do_3d, SizeChangeType::Enum s
 
             // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
             FT.CopyHostToDevice( );
+            // TODO: Why am I copying DeviceToHost right after a copy HostToDevice?
             FT.CopyDeviceToHost(false, false);
 
             cuFFT.CopyHostToDevice( );
@@ -898,6 +901,9 @@ void compare_libraries(std::vector<int> size, bool do_3d, SizeChangeType::Enum s
             cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
 
             // Positive control on the host.
+            // After both forward FFT's we should constant values in each pixel = testVal_1 and testVal_2.
+            // After the Conjugate multiplication, we should have a constant value of testVal_1*testVal_2.
+            // After the inverse FFT, we should have a constant value of testVal_1*testVal_2 in the center pixel and 0 everywhere else.
             positive_control.FwdFFT( );
             positive_control.MultiplyConjugateImage(target_search_image.complex_values);
             positive_control.InvFFT( );
@@ -951,88 +957,90 @@ void compare_libraries(std::vector<int> size, bool do_3d, SizeChangeType::Enum s
             //////////////////////////////////////////
             //////////////////////////////////////////
             // Warm up and check for accuracy
-            if ( set_conjMult_callback || is_size_change_decrease ) // we set set_conjMult_callback = false
-            {
+            // we set set_conjMult_callback = false
+            if ( set_conjMult_callback || is_size_change_decrease ) {
                 // FT.CrossCorrelate(targetFT.d_ptr.momentum_space, false);
                 // Will type deduction work here?
+                MyFFTDebugPrintWithDetails("Calling Generic_Fwd_Image_Inv");
                 FT.Generic_Fwd_Image_Inv(targetFT.d_ptr.momentum_space, noop, conj_mul, noop);
             }
             else {
+                MyFFTDebugPrintWithDetails("Calling Generic_Fwd_Image_Inv");
                 FT.FwdFFT( );
                 FT.InvFFT( );
             }
 
             if ( is_size_change_decrease ) {
                 FT.CopyDeviceToHost(false, false);
-#if DEBUG_FFT_STAGE == 0
+#if FFT_DEBUG_STAGE == 0
 
                 PrintArray(FT_input.real_values, fwd_dims_in.x, fwd_dims_in.y, fwd_dims_in.z, fwd_dims_in.w);
                 MyTestPrintAndExit(" Stage 0");
-#elif DEBUG_FFT_STAGE == 1
+#elif FFT_DEBUG_STAGE == 1
 
                 PrintArray(FT_input.complex_values, fwd_dims_in.y, fwd_dims_in.z, fwd_dims_out.w);
                 MyTestPrintAndExit(" Stage 1");
-#elif DEBUG_FFT_STAGE == 2
+#elif FFT_DEBUG_STAGE == 2
                 PrintArray(FT_input.complex_values, fwd_dims_in.y, fwd_dims_out.z, fwd_dims_out.w);
                 MyTestPrintAndExit(" Stage 2");
-#elif DEBUG_FFT_STAGE == 3
+#elif FFT_DEBUG_STAGE == 3
 
                 PrintArray(FT_input.complex_values, fwd_dims_in.y, fwd_dims_out.z, fwd_dims_out.w);
                 MyTestPrintAndExit(" Stage 3");
-#elif DEBUG_FFT_STAGE == 4
+#elif FFT_DEBUG_STAGE == 4
 
                 PrintArray(FT_input.complex_values, fwd_dims_in.y, fwd_dims_out.z, fwd_dims_out.w);
                 MyTestPrintAndExit(" Stage 4");
-#elif DEBUG_FFT_STAGE == 5
+#elif FFT_DEBUG_STAGE == 5
                 PrintArray(FT_input.complex_values, inv_dims_out.y, inv_dims_in.z, inv_dims_in.w);
                 MyTestPrintAndExit(" Stage 5");
-#elif DEBUG_FFT_STAGE == 6
+#elif FFT_DEBUG_STAGE == 6
                 PrintArray(FT_input.complex_values, inv_dims_out.y, inv_dims_out.z, inv_dims_in.w);
                 MyTestPrintAndExit(" Stage 6");
-#elif DEBUG_FFT_STAGE == 7
+#elif FFT_DEBUG_STAGE == 7
                 PrintArray(FT_input.real_values, inv_dims_out.x, inv_dims_out.y, inv_dims_out.z, inv_dims_out.w);
                 MyTestPrintAndExit(" Stage 7");
-#elif DEBUG_FFT_STAGE > 7
+#elif FFT_DEBUG_STAGE > 7
                 // Do nothing, we are doing all ops and not debugging.
 #else
-                MyTestPrintAndExit("DEBUG_FFT_STAGE not recognized " + std::to_string(DEBUG_FFT_STAGE));
+                MyTestPrintAndExit("FFT_DEBUG_STAGE not recognized " + std::to_string(FFT_DEBUG_STAGE));
 #endif
             }
             else {
                 // the output is equal or > the input, so we can always copy there.
                 FT.CopyDeviceToHost(FT_output.real_values, false, false);
 
-#if DEBUG_FFT_STAGE == 0
+#if FFT_DEBUG_STAGE == 0
                 PrintArray(FT_output.real_values, fwd_dims_in.x, fwd_dims_in.y, fwd_dims_in.z, fwd_dims_in.w);
                 MyTestPrintAndExit(" Stage 0");
-#elif DEBUG_FFT_STAGE == 1
+#elif FFT_DEBUG_STAGE == 1
 
                 PrintArray(FT_output.complex_values, fwd_dims_in.y, fwd_dims_in.z, fwd_dims_out.w);
                 FastFFT::PrintVectorType(fwd_dims_in);
                 FastFFT::PrintVectorType(fwd_dims_out);
                 MyTestPrintAndExit(" Stage 1");
-#elif DEBUG_FFT_STAGE == 2
+#elif FFT_DEBUG_STAGE == 2
                 PrintArray(FT_output.complex_values, fwd_dims_in.y, fwd_dims_out.z, fwd_dims_out.w);
                 MyTestPrintAndExit(" Stage 2");
-#elif DEBUG_FFT_STAGE == 3
+#elif FFT_DEBUG_STAGE == 3
                 PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.w, fwd_dims_out.z);
                 MyTestPrintAndExit(" Stage 3");
-#elif DEBUG_FFT_STAGE == 4
+#elif FFT_DEBUG_STAGE == 4
                 PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.w, fwd_dims_out.z);
                 MyTestPrintAndExit(" Stage 4");
-#elif DEBUG_FFT_STAGE == 5
+#elif FFT_DEBUG_STAGE == 5
                 PrintArray(FT_output.complex_values, inv_dims_out.y, inv_dims_in.z, inv_dims_out.w);
                 MyTestPrintAndExit(" Stage 5");
-#elif DEBUG_FFT_STAGE == 6
+#elif FFT_DEBUG_STAGE == 6
                 PrintArray(FT_output.complex_values, inv_dims_out.y, inv_dims_out.z, inv_dims_out.w);
                 MyTestPrintAndExit(" Stage 6");
-#elif DEBUG_FFT_STAGE == 7
+#elif FFT_DEBUG_STAGE == 7
                 PrintArray(FT_output.real_values, inv_dims_out.x, inv_dims_out.y, inv_dims_out.z, inv_dims_out.w);
                 MyTestPrintAndExit(" Stage 7");
-#elif DEBUG_FFT_STAGE > 7
+#elif FFT_DEBUG_STAGE > 7
                 // Do nothing, we are doing all ops and not debugging.
 #else
-                MyTestPrintAndExit("DEBUG_FFT_STAGE not recognized " + std::to_string(DEBUG_FFT_STAGE));
+                MyTestPrintAndExit("FFT_DEBUG_STAGE not recognized " + std::to_string(FFT_DEBUG_STAGE));
 #endif
             }
 
@@ -1099,12 +1107,12 @@ void compare_libraries(std::vector<int> size, bool do_3d, SizeChangeType::Enum s
             ////////////////////////////////////////
             //////////////////////////////////////////
 
-#if DEBUG_FFT_STAGE == 0
+#if FFT_DEBUG_STAGE == 0
 
             PrintArray(FT_output.real_values, fwd_dims_in.x, fwd_dims_in.y, fwd_dims_in.z, fwd_dims_in.w);
 
             MyTestPrintAndExit("stage 0 ");
-#elif DEBUG_FFT_STAGE == 1
+#elif FFT_DEBUG_STAGE == 1
             // If we are doing a fwd increase, the data will have only been expanded along the (transposed) X dimension at this point
             // So the (apparent) X is dims_in.y not output_size.y
             // decrease is currently just tested on the output. Really, to simplify there should be 3 different functions, fwd_none_inv_decrease (current decrease), fwd_decrease_inc_decrease (not yet) fwd_increase_inv_none
@@ -1117,18 +1125,18 @@ void compare_libraries(std::vector<int> size, bool do_3d, SizeChangeType::Enum s
                 PrintArray(FT_output.complex_values, fwd_dims_in.y, fwd_dims_in.z, fwd_dims_out.w);
             }
 
-#elif DEBUG_FFT_STAGE == 2
+#elif FFT_DEBUG_STAGE == 2
             // Now the array is fully expanded to output_size, but still transposed
             PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.z, fwd_dims_out.w);
             MyTestPrintAndExit("stage 2 ");
 
-#elif DEBUG_FFT_STAGE == 3
+#elif FFT_DEBUG_STAGE == 3
             PrintArray(FT_output.complex_values, inv_dims_out.y, inv_dims_out.z, inv_dims_out.w);
             MyTestPrintAndExit("stage 3 ");
-#elif DEBUG_FFT_STAGE == 4
+#elif FFT_DEBUG_STAGE == 4
             PrintArray(FT_output.real_values, inv_dims_out.x, inv_dims_out.y, inv_dims_out.z, inv_dims_out.w);
             MyTestPrintAndExit("stage 4 ");
-#elif DEBUG_FFT_STAGE > 7
+#elif FFT_DEBUG_STAGE > 7
             // This is the final stage, the data is fully expanded and transposed
 #else
             MyTestPrintAndExit("This blah blah");
