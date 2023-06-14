@@ -3,6 +3,13 @@
 #include <cufft.h>
 #include <cufftXt.h>
 
+// Define an enum for size change type to indecate a decrease, no change or increase
+namespace SizeChangeType {
+enum class Enum { decrease,
+                  no_change,
+                  increase };
+}
+
 #define MyTestPrintAndExit(...)                                                                                          \
     {                                                                                                                    \
         std::cerr << __VA_ARGS__ << " From: " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; \
@@ -704,21 +711,27 @@ bool unit_impulse_test(std::vector<int> size, bool do_3d, bool do_increase_size)
 }
 
 template <int Rank>
-void compare_libraries(std::vector<int> size, bool do_3d, int size_change_type, bool do_rectangle) {
+void compare_libraries(std::vector<int> size, bool do_3d, SizeChangeType::Enum size_change_type, bool do_rectangle) {
 
-    bool skip_cufft_for_profiling = false;
-    bool print_out_time           = true;
+    using SCT = SizeChangeType::Enum;
+
+    constexpr bool skip_cufft_for_profiling = false;
+    constexpr bool print_out_time           = true;
     // bool set_padding_callback = false; // the padding callback is slower than pasting in b/c the read size of the pointers is larger than the actual data. do not use.
     bool set_conjMult_callback   = true;
     bool is_size_change_decrease = false;
 
-    if ( size_change_type < 0 ) {
+    if ( size_change_type == SCT::decrease ) {
         is_size_change_decrease = true;
     }
+
+    // For an increase or decrease in size, we have to shrink the loop by one,
+    // for a no_change, we don't because every size is compared to itself.
     int loop_limit = 1;
-    if ( size_change_type == 0 )
+    if ( size_change_type == SCT::no_change )
         loop_limit = 0;
 
+    // Only testing a rectangular image by altering the X dimension if at all.
     int make_rect_x;
     int make_rect_y = 1;
     if ( do_rectangle )
@@ -736,7 +749,7 @@ void compare_libraries(std::vector<int> size, bool do_3d, int size_change_type, 
     for ( int iSize = 0; iSize < size.size( ) - loop_limit; iSize++ ) {
         int oSize;
         int loop_size;
-        if ( size_change_type != 0 ) {
+        if ( size_change_type != SCT::no_change ) {
             oSize     = iSize + 1;
             loop_size = size.size( );
         }
@@ -1044,6 +1057,7 @@ void compare_libraries(std::vector<int> size, bool do_3d, int size_change_type, 
                     else {
                         if ( print_out_time ) {
                             std::cout << "Test failed for FastFFT positive control. Value at zero is  " << FT_input.real_values[address] << std::endl;
+                            std::cout << "Expected value is " << FT_input.size.x * FT_input.size.y * FT_input.size.z * testVal_1 * testVal_2 << std::endl;
                         }
                     }
                 }
@@ -1376,6 +1390,8 @@ void print_options(char** argv) {
 
 int main(int argc, char** argv) {
 
+    using SCT = SizeChangeType::Enum;
+
     if ( argc != 2 ) {
         print_options(argv);
         return 1;
@@ -1447,18 +1463,19 @@ int main(int argc, char** argv) {
 // exit(1);
 #endif
 
-        int  size_change_type;
+        SCT  size_change_type;
         bool do_3d = false;
 
-        size_change_type = 0; // no
+        // Set the SCT to no_change, increase, or decrease
+        size_change_type = SCT::no_change;
         compare_libraries<2>(test_size, do_3d, size_change_type, false);
         // compare_libraries<2>(test_size_rectangle, do_3d, size_change_type, true);
 
-        size_change_type = 1; // increase
+        size_change_type = SCT::increase;
         compare_libraries<2>(test_size, do_3d, size_change_type, false);
         // compare_libraries<2>(test_size_rectangle, do_3d, size_change_type, true);
         exit(1);
-        size_change_type = -1; // decrease
+        size_change_type = SCT::decrease;
         compare_libraries<2>(test_size, do_3d, size_change_type, false);
     }
 
@@ -1468,17 +1485,17 @@ int main(int argc, char** argv) {
         std::cout << "This doesn't make sense as the synchronizations are invalidating.\n";
 #endif
 
-        int  size_change_type;
+        SCT  size_change_type;
         bool do_3d = true;
 
-        size_change_type = 0; // no change
+        size_change_type = SCT::no_change;
         compare_libraries<3>(test_size, do_3d, size_change_type, false);
 
         // TODO: These are not yet completed.
-        // size_change_type = 1; // increase
+        // size_change_type = SCT::increase;
         // compare_libraries(test_size, do_3d, size_change_type, false);
 
-        // size_change_type = -1; // decrease
+        // size_change_type = SCT::decrease;
         // compare_libraries(test_size, do_3d, size_change_type, false);
     }
 
