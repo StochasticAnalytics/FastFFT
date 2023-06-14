@@ -879,11 +879,11 @@ void compare_libraries(std::vector<int> size, bool do_3d, SizeChangeType::Enum s
 
             // Place these values at the origin of the image and after convolution, should be at 0,0,0.
             float testVal_1                    = 2.0f;
-            float testVal_2                    = 3.0f;
+            float testVal_2                    = set_conjMult_callback ? 3.0f : 1.0; // This way the test conditions are the same, the 1. indicating no conj
             FT_input.real_values[0]            = testVal_1;
             cuFFT_input.real_values[0]         = testVal_1;
-            target_search_image.real_values[0] = testVal_2; //target_search_image.size.w*2*target_search_image.size.y/2 + target_search_image.size.x/2] = testVal_2;
-            positive_control.real_values[0]    = testVal_1; //target_search_image.size.w*2*target_search_image.size.y/2 + target_search_image.size.x/2] = testVal_1;
+            target_search_image.real_values[0] = testVal_2;
+            positive_control.real_values[0]    = testVal_1;
 
             // Transform the target on the host prior to transfer.
             target_search_image.FwdFFT( );
@@ -905,7 +905,8 @@ void compare_libraries(std::vector<int> size, bool do_3d, SizeChangeType::Enum s
             // After the Conjugate multiplication, we should have a constant value of testVal_1*testVal_2.
             // After the inverse FFT, we should have a constant value of testVal_1*testVal_2 in the center pixel and 0 everywhere else.
             positive_control.FwdFFT( );
-            positive_control.MultiplyConjugateImage(target_search_image.complex_values);
+            if ( set_conjMult_callback )
+                positive_control.MultiplyConjugateImage(target_search_image.complex_values);
             positive_control.InvFFT( );
 
             // address = 0;
@@ -1014,21 +1015,35 @@ void compare_libraries(std::vector<int> size, bool do_3d, SizeChangeType::Enum s
                 PrintArray(FT_output.real_values, fwd_dims_in.x, fwd_dims_in.y, fwd_dims_in.z, fwd_dims_in.w);
                 MyTestPrintAndExit(" Stage 0");
 #elif FFT_DEBUG_STAGE == 1
-
-                PrintArray(FT_output.complex_values, fwd_dims_in.y, fwd_dims_in.z, fwd_dims_out.w);
-                FastFFT::PrintVectorType(fwd_dims_in);
-                FastFFT::PrintVectorType(fwd_dims_out);
+                if ( Rank == 2 )
+                    // Transformed X transposed XY
+                    PrintArray(FT_output.complex_values, fwd_dims_in.y, fwd_dims_out.w, fwd_dims_in.z);
+                else
+                    // Transformed X transposed XZ
+                    PrintArray(FT_output.complex_values, fwd_dims_in.y, fwd_dims_in.z, fwd_dims_out.w);
                 MyTestPrintAndExit(" Stage 1");
 #elif FFT_DEBUG_STAGE == 2
-                PrintArray(FT_output.complex_values, fwd_dims_in.y, fwd_dims_out.z, fwd_dims_out.w);
+                if ( Rank == 2 )
+                    // Noop, Transformed X transposed XY
+                    PrintArray(FT_output.complex_values, fwd_dims_in.y, fwd_dims_out.w, fwd_dims_in.z);
+                else
+                    // Transformed Z, permute XYZ
+                    PrintArray(FT_output.complex_values, fwd_dims_in.y, fwd_dims_out.w, fwd_dims_out.z);
                 MyTestPrintAndExit(" Stage 2");
 #elif FFT_DEBUG_STAGE == 3
-                PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.w, fwd_dims_out.z);
+                if ( Rank == 2 )
+                    // Transormed Y, no reordering
+                    PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.w, fwd_dims_out.z);
+                else
+                    // Transormed Y, no reordering
+                    PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.w, fwd_dims_out.z);
                 MyTestPrintAndExit(" Stage 3");
 #elif FFT_DEBUG_STAGE == 4
+                // Same for 2d/3d intra-transorm op (if specified)
                 PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.w, fwd_dims_out.z);
                 MyTestPrintAndExit(" Stage 4");
 #elif FFT_DEBUG_STAGE == 5
+
                 PrintArray(FT_output.complex_values, inv_dims_out.y, inv_dims_in.z, inv_dims_out.w);
                 MyTestPrintAndExit(" Stage 5");
 #elif FFT_DEBUG_STAGE == 6
@@ -1510,3 +1525,294 @@ int main(int argc, char** argv) {
     // If we get here, all tests passed.
     return 0;
 };
+
+compare_libraries<2>(test_size, do_3d, size_change_type, false);
+}
+
+if ( run_3d_performance_tests ) {
+#ifdef HEAVYERRORCHECKING_FFT
+    std::cout << "Running performance tests with heavy error checking.\n";
+    std::cout << "This doesn't make sense as the synchronizations are invalidating.\n";
+#endif
+
+    // comp;
+
+    size_change_type = SCT::no_change;
+    compare_libraries<3>(test_size, do_3d, size_change_type, false);
+
+    // TODO: These are not yet completed.
+    // size_change_type = SCT::increaseare_libraries(test_size, do_3d, size_change_type, false);
+
+    // size_change_type = SCT::decrease;
+    // compare_libraries(test_size, do_3d, size_change_type, false);
+}
+
+// If we get here, all tests passed.
+return 0;
+
+SCT  size_change_type;
+bool do_3d = true;
+
+size_change_type = SCT::no_change;
+compare_libraries<3>(test_size, do_3d, size_change_type, false);
+
+// TODO: These are not yet completed.
+// size_change_type = SCT::increase;
+// compare_libraries(test_size, do_3d, size_change_type, false);
+
+// size_change_type = SCT::decrease;
+// compare_libraries(test_size, do_3d, size_change_type, false);
+}
+
+// If we get here, all tests passed.
+return 0;
+
+size_change_type = SCT::no_change;
+compare_libraries<3>(test_size, do_3d, size_change_type, false);
+
+// TODO: These are not yet completed.
+// size_change_type = SCT::increase;
+// compare_libraries(test_size, do_3d, size_change_type, false);
+
+// size_change_type = SCT::decrease;
+// compare_libraries(test_size, do_3d, size_change_type, false);
+}
+
+// If we get here, all tests passed.
+return 0;
+
+size_change_type = SCT::no_change;
+compare_libraries<3>(test_size, do_3d, size_change_type, false);
+
+// TODO: These are not yet completed.
+// size_change_type = SCT::increase;
+// compare_libraries(test_size, do_3d, size_change_type, false);
+
+// size_change_type = SCT::decrease;
+// compare_libraries(test_size, do_3d, size_change_type, false);
+}
+
+// If we get here, all tests passed.
+return 0;
+}
+;
+size_change_type = es<2>(test_size, do_3d, size_change_type, false);
+// compare_libraries<2>(test_size_rectangle, do_3d, size_change_type, true);
+exit(1);
+size_change_type = SCT::decrease;
+compare_libraries<2>(test_size, do_3d, size_change_type, false);
+}
+
+if ( run_3d_performance_tests ) {
+#ifdef HEAVYERRORCHECKING_FFT
+    std::cout << "Running performance tests with heavy error checking.\n";
+    std::cout << "This doesn't make sense as the synchronizations are invalidating.\n";
+#endif
+
+    // comp;
+
+    size_change_type = SCT::no_change;
+    compare_libraries<3>(test_size, do_3d, size_change_type, false);
+
+    // TODO: These are not yet completed.
+    // size_change_type = SCT::increaseare_libraries(test_size, do_3d, size_change_type, false);
+
+    // size_change_type = SCT::decrease;
+    // compare_libraries(test_size, do_3d, size_change_type, false);
+}
+
+// If we get here, all tests passed.
+return 0;
+
+SCT  size_change_type;
+bool do_3d = true;
+
+size_change_type = SCT::no_change;
+compare_libraries<3>(test_size, do_3d, size_change_type, false);
+
+// TODO: These are not yet completed.
+// size_change_type = SCT::increase;
+// compare_libraries(test_size, do_3d, size_change_type, false);
+
+// size_change_type = SCT::decrease;
+// compare_libraries(test_size, do_3d, size_change_type, false);
+}
+
+// If we get here, all tests passed.
+return 0;
+
+size_change_type = SCT::no_change;
+compare_libraries<3>(test_size, do_3d, size_change_type, false);
+
+// TODO: These are not yet completed.
+// size_change_type = SCT::increase;
+// compare_libraries(test_size, do_3d, size_change_type, false);
+
+// size_change_type = SCT::decrease;
+// compare_libraries(test_size, do_3d, size_change_type, false);
+}
+
+// If we get here, all tests passed.
+return 0;
+
+size_change_type = SCT::no_change;
+compare_libraries<3>(test_size, do_3d, size_change_type, false);
+
+// TODO: These are not yet completed.
+// size_change_type = SCT::increase;
+// compare_libraries(test_size, do_3d, size_change_type, false);
+
+// size_change_type = SCT::decrease;
+// compare_libraries(test_size, do_3d, size_change_type, false);
+}
+
+// If we get here, all tests passed.
+return 0;
+}
+;
+exit(1);
+size_change_type = SCT::decrease;
+compare_libraries<2>(test_size, do_3d, size_change_type, false);
+}
+
+if ( run_3d_performance_tests ) {
+#ifdef HEAVYERRORCHECKING_FFT
+    std::cout << "Running performance tests with heavy error checking.\n";
+    std::cout << "This doesn't make sense as the synchronizations are invalidating.\n";
+#endif
+
+    // comp;
+
+    size_change_type = SCT::no_change;
+    compare_libraries<3>(test_size, do_3d, size_change_type, false);
+
+    // TODO: These are not yet completed.
+    // size_change_type = SCT::increaseare_libraries(test_size, do_3d, size_change_type, false);
+
+    // size_change_type = SCT::decrease;
+    // compare_libraries(test_size, do_3d, size_change_type, false);
+}
+
+// If we get here, all tests passed.
+return 0;
+
+SCT  size_change_type;
+bool do_3d = true;
+
+size_change_type = SCT::no_change;
+compare_libraries<3>(test_size, do_3d, size_change_type, false);
+
+// TODO: These are not yet completed.
+// size_change_type = SCT::increase;
+// compare_libraries(test_size, do_3d, size_change_type, false);
+
+// size_change_type = SCT::decrease;
+// compare_libraries(test_size, do_3d, size_change_type, false);
+}
+
+// If we get here, all tests passed.
+return 0;
+
+size_change_type = SCT::no_change;
+compare_libraries<3>(test_size, do_3d, size_change_type, false);
+
+// TODO: These are not yet completed.
+// size_change_type = SCT::increase;
+// compare_libraries(test_size, do_3d, size_change_type, false);
+
+// size_change_type = SCT::decrease;
+// compare_libraries(test_size, do_3d, size_change_type, false);
+}
+
+// If we get here, all tests passed.
+return 0;
+
+size_change_type = SCT::no_change;
+compare_libraries<3>(test_size, do_3d, size_change_type, false);
+
+// TODO: These are not yet completed.
+// size_change_type = SCT::increase;
+// compare_libraries(test_size, do_3d, size_change_type, false);
+
+// size_change_type = SCT::decrease;
+// compare_libraries(test_size, do_3d, size_change_type, false);
+}
+
+// If we get here, all tests passed.
+return 0;
+}
+;
+size_change_type = es<2>(test_size, do_3d, size_change_type, false);
+// compare_libraries<2>(test_size_rectangle, do_3d, size_change_type, true);
+exit(1);
+size_change_type = SCT::decrease;
+compare_libraries<2>(test_size, do_3d, size_change_type, false);
+}
+
+if ( run_3d_performance_tests ) {
+#ifdef HEAVYERRORCHECKING_FFT
+    std::cout << "Running performance tests with heavy error checking.\n";
+    std::cout << "This doesn't make sense as the synchronizations are invalidating.\n";
+#endif
+
+    // comp;
+
+    size_change_type = SCT::no_change;
+    compare_libraries<3>(test_size, do_3d, size_change_type, false);
+
+    // TODO: These are not yet completed.
+    // size_change_type = SCT::increaseare_libraries(test_size, do_3d, size_change_type, false);
+
+    // size_change_type = SCT::decrease;
+    // compare_libraries(test_size, do_3d, size_change_type, false);
+}
+
+// If we get here, all tests passed.
+return 0;
+
+SCT  size_change_type;
+bool do_3d = true;
+
+size_change_type = SCT::no_change;
+compare_libraries<3>(test_size, do_3d, size_change_type, false);
+
+// TODO: These are not yet completed.
+// size_change_type = SCT::increase;
+// compare_libraries(test_size, do_3d, size_change_type, false);
+
+// size_change_type = SCT::decrease;
+// compare_libraries(test_size, do_3d, size_change_type, false);
+}
+
+// If we get here, all tests passed.
+return 0;
+
+size_change_type = SCT::no_change;
+compare_libraries<3>(test_size, do_3d, size_change_type, false);
+
+// TODO: These are not yet completed.
+// size_change_type = SCT::increase;
+// compare_libraries(test_size, do_3d, size_change_type, false);
+
+// size_change_type = SCT::decrease;
+// compare_libraries(test_size, do_3d, size_change_type, false);
+}
+
+// If we get here, all tests passed.
+return 0;
+
+size_change_type = SCT::no_change;
+compare_libraries<3>(test_size, do_3d, size_change_type, false);
+
+// TODO: These are not yet completed.
+// size_change_type = SCT::increase;
+// compare_libraries(test_size, do_3d, size_change_type, false);
+
+// size_change_type = SCT::decrease;
+// compare_libraries(test_size, do_3d, size_change_type, false);
+}
+
+// If we get here, all tests passed.
+return 0;
+}
+;

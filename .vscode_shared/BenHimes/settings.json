@@ -3,7 +3,8 @@
     "C_Cpp.errorSquiggles": "Enabled",
     "C_Cpp.dimInactiveRegions": true,
     "files.associations": {
-        "*.cu": "cpp",
+        // "*.cu": ".cpp",
+        // "*.cuh": ".cpp",
         "string": "cpp",
         "filesystem": "cpp",
         "array": "cpp",

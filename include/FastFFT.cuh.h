@@ -20,8 +20,7 @@
 // #define forceforce( type )  __nv_is_extended_device_lambda_closure_type( type )
 //FIXME: change to constexpr func
 
-// Make sure we do not mess up our defines
-// clang-format off
+
 
 template <typename K>
 constexpr inline bool IS_IKF_t( ) {
@@ -102,7 +101,6 @@ constexpr inline bool IS_IKF_t( ) {
     #endif
 #endif
 
-// clang-format on
 
 inline void checkCudaErr(cudaError_t err) {
     if ( err != cudaSuccess ) {
