@@ -1049,14 +1049,28 @@ void compare_libraries(std::vector<int> size, bool do_3d, SizeChangeType::Enum s
                 PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.w, fwd_dims_out.z);
                 MyTestPrintAndExit(" Stage 4");
 #elif FFT_DEBUG_STAGE == 5
-
-                PrintArray(FT_output.complex_values, inv_dims_out.y, inv_dims_in.z, inv_dims_out.w);
+                if ( Rank == 2 )
+                    // Inv Transformed Y, no transpose
+                    PrintArray(FT_output.complex_values, inv_dims_out.y, inv_dims_in.w, inv_dims_out.z);
+                else
+                    // Inv Transformed Y, swap YZ
+                    PrintArray(FT_output.complex_values, inv_dims_in.z, inv_dims_in.w, inv_dims_out.y);
                 MyTestPrintAndExit(" Stage 5");
 #elif FFT_DEBUG_STAGE == 6
-                PrintArray(FT_output.complex_values, inv_dims_out.y, inv_dims_out.z, inv_dims_out.w);
+                if ( Rank == 2 )
+                    // Nothing different from debug 5 for 2d
+                    PrintArray(FT_output.complex_values, inv_dims_out.y, inv_dims_in.w, inv_dims_out.z);
+                else
+                    // Inv Transformed Z, permute XYZ
+                    PrintArray(FT_output.complex_values, inv_dims_in.w, inv_dims_out.y, inv_dims_out.z);
                 MyTestPrintAndExit(" Stage 6");
 #elif FFT_DEBUG_STAGE == 7
-                PrintArray(FT_output.real_values, inv_dims_out.x, inv_dims_out.y, inv_dims_out.z, inv_dims_out.w);
+                if ( Rank == 2 )
+                    // Inv transformed X, no transpose
+                    PrintArray(FT_output.real_values, inv_dims_out.x, inv_dims_out.y, inv_dims_out.z, inv_dims_out.w);
+                else
+                    // Inv transformed X, no transpose
+                    PrintArray(FT_output.real_values, inv_dims_out.x, inv_dims_out.y, inv_dims_out.z, inv_dims_out.w);
                 MyTestPrintAndExit(" Stage 7");
 #elif FFT_DEBUG_STAGE > 7
                 // Do nothing, we are doing all ops and not debugging.
@@ -1067,12 +1081,7 @@ void compare_libraries(std::vector<int> size, bool do_3d, SizeChangeType::Enum s
 
             test_passed = true;
             if ( is_size_change_decrease ) {
-                for ( int address = 1; address < FT_input.real_memory_allocated / 2; address++ ) {
-                    if ( FT_input.real_values[address] != 0.0f ) {
-                        std::cout << "Test failed for FastFFT control, non-zero values found away from the origin." << std::endl;
-                        MyTestPrintAndExit(" ");
-                    }
-                }
+                Check_impulse_real_image(FT_input);
 
                 if ( FT_input.real_values[0] == FT_input.size.x * FT_input.size.y * FT_input.size.z * testVal_1 * testVal_2 ) {
                     if ( print_out_time )
@@ -1085,12 +1094,7 @@ void compare_libraries(std::vector<int> size, bool do_3d, SizeChangeType::Enum s
                 }
             }
             else {
-                for ( int address = 1; address < FT_output.real_memory_allocated / 2; address++ ) {
-                    if ( FT_output.real_values[address] != 0.0f ) {
-                        std::cout << "Test failed for FastFFT control, non-zero values found away from the origin." << std::endl;
-                        MyTestPrintAndExit(" ");
-                    }
-                }
+                Check_impulse_real_image(FT_output);
 
                 if ( FT_output.real_values[0] == FT_output.size.x * FT_output.size.y * FT_output.size.z * testVal_1 * testVal_2 ) {
                     if ( print_out_time ) {
