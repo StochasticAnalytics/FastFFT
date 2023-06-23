@@ -116,6 +116,83 @@ void Check_impulse_real_image(Image<realType, complexType>& positive_control) {
     return;
 }
 
+// For debugging the individual stages of the xforms
+template <int fft_debug_stage, int Rank, typename realType, typename complexType>
+void debug_partial_fft(Image<realType, complexType> test_image,
+                       short4                       fwd_dims_in,
+                       short4                       fwd_dims_out,
+                       short4                       inv_dims_in,
+                       short4                       inv_dims_out) {
+
+    if constexpr ( fft_debug_stage == 0 ) {
+        PrintArray(test_image.real_values, fwd_dims_in.x, fwd_dims_in.y, fwd_dims_in.z, fwd_dims_in.w);
+        MyTestPrintAndExit(" Stage 0");
+    }
+    else if constexpr ( fft_debug_stage == 1 ) {
+        if ( Rank == 2 )
+            // Transformed X transposed XY
+            PrintArray(test_image.complex_values, fwd_dims_in.y, fwd_dims_out.w, fwd_dims_in.z);
+        else
+            // Transformed X transposed XZ
+            PrintArray(test_image.complex_values, fwd_dims_in.z, fwd_dims_in.y, fwd_dims_out.w);
+        MyTestPrintAndExit(" Stage 1");
+    }
+    else if constexpr ( fft_debug_stage == 2 ) {
+        if ( Rank == 2 )
+            // Noop, Transformed X transposed XY
+            PrintArray(test_image.complex_values, fwd_dims_in.y, fwd_dims_out.w, fwd_dims_in.z);
+        else
+            // Transformed Z, permute XYZ
+            PrintArray(test_image.complex_values, fwd_dims_in.y, fwd_dims_out.w, fwd_dims_out.z);
+        MyTestPrintAndExit(" Stage 2");
+    }
+    else if constexpr ( fft_debug_stage == 3 ) {
+        if ( Rank == 2 )
+            // Transormed Y, no reordering
+            PrintArray(test_image.complex_values, fwd_dims_out.y, fwd_dims_out.w, fwd_dims_out.z);
+        else
+            // Transormed Y, no reordering
+            PrintArray(test_image.complex_values, fwd_dims_out.y, fwd_dims_out.w, fwd_dims_out.z);
+        MyTestPrintAndExit(" Stage 3");
+    }
+    else if constexpr ( fft_debug_stage == 4 ) {
+        // Same for 2d/3d intra-transorm op (if specified)
+        PrintArray(test_image.complex_values, fwd_dims_out.y, fwd_dims_out.w, fwd_dims_out.z);
+        MyTestPrintAndExit(" Stage 4");
+    }
+    else if constexpr ( fft_debug_stage == 5 ) {
+        if ( Rank == 2 )
+            // Inv Transformed Y, no transpose
+            PrintArray(test_image.complex_values, inv_dims_out.y, inv_dims_in.w, inv_dims_out.z);
+        else
+            // Inv Transformed Y, swap YZ
+            PrintArray(test_image.complex_values, inv_dims_in.z, inv_dims_in.w, inv_dims_out.y);
+        MyTestPrintAndExit(" Stage 5");
+    }
+    else if constexpr ( fft_debug_stage == 6 ) {
+        if ( Rank == 2 )
+            // Nothing different from debug 5 for 2d
+            PrintArray(test_image.complex_values, inv_dims_out.y, inv_dims_in.w, inv_dims_out.z);
+        else
+            // Inv Transformed Z, permute XYZ
+            PrintArray(test_image.complex_values, inv_dims_in.w, inv_dims_out.y, inv_dims_out.z);
+        MyTestPrintAndExit(" Stage 6");
+    }
+    else if constexpr ( fft_debug_stage == 7 ) {
+        if ( Rank == 2 )
+            // Inv transformed X, no transpose
+            PrintArray(test_image.real_values, inv_dims_out.x, inv_dims_out.y, inv_dims_out.z, inv_dims_out.w);
+        else
+            // Inv transformed X, no transpose
+            PrintArray(test_image.real_values, inv_dims_out.x, inv_dims_out.y, inv_dims_out.z, inv_dims_out.w);
+        MyTestPrintAndExit(" Stage 7");
+    }
+    else if constexpr ( fft_debug_stage != 8 )
+        MyTestPrintAndExit("FFT_DEBUG_STAGE not recognized " + std::to_string(FFT_DEBUG_STAGE));
+
+    return;
+}
+
 // The Fourier transform of a constant should be a unit impulse, and on back fft, without normalization, it should be a constant * N.
 // It is assumed the input/output have the same dimension (i.e. no padding)
 
@@ -979,107 +1056,17 @@ void compare_libraries(std::vector<int> size, bool do_3d, SizeChangeType::Enum s
             }
 
             if ( is_size_change_decrease ) {
+                // Because the output is smaller than the input, we just copy to FT input.
+                // FIXME: In reality, we didn't need to allocate FT_output at all in this case
                 FT.CopyDeviceToHost(false, false);
-#if FFT_DEBUG_STAGE == 0
-                PrintArray(FT_input.real_values, fwd_dims_in.x, fwd_dims_in.y, fwd_dims_in.z, fwd_dims_in.w);
-                MyTestPrintAndExit(" Stage 0");
-#elif FFT_DEBUG_STAGE == 1
-
-                PrintArray(FT_input.complex_values, fwd_dims_in.y, fwd_dims_in.z, fwd_dims_out.w);
-                MyTestPrintAndExit(" Stage 1");
-#elif FFT_DEBUG_STAGE == 2
-                PrintArray(FT_input.complex_values, fwd_dims_in.y, fwd_dims_out.z, fwd_dims_out.w);
-                MyTestPrintAndExit(" Stage 2");
-#elif FFT_DEBUG_STAGE == 3
-
-                PrintArray(FT_input.complex_values, fwd_dims_in.y, fwd_dims_out.z, fwd_dims_out.w);
-                MyTestPrintAndExit(" Stage 3");
-#elif FFT_DEBUG_STAGE == 4
-
-                PrintArray(FT_input.complex_values, fwd_dims_in.y, fwd_dims_out.z, fwd_dims_out.w);
-                MyTestPrintAndExit(" Stage 4");
-#elif FFT_DEBUG_STAGE == 5
-                PrintArray(FT_input.complex_values, inv_dims_out.y, inv_dims_in.z, inv_dims_in.w);
-                MyTestPrintAndExit(" Stage 5");
-#elif FFT_DEBUG_STAGE == 6
-                PrintArray(FT_input.complex_values, inv_dims_out.y, inv_dims_out.z, inv_dims_in.w);
-                MyTestPrintAndExit(" Stage 6");
-#elif FFT_DEBUG_STAGE == 7
-                PrintArray(FT_input.real_values, inv_dims_out.x, inv_dims_out.y, inv_dims_out.z, inv_dims_out.w);
-                MyTestPrintAndExit(" Stage 7");
-#elif FFT_DEBUG_STAGE > 7
-                // Do nothing, we are doing all ops and not debugging.
-#else
-                MyTestPrintAndExit("FFT_DEBUG_STAGE not recognized " + std::to_string(FFT_DEBUG_STAGE));
-#endif
+                debug_partial_fft<FFT_DEBUG_STAGE, Rank>(FT_input, fwd_dims_in, fwd_dims_out, inv_dims_in, inv_dims_out);
             }
             else {
                 // the output is equal or > the input, so we can always copy there.
                 FT.CopyDeviceToHost(FT_output.real_values, false, false);
-
-#if FFT_DEBUG_STAGE == 0
-                PrintArray(FT_output.real_values, fwd_dims_in.x, fwd_dims_in.y, fwd_dims_in.z, fwd_dims_in.w);
-                MyTestPrintAndExit(" Stage 0");
-#elif FFT_DEBUG_STAGE == 1
-                if ( Rank == 2 )
-                    // Transformed X transposed XY
-                    PrintArray(FT_output.complex_values, fwd_dims_in.y, fwd_dims_out.w, fwd_dims_in.z);
-                else
-                    // Transformed X transposed XZ
-                    PrintArray(FT_output.complex_values, fwd_dims_in.z, fwd_dims_in.y, fwd_dims_out.w);
-                MyTestPrintAndExit(" Stage 1");
-#elif FFT_DEBUG_STAGE == 2
-                if ( Rank == 2 )
-                    // Noop, Transformed X transposed XY
-                    PrintArray(FT_output.complex_values, fwd_dims_in.y, fwd_dims_out.w, fwd_dims_in.z);
-                else
-                    // Transformed Z, permute XYZ
-                    PrintArray(FT_output.complex_values, fwd_dims_in.y, fwd_dims_out.w, fwd_dims_out.z);
-                MyTestPrintAndExit(" Stage 2");
-#elif FFT_DEBUG_STAGE == 3
-                if ( Rank == 2 )
-                    // Transormed Y, no reordering
-                    PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.w, fwd_dims_out.z);
-                else
-                    // Transormed Y, no reordering
-                    PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.w, fwd_dims_out.z);
-                MyTestPrintAndExit(" Stage 3");
-#elif FFT_DEBUG_STAGE == 4
-                // Same for 2d/3d intra-transorm op (if specified)
-                PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.w, fwd_dims_out.z);
-                MyTestPrintAndExit(" Stage 4");
-#elif FFT_DEBUG_STAGE == 5
-                if ( Rank == 2 )
-                    // Inv Transformed Y, no transpose
-                    PrintArray(FT_output.complex_values, inv_dims_out.y, inv_dims_in.w, inv_dims_out.z);
-                else
-                    // Inv Transformed Y, swap YZ
-                    PrintArray(FT_output.complex_values, inv_dims_in.z, inv_dims_in.w, inv_dims_out.y);
-                MyTestPrintAndExit(" Stage 5");
-#elif FFT_DEBUG_STAGE == 6
-                if ( Rank == 2 )
-                    // Nothing different from debug 5 for 2d
-                    PrintArray(FT_output.complex_values, inv_dims_out.y, inv_dims_in.w, inv_dims_out.z);
-                else
-                    // Inv Transformed Z, permute XYZ
-                    PrintArray(FT_output.complex_values, inv_dims_in.w, inv_dims_out.y, inv_dims_out.z);
-                MyTestPrintAndExit(" Stage 6");
-#elif FFT_DEBUG_STAGE == 7
-                if ( Rank == 2 )
-                    // Inv transformed X, no transpose
-                    PrintArray(FT_output.real_values, inv_dims_out.x, inv_dims_out.y, inv_dims_out.z, inv_dims_out.w);
-                else
-                    // Inv transformed X, no transpose
-                    PrintArray(FT_output.real_values, inv_dims_out.x, inv_dims_out.y, inv_dims_out.z, inv_dims_out.w);
-                MyTestPrintAndExit(" Stage 7");
-#elif FFT_DEBUG_STAGE > 7
-                // Do nothing, we are doing all ops and not debugging.
-#else
-                MyTestPrintAndExit("FFT_DEBUG_STAGE not recognized " + std::to_string(FFT_DEBUG_STAGE));
-#endif
+                debug_partial_fft<FFT_DEBUG_STAGE, Rank>(FT_output, fwd_dims_in, fwd_dims_out, inv_dims_in, inv_dims_out);
             }
 
-            test_passed = true;
             if ( is_size_change_decrease ) {
                 Check_impulse_real_image(FT_input);
 
@@ -1110,40 +1097,41 @@ void compare_libraries(std::vector<int> size, bool do_3d, SizeChangeType::Enum s
             ////////////////////////////////////////
             //////////////////////////////////////////
 
-#if FFT_DEBUG_STAGE == 0
+            // I think this is garbage that the clang-format bug inserted
+            // #if FFT_DEBUG_STAGE == 0
 
-            PrintArray(FT_output.real_values, fwd_dims_in.x, fwd_dims_in.y, fwd_dims_in.z, fwd_dims_in.w);
+            //             PrintArray(FT_output.real_values, fwd_dims_in.x, fwd_dims_in.y, fwd_dims_in.z, fwd_dims_in.w);
+            //             MyTestPrintAndExit("stage 0 ");
+            // #elif FFT_DEBUG_STAGE == 1
+            //             // If we are doing a fwd increase, the data will have only been expanded along the (transposed) X dimension at this point
+            //             // So the (apparent) X is dims_in.y not output_size.y
+            //             // decrease is currently just tested on the output. Really, to simplify there should be 3 different functions, fwd_none_inv_decrease (current decrease), fwd_decrease_inc_decrease (not yet) fwd_increase_inv_none
+            //             if ( is_size_change_decrease ) {
+            //                 MyTestPrintAndExit("stage 1 decrease");
+            //                 PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.z, fwd_dims_out.w);
+            //             }
+            //             else {
+            //                 MyTestPrintAndExit("stage 1 increase");
+            //                 PrintArray(FT_output.complex_values, fwd_dims_in.y, fwd_dims_in.z, fwd_dims_out.w);
+            //             }
 
-            MyTestPrintAndExit("stage 0 ");
-#elif FFT_DEBUG_STAGE == 1
-            // If we are doing a fwd increase, the data will have only been expanded along the (transposed) X dimension at this point
-            // So the (apparent) X is dims_in.y not output_size.y
-            // decrease is currently just tested on the output. Really, to simplify there should be 3 different functions, fwd_none_inv_decrease (current decrease), fwd_decrease_inc_decrease (not yet) fwd_increase_inv_none
-            if ( is_size_change_decrease ) {
-                MyTestPrintAndExit("stage 1 decrease");
-                PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.z, fwd_dims_out.w);
-            }
-            else {
-                MyTestPrintAndExit("stage 1 increase");
-                PrintArray(FT_output.complex_values, fwd_dims_in.y, fwd_dims_in.z, fwd_dims_out.w);
-            }
+            // #elif FFT_DEBUG_STAGE == 2
+            //             // Now the array is fully expanded to output_size, but still transposed
+            //             PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.z, fwd_dims_out.w);
+            //             MyTestPrintAndExit("stage 2 ");
 
-#elif FFT_DEBUG_STAGE == 2
-            // Now the array is fully expanded to output_size, but still transposed
-            PrintArray(FT_output.complex_values, fwd_dims_out.y, fwd_dims_out.z, fwd_dims_out.w);
-            MyTestPrintAndExit("stage 2 ");
-
-#elif FFT_DEBUG_STAGE == 3
-            PrintArray(FT_output.complex_values, inv_dims_out.y, inv_dims_out.z, inv_dims_out.w);
-            MyTestPrintAndExit("stage 3 ");
-#elif FFT_DEBUG_STAGE == 4
-            PrintArray(FT_output.real_values, inv_dims_out.x, inv_dims_out.y, inv_dims_out.z, inv_dims_out.w);
-            MyTestPrintAndExit("stage 4 ");
-#elif FFT_DEBUG_STAGE > 7
-            // This is the final stage, the data is fully expanded and transposed
-#else
-            MyTestPrintAndExit("This blah blah");
-#endif
+            // #elif FFT_DEBUG_STAGE == 3
+            //             PrintArray(FT_output.complex_values, inv_dims_out.y, inv_dims_out.z, inv_dims_out.w);
+            //             MyTestPrintAndExit("stage 3 ");
+            // #elif FFT_DEBUG_STAGE == 4
+            //             PrintArray(FT_output.real_values, inv_dims_out.x, inv_dims_out.y, inv_dims_out.z, inv_dims_out.w);
+            //             MyTestPrintAndExit("stage 4 ");
+            // #elif FFT_DEBUG_STAGE > 7
+            //             // This is the final stage, the data is fully expanded and transposed
+            // #else
+            //             MyTestPrintAndExit("This blah blah");
+            // #endif
+            // END possible garbage
 
             int n_loops;
             if ( do_3d ) {
@@ -1477,14 +1465,14 @@ int main(int argc, char** argv) {
         bool do_3d = false;
 
         // Set the SCT to no_change, increase, or decrease
-        size_change_type = SCT::no_change;
-        compare_libraries<2>(test_size, do_3d, size_change_type, false);
+        // size_change_type = SCT::no_change;
+        // compare_libraries<2>(test_size, do_3d, size_change_type, false);
         // compare_libraries<2>(test_size_rectangle, do_3d, size_change_type, true);
 
-        size_change_type = SCT::increase;
-        compare_libraries<2>(test_size, do_3d, size_change_type, false);
+        // size_change_type = SCT::increase;
+        // compare_libraries<2>(test_size, do_3d, size_change_type, false);
         // compare_libraries<2>(test_size_rectangle, do_3d, size_change_type, true);
-        exit(1);
+
         size_change_type = SCT::decrease;
         compare_libraries<2>(test_size, do_3d, size_change_type, false);
     }
@@ -1498,12 +1486,12 @@ int main(int argc, char** argv) {
         SCT  size_change_type;
         bool do_3d = true;
 
-        size_change_type = SCT::no_change;
+        // size_change_type = SCT::no_change;
         compare_libraries<3>(test_size, do_3d, size_change_type, false);
 
         // TODO: These are not yet completed.
         // size_change_type = SCT::increase;
-        // compare_libraries(test_size, do_3d, size_change_type, false);
+        // compare_libraries<3>(test_size, do_3d, size_change_type, false);
 
         // size_change_type = SCT::decrease;
         // compare_libraries(test_size, do_3d, size_change_type, false);
