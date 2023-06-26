@@ -1,5 +1,5 @@
-#include "../cpp/Image.cu"
-#include "../FastFFT.cu"
+#include "../fastfft/Image.cuh"
+#include "../../include/FastFFT.cuh"
 #include <cufft.h>
 #include <cufftXt.h>
 
@@ -12,11 +12,13 @@ enum class Enum {
 };
 }
 
+// clang-format off
 #define MyTestPrintAndExit(...)                                                                                          \
     {                                                                                                                    \
         std::cerr << __VA_ARGS__ << " From: " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; \
         exit(-1);                                                                                                        \
     }
+// clang-format on
 
 #ifndef FFT_DEBUG_LEVEL
 #error "FFT_DEBUG_LEVEL not defined"
@@ -95,7 +97,7 @@ void PrintArray_XZ(float2* array, short NX, short NY, short NZ, int line_wrappin
 };
 
 template <typename realType, typename complexType>
-void Check_impulse_real_image(Image<realType, complexType>& positive_control) {
+void Check_impulse_real_image(Image<realType, complexType>& positive_control, int input_line) {
 
     long address = 0;
     // Loop over the real values z,y,x skipping the fft padding
@@ -104,8 +106,10 @@ void Check_impulse_real_image(Image<realType, complexType>& positive_control) {
             for ( int i = 0; i < positive_control.size.x; i++ ) {
                 // Only check the address if we have too.
                 if ( positive_control.real_values[address] != 0.0f && address != 0 ) {
+                    PrintArray(positive_control.real_values, positive_control.size.x, positive_control.size.y, positive_control.size.z, positive_control.size.w);
                     std::cout << "Test failed for positive control, non-zero values found away from the origin." << std::endl;
                     std::cout << "Address: " << address << " Value: " << positive_control.real_values[address] << std::endl;
+                    std::cout << "Input line: " << input_line << std::endl;
                     MyTestPrintAndExit(" ");
                 }
                 address++;
@@ -118,15 +122,15 @@ void Check_impulse_real_image(Image<realType, complexType>& positive_control) {
 
 // For debugging the individual stages of the xforms
 template <int fft_debug_stage, int Rank, typename realType, typename complexType>
-void debug_partial_fft(Image<realType, complexType> test_image,
+bool debug_partial_fft(Image<realType, complexType> test_image,
                        short4                       fwd_dims_in,
                        short4                       fwd_dims_out,
                        short4                       inv_dims_in,
                        short4                       inv_dims_out) {
 
+    bool debug_stage_is_8 = false;
     if constexpr ( fft_debug_stage == 0 ) {
         PrintArray(test_image.real_values, fwd_dims_in.x, fwd_dims_in.y, fwd_dims_in.z, fwd_dims_in.w);
-        MyTestPrintAndExit(" Stage 0");
     }
     else if constexpr ( fft_debug_stage == 1 ) {
         if ( Rank == 2 )
@@ -135,7 +139,6 @@ void debug_partial_fft(Image<realType, complexType> test_image,
         else
             // Transformed X transposed XZ
             PrintArray(test_image.complex_values, fwd_dims_in.z, fwd_dims_in.y, fwd_dims_out.w);
-        MyTestPrintAndExit(" Stage 1");
     }
     else if constexpr ( fft_debug_stage == 2 ) {
         if ( Rank == 2 )
@@ -144,7 +147,6 @@ void debug_partial_fft(Image<realType, complexType> test_image,
         else
             // Transformed Z, permute XYZ
             PrintArray(test_image.complex_values, fwd_dims_in.y, fwd_dims_out.w, fwd_dims_out.z);
-        MyTestPrintAndExit(" Stage 2");
     }
     else if constexpr ( fft_debug_stage == 3 ) {
         if ( Rank == 2 )
@@ -153,12 +155,10 @@ void debug_partial_fft(Image<realType, complexType> test_image,
         else
             // Transormed Y, no reordering
             PrintArray(test_image.complex_values, fwd_dims_out.y, fwd_dims_out.w, fwd_dims_out.z);
-        MyTestPrintAndExit(" Stage 3");
     }
     else if constexpr ( fft_debug_stage == 4 ) {
         // Same for 2d/3d intra-transorm op (if specified)
         PrintArray(test_image.complex_values, fwd_dims_out.y, fwd_dims_out.w, fwd_dims_out.z);
-        MyTestPrintAndExit(" Stage 4");
     }
     else if constexpr ( fft_debug_stage == 5 ) {
         if ( Rank == 2 )
@@ -167,7 +167,6 @@ void debug_partial_fft(Image<realType, complexType> test_image,
         else
             // Inv Transformed Y, swap YZ
             PrintArray(test_image.complex_values, inv_dims_in.z, inv_dims_in.w, inv_dims_out.y);
-        MyTestPrintAndExit(" Stage 5");
     }
     else if constexpr ( fft_debug_stage == 6 ) {
         if ( Rank == 2 )
@@ -176,7 +175,6 @@ void debug_partial_fft(Image<realType, complexType> test_image,
         else
             // Inv Transformed Z, permute XYZ
             PrintArray(test_image.complex_values, inv_dims_in.w, inv_dims_out.y, inv_dims_out.z);
-        MyTestPrintAndExit(" Stage 6");
     }
     else if constexpr ( fft_debug_stage == 7 ) {
         if ( Rank == 2 )
@@ -185,12 +183,14 @@ void debug_partial_fft(Image<realType, complexType> test_image,
         else
             // Inv transformed X, no transpose
             PrintArray(test_image.real_values, inv_dims_out.x, inv_dims_out.y, inv_dims_out.z, inv_dims_out.w);
-        MyTestPrintAndExit(" Stage 7");
     }
-    else if constexpr ( fft_debug_stage != 8 )
+    else if constexpr ( fft_debug_stage == 8 )
+        debug_stage_is_8 = true;
+    else
         MyTestPrintAndExit("FFT_DEBUG_STAGE not recognized " + std::to_string(FFT_DEBUG_STAGE));
 
-    return;
+    std::cerr << "Debug stage " << fft_debug_stage << " passed." << std::endl;
+    return debug_stage_is_8;
 }
 
 // The Fourier transform of a constant should be a unit impulse, and on back fft, without normalization, it should be a constant * N.
@@ -263,7 +263,7 @@ bool const_image_test(std::vector<int> size, bool do_3d = false) {
         // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
         // ensures faster transfer. If false, it will be pinned for you.
         FT.SetInputPointer(host_output.real_values, false);
-        sum = ReturnSumOfReal(host_output.real_values, dims_out);
+        sum = host_output.ReturnSumOfReal(host_output.real_values, dims_out);
 
         if ( sum != long(dims_in.x) * long(dims_in.y) * long(dims_in.z) ) {
             all_passed     = false;
@@ -364,7 +364,7 @@ bool const_image_test(std::vector<int> size, bool do_3d = false) {
 #endif
 
         // Assuming the outputs are always even dimensions, padding_jump_val is always 2.
-        sum = ReturnSumOfReal(host_output.real_values, dims_out, true);
+        sum = host_output.ReturnSumOfReal(host_output.real_values, dims_out, true);
 
         if ( sum != full_sum ) {
             all_passed                  = false;
@@ -545,7 +545,7 @@ bool random_image_test(std::vector<int> size, bool do_3d = false) {
 #endif
 
         // Assuming the outputs are always even dimensions, padding_jump_val is always 2.
-        sum = ReturnSumOfReal(host_output.real_values, dims_out, true);
+        sum = host_output.ReturnSumOfReal(host_output.real_values, dims_out, true);
 
         if ( sum != full_sum ) {
             all_passed                  = false;
@@ -652,7 +652,7 @@ bool unit_impulse_test(std::vector<int> size, bool do_3d, bool do_increase_size)
             FT.SetToConstant(host_input.real_values, host_input.real_memory_allocated, 0.0f);
             FT.SetToConstant(host_output.real_values, host_output.real_memory_allocated, 0.0f);
 
-            sum = ReturnSumOfReal(host_output.real_values, dims_out);
+            sum = host_output.ReturnSumOfReal(host_output.real_values, dims_out);
             // host_input.real_values[ dims_in.y/2 * (dims_in.x+host_input.padding_jump_value) + dims_in.x/2] = 1.0f;
             // short4 wanted_center = make_short4(0,0,0,0);
             // ClipInto(host_input.real_values, host_output.real_values, dims_in ,  dims_out,  wanted_center, 0.f);
@@ -661,7 +661,7 @@ bool unit_impulse_test(std::vector<int> size, bool do_3d, bool do_increase_size)
             host_input.real_values[0]  = 1.0f;
             host_output.real_values[0] = 1.0f;
 
-            sum = ReturnSumOfReal(host_output.real_values, dims_out);
+            sum = host_output.ReturnSumOfReal(host_output.real_values, dims_out);
             if ( sum != 1 ) {
                 all_passed         = false;
                 init_passed[iSize] = false;
@@ -674,7 +674,7 @@ bool unit_impulse_test(std::vector<int> size, bool do_3d, bool do_increase_size)
 
             host_output.FwdFFT( );
 
-            host_output.fftw_epsilon = ReturnSumOfComplexAmplitudes(host_output.complex_values, host_output.real_memory_allocated / 2);
+            host_output.fftw_epsilon = host_output.ReturnSumOfComplexAmplitudes(host_output.complex_values, host_output.real_memory_allocated / 2);
             // std::cout << "host " << host_output.fftw_epsilon << " " << host_output.real_memory_allocated<< std::endl;
 
             host_output.fftw_epsilon -= (host_output.real_memory_allocated / 2);
@@ -720,7 +720,7 @@ bool unit_impulse_test(std::vector<int> size, bool do_3d, bool do_increase_size)
                 PrintArray(host_output.complex_values, dims_out.y, dims_out.z, dims_out.w);
                 MyTestPrintAndExit("stage 3 ");
 #endif
-                sum = ReturnSumOfComplexAmplitudes(host_output.complex_values, host_output.real_memory_allocated / 2);
+                sum = host_output.ReturnSumOfComplexAmplitudes(host_output.complex_values, host_output.real_memory_allocated / 2);
             }
             else {
                 FT.CopyDeviceToHost(false, false, FT.ReturnInputMemorySize( ));
@@ -742,7 +742,7 @@ bool unit_impulse_test(std::vector<int> size, bool do_3d, bool do_increase_size)
                 PrintArray(host_input.complex_values, dims_out.y, dims_out.z, dims_out.w);
                 MyTestPrintAndExit("stage 3 ");
 #endif
-                sum = ReturnSumOfComplexAmplitudes(host_input.complex_values, host_input.real_memory_allocated / 2);
+                sum = host_input.ReturnSumOfComplexAmplitudes(host_input.complex_values, host_input.real_memory_allocated / 2);
             }
 
             sum -= (host_output.real_memory_allocated / 2);
@@ -777,7 +777,7 @@ bool unit_impulse_test(std::vector<int> size, bool do_3d, bool do_increase_size)
             MyTestPrintAndExit(" This block is only valid for FFT_DEBUG_STAGE == 3 || 4 ");
 #endif
 
-            sum = ReturnSumOfReal(host_output.real_values, dims_out);
+            sum = host_output.ReturnSumOfReal(host_output.real_values, dims_out);
             if ( sum != dims_out.x * dims_out.y * dims_out.z ) {
                 all_passed                      = false;
                 FastFFT_roundTrip_passed[iSize] = false;
@@ -1009,7 +1009,7 @@ void compare_libraries(std::vector<int> size, bool do_3d, SizeChangeType::Enum s
                 positive_control.MultiplyConjugateImage(target_search_image.complex_values);
             positive_control.InvFFT( );
 
-            Check_impulse_real_image(positive_control);
+            Check_impulse_real_image(positive_control, __LINE__);
 
             if ( positive_control.real_values[0] == positive_control.size.x * positive_control.size.y * positive_control.size.z * testVal_1 * testVal_2 ) {
                 if ( print_out_time ) {
@@ -1059,16 +1059,18 @@ void compare_libraries(std::vector<int> size, bool do_3d, SizeChangeType::Enum s
                 // Because the output is smaller than the input, we just copy to FT input.
                 // FIXME: In reality, we didn't need to allocate FT_output at all in this case
                 FT.CopyDeviceToHost(false, false);
-                debug_partial_fft<FFT_DEBUG_STAGE, Rank>(FT_input, fwd_dims_in, fwd_dims_out, inv_dims_in, inv_dims_out);
+                bool res = debug_partial_fft<FFT_DEBUG_STAGE, Rank>(FT_input, fwd_dims_in, fwd_dims_out, inv_dims_in, inv_dims_out);
+                MyFFTRunTimeAssertTrue(res, " decrease");
             }
             else {
                 // the output is equal or > the input, so we can always copy there.
                 FT.CopyDeviceToHost(FT_output.real_values, false, false);
-                debug_partial_fft<FFT_DEBUG_STAGE, Rank>(FT_output, fwd_dims_in, fwd_dims_out, inv_dims_in, inv_dims_out);
+                bool res = debug_partial_fft<FFT_DEBUG_STAGE, Rank>(FT_output, fwd_dims_in, fwd_dims_out, inv_dims_in, inv_dims_out);
+                MyFFTRunTimeAssertTrue(res, " none/increase");
             }
 
             if ( is_size_change_decrease ) {
-                Check_impulse_real_image(FT_input);
+                Check_impulse_real_image(FT_input, __LINE__);
 
                 if ( FT_input.real_values[0] == FT_input.size.x * FT_input.size.y * FT_input.size.z * testVal_1 * testVal_2 ) {
                     if ( print_out_time )
@@ -1081,7 +1083,7 @@ void compare_libraries(std::vector<int> size, bool do_3d, SizeChangeType::Enum s
                 }
             }
             else {
-                Check_impulse_real_image(FT_output);
+                Check_impulse_real_image(FT_output, __LINE__);
 
                 if ( FT_output.real_values[0] == FT_output.size.x * FT_output.size.y * FT_output.size.z * testVal_1 * testVal_2 ) {
                     if ( print_out_time ) {
@@ -1465,12 +1467,12 @@ int main(int argc, char** argv) {
         bool do_3d = false;
 
         // Set the SCT to no_change, increase, or decrease
-        // size_change_type = SCT::no_change;
-        // compare_libraries<2>(test_size, do_3d, size_change_type, false);
+        size_change_type = SCT::no_change;
+        compare_libraries<2>(test_size, do_3d, size_change_type, false);
         // compare_libraries<2>(test_size_rectangle, do_3d, size_change_type, true);
 
-        // size_change_type = SCT::increase;
-        // compare_libraries<2>(test_size, do_3d, size_change_type, false);
+        size_change_type = SCT::increase;
+        compare_libraries<2>(test_size, do_3d, size_change_type, false);
         // compare_libraries<2>(test_size_rectangle, do_3d, size_change_type, true);
 
         size_change_type = SCT::decrease;

@@ -69,10 +69,6 @@ debug_stage=${FFT_DEBUG_STAGE}
 $(info $$debug_stage is  [${FFT_DEBUG_STAGE}])
 endif
 
-ifneq (${HEAVYERRORCHECKING_FFT},)
-NVCC_FLAGS+=-DHEAVYERRORCHECKING_FFT
-endif
-
 # Track what the last build did so that the pre-commit hook can skip re-building if there is no debug included.
 remove_debug_file=0
 ifeq (${debug_stage}, 8) 
@@ -82,7 +78,9 @@ ifeq (${debug_stage}, 8)
 else
 	remove_debug_file=1
 ifeq (${HEAVYERRORCHECKING_FFT},)
-# If HEAVYERRORCHECKING_FFT is not already asked for, then add it anytime debug_stage < 8 (partial FFTs)
+# Generally we want this to be enabled for anytime debug_stage < 8 (partial FFTs) for actual debugging
+# Sometimes, the synchronizations in HEAVYERRORCHECKING_FFT will hide problems that we need to isolate to a
+# particular debug stage. In that case, pre-define, for example HEAVYERRORCHECKING_FFT=-1 or anything really
 	NVCC_FLAGS+=-DHEAVYERRORCHECKING_FFT
 endif
 endif
@@ -97,15 +95,18 @@ SRC_DIR  := ../src
 
 #TEST_SRCS=$(shell find $(SRC_DIR)/tests -name '*.cu' -or -name '*.cpp')
 # Because I am linking test.cu.cpp -> test.cu as a cheap trick to get auto formatting in vs code, we can't include cpp in the src list
+LIBRARY_SRCS=$(shell find $(SRC_DIR)/fastfft -name '*.cu' -or -name '*.cpp')
 TEST_SRCS=$(shell find $(SRC_DIR)/tests -name '*.cu')
 EXAMPLE_SRCS=$(shell find $(SRC_DIR)/cpp -name '*.cu' -or -name '*.cpp')
 BENCHMARK_SRCS=$(shell find $(SRC_DIR)/benchmarks -name '*.cu' -or -name '*.cpp')
+
 
 
 TEST_TARGETS=$(patsubst $(SRC_DIR)/tests/%.cu,$(TESTS_BUILD_DIR)/%,$(TEST_SRCS))
 EXAMPLE_TARGETS=$(patsubst %.cpp,%,$(EXAMPLE_SRCS))
 BENCHMARK_TARGETS=$(patsubst %.cu,%,$(BENCHMARK_SRCS))
 
+LIBRARY_OBJS=$(patsubst %.cu,%.o,$(LIBRARY_SRCS))
 TEST_OBJS=$(patsubst %,%.o,$(TEST_TARGETS))
 EXAMPLE_OBJS=$(patsubst %,%.o,$(EXAMPLE_TARGETS))
 BENCHMARK_OBJS=$(patsubst %,%.o,$(BENCHMARK_TARGETS))
@@ -114,21 +115,47 @@ printit:
 	echo This is $(TEST_SRCS)
 	echo $(TEST_TARGETS)
 	echo $(TEST_OBJS)
+	echo lib SRCS $(LIBRARY_SRCS)
+	echo lib TARGETS $(LIBRARY_TARGET)
+	echo lib OBJECTS $(LIBRARY_OBJS)
 
 
-all: $(TEST_TARGETS)
+all: libFastFFT.a $(TEST_TARGETS)
+#
 ifeq (${remove_debug_file}, 0)
 	touch built_without_debug.txt
 else
 	rm -f built_without_debug.txt
 endif
 
-$(TEST_TARGETS): $(TEST_OBJS)
-	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -o $@ $< -lfftw3f -lcufft_static -lculibos -lcudart_static -lrt
+# External libraries used for testing
+EXTERNAL_LIBS= -lfftw3f -lcufft_static -lculibos -lcudart_static -lrt
+
+$(TEST_TARGETS): $(TEST_OBJS) 
+	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -L/scratch/salina/git/FastFFT/build -o $@ $< -lFastFFT $(EXTERNAL_LIBS)
 
 $(TEST_OBJS): $(TEST_SRCS)
 	mkdir -p $(TESTS_BUILD_DIR)
 	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DFFT_DEBUG_STAGE=${debug_stage} -o $@ $<
+
+
+# Build the core lib needed for the examples and benchmarks
+# This isn't strictly necessary if you are compiling everything on your own, however, it will speed up testing if you are using the pre-built libraries.
+
+libFastFFT.a: libFastFFT.o
+	$(NVCC) --lib --output-file libFastFFT.a $(LIBRARY_OBJS) libFastFFT.o
+# Link the core lib together
+
+libFastFFT.o: $(LIBRARY_OBJS)
+	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DFFT_DEBUG_STAGE=${debug_stage} --device-link -o libFastFFT.o ../src/fastfft/Image.o ../src/fastfft/FastFFT.o $(EXTERNAL_LIBS)
+	
+#$(EXTERNAL_LIBS) 
+
+$(LIBRARY_OBJS):$(LIBRARY_SRCS)
+	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DFFT_DEBUG_STAGE=${debug_stage} -o ../src/fastfft/Image.o ../src/fastfft/Image.cu
+	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DFFT_DEBUG_STAGE=${debug_stage} -o ../src/fastfft/FastFFT.o ../src/fastfft/FastFFT.cu
+
+
 
 # .PHONY: all examples tests benchmarks clean
 
@@ -169,17 +196,17 @@ $(TEST_OBJS): $(TEST_SRCS)
 # 	$(NVCC) -o $@ $< $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) $(NVRTC_DEFINES) -lnvrtc -lcuda
 
 
-# remove all but the executables.
-clean:
-	rm -f $(TESTS_BUILD_DIR)/*.*
-	rm -f $(TEST_TARGETS)
+# # remove all but the executables.
+# clean:
+# 	rm -f $(TESTS_BUILD_DIR)/*.*
+# 	rm -f $(TEST_TARGETS)
 
 
-# clean out everything.
-clobber:
-ifneq ($(TESTS_BUILD_DIR),)
-	rm -f $(TESTS_BUILD_DIR)/*
-	rmdir $(TESTS_BUILD_DIR)
-endif
+# # clean out everything.
+# clobber:
+# ifneq ($(TESTS_BUILD_DIR),)
+# 	rm -f $(TESTS_BUILD_DIR)/*
+# 	rmdir $(TESTS_BUILD_DIR)
+# endif
 
 .DEFAULT_GOAL := all
