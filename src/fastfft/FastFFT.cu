@@ -3282,52 +3282,51 @@ void CheckSharedMemory(unsigned int& memory_requested, DeviceProps& dp) {
     // if (memory_requested > dp.max_shared_memory_per_block) { memory_requested = dp.max_shared_memory_per_block; }
 }
 
-// 2d
+using namespace FastFFT::KernelFunction;
+// my_functor, IKF_t
+
+// 2d explicit instantiations
+
 template class FourierTransformer<float, float, float, 2>;
 
-template void FourierTransformer<float, float, float>::Generic_Fwd<FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>,
-                                                                   FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>>(
-        FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>,
-        FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>);
+template void FourierTransformer<float, float, float>::Generic_Fwd<my_functor<float, 0, IKF_t::NOOP>,
+                                                                   my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,
+                                                                                                      my_functor<float, 0, IKF_t::NOOP>);
 
-template void FourierTransformer<float, float, float>::Generic_Inv<FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>,
-                                                                   FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>>(
-        FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>,
-        FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>);
+template void FourierTransformer<float, float, float>::Generic_Inv<my_functor<float, 0, IKF_t::NOOP>,
+                                                                   my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,
+                                                                                                      my_functor<float, 0, IKF_t::NOOP>);
 
 template void FourierTransformer<float, float, float>::Generic_Fwd<std::nullptr_t, std::nullptr_t>(std::nullptr_t, std::nullptr_t);
 template void FourierTransformer<float, float, float>::Generic_Inv<std::nullptr_t, std::nullptr_t>(std::nullptr_t, std::nullptr_t);
 
-template void FourierTransformer<float, float, float>::Generic_Fwd_Image_Inv<FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>,
-                                                                             FastFFT::KernelFunction::my_functor<float, 2, FastFFT::KernelFunction::IKF_t::CONJ_MUL>,
-                                                                             FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>>(
-        float2*,
-        FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>,
-        FastFFT::KernelFunction::my_functor<float, 2, FastFFT::KernelFunction::IKF_t::CONJ_MUL>,
-        FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>);
+template void FourierTransformer<float, float, float>::Generic_Fwd_Image_Inv<my_functor<float, 0, IKF_t::NOOP>,
+                                                                             my_functor<float, 2, IKF_t::CONJ_MUL>,
+                                                                             my_functor<float, 0, IKF_t::NOOP>>(float2*,
+                                                                                                                my_functor<float, 0, IKF_t::NOOP>,
+                                                                                                                my_functor<float, 2, IKF_t::CONJ_MUL>,
+                                                                                                                my_functor<float, 0, IKF_t::NOOP>);
 
-// 3d
+// 3d explicit instantiations
+
 template class FourierTransformer<float, float, float, 3>;
 
-template void FourierTransformer<float, float, float, 3>::Generic_Fwd<FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>,
-                                                                      FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>>(
-        FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>,
-        FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>);
+template void FourierTransformer<float, float, float, 3>::Generic_Fwd<my_functor<float, 0, IKF_t::NOOP>,
+                                                                      my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,
+                                                                                                         my_functor<float, 0, IKF_t::NOOP>);
 
-template void FourierTransformer<float, float, float, 3>::Generic_Inv<FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>,
-                                                                      FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>>(
-        FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>,
-        FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>);
+template void FourierTransformer<float, float, float, 3>::Generic_Inv<my_functor<float, 0, IKF_t::NOOP>,
+                                                                      my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,
+                                                                                                         my_functor<float, 0, IKF_t::NOOP>);
 
 template void FourierTransformer<float, float, float, 3>::Generic_Fwd<std::nullptr_t, std::nullptr_t>(std::nullptr_t, std::nullptr_t);
 template void FourierTransformer<float, float, float, 3>::Generic_Inv<std::nullptr_t, std::nullptr_t>(std::nullptr_t, std::nullptr_t);
 
-template void FourierTransformer<float, float, float, 3>::Generic_Fwd_Image_Inv<FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>,
-                                                                                FastFFT::KernelFunction::my_functor<float, 2, FastFFT::KernelFunction::IKF_t::CONJ_MUL>,
-                                                                                FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>>(
-        float2*,
-        FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>,
-        FastFFT::KernelFunction::my_functor<float, 2, FastFFT::KernelFunction::IKF_t::CONJ_MUL>,
-        FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::IKF_t::NOOP>);
+template void FourierTransformer<float, float, float, 3>::Generic_Fwd_Image_Inv<my_functor<float, 0, IKF_t::NOOP>,
+                                                                                my_functor<float, 2, IKF_t::CONJ_MUL>,
+                                                                                my_functor<float, 0, IKF_t::NOOP>>(float2*,
+                                                                                                                   my_functor<float, 0, IKF_t::NOOP>,
+                                                                                                                   my_functor<float, 2, IKF_t::CONJ_MUL>,
+                                                                                                                   my_functor<float, 0, IKF_t::NOOP>);
 
 } // namespace FastFFT
