@@ -93,27 +93,28 @@ BENCHMARK_BUILD_DIR := ./benchmarks
 
 LIBRARY_NAME := libFastFFT.a
 # Because I am linking test.cu.cpp -> test.cu as a cheap trick to get auto formatting in vs code, we can't include cpp in the src list
-LIBRARY_SRCS := ../src/fastfft/Image.cu ../src/fastfft/FastFFT.cu
+LIBRARY_SRCS:= ../src/fastfft/Image.cu ../src/fastfft/FastFFT.cu
 TEST_SRCS := ../src/tests/test.cu 
-
-LIBRARY_OBJS=$(LIBRARY_SRCS:%.cu=%.o)
+# LIBRARY_OBJS := ../src/fastfft/Image.o ../src/fastfft/FastFFT.o
+# LIBRARY_OBJS=$(patsubst %.cu,$(TESTS_BUILD_DIR)/%.o,$(notdir $(LIBRARY_SRCS)))
+LIBRARY_OBJS=$(patsubst %.cu,%.o,$(notdir $(LIBRARY_SRCS)))
 TEST_OBJS=$(TEST_SRCS:%.cu=%.o)
 
-TEST_TARGETS=$(TEST_SRCS:%.cu=%)
+TEST_TARGETS=$(patsubst %.cu,$(TESTS_BUILD_DIR)/%, $(notdir $(TEST_SRCS)))
 
 
 
 
 printit:
-	echo This is $(TEST_SRCS)
-	echo $(TEST_TARGETS)
-	echo $(TEST_OBJS)
-	echo lib SRCS $(LIBRARY_SRCS)
-	echo lib TARGETS $(LIBRARY_TARGET)
-	echo lib OBJECTS $(LIBRARY_OBJS)
+	@echo test SRCS $(TEST_SRCS)
+	@echo test TARGETS $(TEST_TARGETS)
+	@echo test OBJS $(TEST_OBJS)
+	@echo lib SRCS $(LIBRARY_SRCS)
+	@echo lib TARGETS $(LIBRARY_TARGET)
+	@echo lib OBJECTS $(LIBRARY_OBJS)
 
 
-all: $(LIBRARY_NAME) $(TEST_TARGETS)
+all: $(TEST_TARGETS)
 #
 ifeq (${remove_debug_file}, 0)
 	touch built_without_debug.txt
@@ -124,12 +125,12 @@ endif
 # External libraries used for testing
 EXTERNAL_LIBS= -lfftw3f -lcufft_static -lculibos -lcudart_static -lrt
 
-$(TEST_TARGETS): $(TEST_OBJS) 
-	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -L/scratch/salina/git/FastFFT/build -o $@ $< -lFastFFT $(EXTERNAL_LIBS)
+$(TEST_TARGETS): $(LIBRARY_NAME) $(TEST_OBJS) 
+	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -L/scratch/salina/git/FastFFT/build -o $@ $(TEST_OBJS) -lFastFFT $(EXTERNAL_LIBS)
 
 # TODO: examples?
 $(TEST_OBJS): $(TEST_SRCS)
-	mkdir -p $(TESTS_BUILD_DIR)
+	@mkdir -p $(TESTS_BUILD_DIR)
 	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DFFT_DEBUG_STAGE=${debug_stage} -o $@ $<
 
 
@@ -146,16 +147,16 @@ $(LIBRARY_NAME:%.a=%.o): $(LIBRARY_OBJS)
 
 # # For some reason, I was getting an expansion that resulted in Image.o being built twice, once from Image.cu and once form FastFFT.cu, which obviously failed.
 # # This is a hack to get around that. I don't know why it was happening, but it was only happening when I was building the library.
-$(LIBRARY_OBJS):
-	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DFFT_DEBUG_STAGE=${debug_stage} -o ../src/fastfft/Image.o ../src/fastfft/Image.cu
-	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DFFT_DEBUG_STAGE=${debug_stage} -o ../src/fastfft/FastFFT.o ../src/fastfft/FastFFT.cu
+$(notdir %.o): ../src/fastfft/%.cu
+	@mkdir -p $(TESTS_BUILD_DIR)
+	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DFFT_DEBUG_STAGE=${debug_stage} $< -o $@ 
 
 
 
 
 # remove all but the executables.
 clean:
-	rm -f $(TESTS_BUILD_DIR)/*.* ../src/fastfft/Image.o ../src/fastfft/FastFFT.o libFastFFT.a libFastFFT.o
+	rm -f $(TESTS_BUILD_DIR)/*.* ../src/fastfft/Image.o ../src/fastfft/FastFFT.o ../src/tests/*.o libFastFFT.a libFastFFT.o $(TEST_OBJS) $(LIBRARY_OBJS)
 	rm -f $(TEST_TARGETS)
 
 
