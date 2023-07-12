@@ -1,5 +1,7 @@
-#include "../fastfft/Image.cuh"
-#include "../../include/FastFFT.cuh"
+// #include "../fastfft/Image.cuh"
+// #include "../../include/FastFFT.cuh"
+#include "../fastfft/Image.cu"
+#include "../fastfft/FastFFT.cu"
 #include "../cpp/helper_functions.cuh"
 #include <cufft.h>
 #include <cufftXt.h>
@@ -883,43 +885,28 @@ void compare_libraries(std::vector<int> size, bool do_3d, SizeChangeType::Enum s
                 FT.InvFFT( );
             }
 
+            bool continue_debugging;
             if ( is_size_change_decrease ) {
                 // Because the output is smaller than the input, we just copy to FT input.
                 // FIXME: In reality, we didn't need to allocate FT_output at all in this case
                 FT.CopyDeviceToHost(false, false);
-                debug_partial_fft<FFT_DEBUG_STAGE, Rank>(FT_input, fwd_dims_in, fwd_dims_out, inv_dims_in, inv_dims_out, __LINE__);
+                continue_debugging = debug_partial_fft<FFT_DEBUG_STAGE, Rank>(FT_input, fwd_dims_in, fwd_dims_out, inv_dims_in, inv_dims_out, __LINE__);
             }
             else {
                 // the output is equal or > the input, so we can always copy there.
                 FT.CopyDeviceToHost(FT_output.real_values, false, false);
-                debug_partial_fft<FFT_DEBUG_STAGE, Rank>(FT_output, fwd_dims_in, fwd_dims_out, inv_dims_in, inv_dims_out, __LINE__);
+                continue_debugging = debug_partial_fft<FFT_DEBUG_STAGE, Rank>(FT_output, fwd_dims_in, fwd_dims_out, inv_dims_in, inv_dims_out, __LINE__);
+            }
+
+            if ( ! continue_debugging ) {
+                MyTestPrintAndExit(" ");
             }
 
             if ( is_size_change_decrease ) {
                 Check_impulse_real_image(FT_input, __LINE__);
-
-                if ( FT_input.real_values[0] == FT_input.size.x * FT_input.size.y * FT_input.size.z * testVal_1 * testVal_2 ) {
-                    if ( print_out_time )
-                        std::cout << "Test passed for FastFFT positive control." << std::endl;
-                }
-                else {
-                    std::cout << "Test failed for FastFFT positive control. Value at zero is  " << FT_input.real_values[0] << std::endl;
-                    std::cout << "Expected value is " << FT_input.size.x * FT_input.size.y * FT_input.size.z * testVal_1 * testVal_2 << std::endl;
-                    MyTestPrintAndExit(" ");
-                }
             }
             else {
                 Check_impulse_real_image(FT_output, __LINE__);
-
-                if ( FT_output.real_values[0] == FT_output.size.x * FT_output.size.y * FT_output.size.z * testVal_1 * testVal_2 ) {
-                    if ( print_out_time ) {
-                        std::cout << "Test passed for FastFFT positive control." << std::endl;
-                    }
-                }
-                else {
-                    std::cout << "Test failed for FastFFT positive control. Value at zero is  " << FT_output.real_values[0] << std::endl;
-                    MyTestPrintAndExit(" ");
-                }
             }
 
             ////////////////////////////////////////
@@ -1127,8 +1114,6 @@ void run_oned(std::vector<int> size) {
 
         FT_input_complex.real_memory_allocated  = FT_complex.ReturnInputMemorySize( );
         FT_output_complex.real_memory_allocated = FT_complex.ReturnInvOutputMemorySize( );
-        std::cout << "Allocated " << FT_input_complex.real_memory_allocated << " bytes for input.\n";
-        std::cout << "Allocated complex " << FT_output_complex.real_memory_allocated << " bytes for input.\n";
 
         bool set_fftw_plan = true;
         FT_input.Allocate(set_fftw_plan);
@@ -1163,10 +1148,6 @@ void run_oned(std::vector<int> size) {
 
         FT_input.FwdFFT( );
 
-        for ( int i = 0; i < 5; ++i )
-            std::cout << "FFTW fwd " << FT_input.real_values[i] << std::endl;
-        std::cout << std::endl;
-
         bool transpose_output          = false;
         bool swap_real_space_quadrants = false;
         FT.FwdFFT( );
@@ -1174,13 +1155,6 @@ void run_oned(std::vector<int> size) {
 
         FT.CopyDeviceToHost(FT_output.real_values, false, false);
         FT_complex.CopyDeviceToHost(FT_output_complex.real_values, false, false);
-
-        for ( int i = 0; i < 10; ++i ) {
-            std::cout << "FT fwd " << FT_output.real_values[i] << std::endl;
-        }
-        for ( int i = 0; i < 10; ++i ) {
-            std::cout << "FT complex fwd " << FT_output_complex.real_values[i].x << "," << FT_output_complex.real_values[i].y << std::endl;
-        }
 
         FT_input.InvFFT( );
 

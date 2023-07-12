@@ -141,12 +141,10 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetForwardFFT
     is_fftw_padded_input = is_padded_input; // Note: Must be set before ReturnPaddedMemorySize
     MyFFTRunTimeAssertTrue(is_fftw_padded_input, "Support for input arrays that are not FFTW padded needs to be implemented."); // FIXME
 
-    std::cerr << "In forward fft setup with dims " << fwd_dims_in.x << " " << fwd_dims_in.y << " " << fwd_dims_in.z << " " << fwd_dims_in.w << std::endl;
     // ReturnPaddedMemorySize also sets FFTW padding etc.
     input_memory_allocated      = ReturnPaddedMemorySize(fwd_dims_in);
     fwd_output_memory_allocated = ReturnPaddedMemorySize(fwd_dims_out); // sets .w and also increases compute_memory_allocated if needed.
 
-    std::cerr << "In forward fft setup with input_memory_allocated " << input_memory_allocated << std::endl;
     // The compute memory allocated is the max of all possible sizes.
 
     this->input_origin_type = OriginType::natural;
@@ -286,7 +284,6 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::CopyHostToDev
 
         is_in_memory_device_pointer = true;
     }
-    std::cerr << "From inside memory to copy is" << memory_size_to_copy << std::endl;
     precheck
             cudaErr(cudaMemcpyAsync(d_ptr.position_space, pinnedPtr, memory_size_to_copy * sizeof(InputType), cudaMemcpyHostToDevice, cudaStreamPerThread));
     postcheck
@@ -1086,8 +1083,7 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetDimensions
             // MyFFTDebugAssertTrue(transform_stage_completed == none, "When copying from host, the transform stage should be none, something has gone wrong.");
             // FIXME: is this the right thing to do? Maybe this should be explicitly "reset" when the input image is "refereshed."
             transform_stage_completed = none;
-            std::cerr << "input memory allocate " << input_memory_allocated << std::endl;
-            memory_size_to_copy = input_memory_allocated;
+            memory_size_to_copy       = input_memory_allocated;
             break;
         }
 

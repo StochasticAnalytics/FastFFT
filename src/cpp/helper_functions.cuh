@@ -89,9 +89,6 @@ void Check_impulse_real_image(Image<realType, complexType>& positive_control, in
                 // Only check the address if we have too.
                 if ( positive_control.real_values[address] != 0.0f && address != 0 ) {
                     PrintArray(positive_control.real_values, positive_control.size.x, positive_control.size.y, positive_control.size.z, positive_control.size.w);
-                    std::cout << "Test failed for positive control, non-zero values found away from the origin." << std::endl;
-                    std::cout << "Address: " << address << " Value: " << positive_control.real_values[address] << std::endl;
-                    std::cout << "Input line: " << input_line << std::endl;
                     MyTestPrintAndExit(" ");
                 }
                 address++;
@@ -103,13 +100,15 @@ void Check_impulse_real_image(Image<realType, complexType>& positive_control, in
 }
 
 // For debugging the individual stages of the xforms
+// Note: for some reason, passing by value altered the values while passing by reference did not. (Opposite?)
+// eg.
 template <int fft_debug_stage, int Rank, typename realType, typename complexType>
-bool debug_partial_fft(Image<realType, complexType> test_image,
-                       short4                       fwd_dims_in,
-                       short4                       fwd_dims_out,
-                       short4                       inv_dims_in,
-                       short4                       inv_dims_out,
-                       int                          input_line) {
+bool debug_partial_fft(Image<realType, complexType>& test_image,
+                       short4                        fwd_dims_in,
+                       short4                        fwd_dims_out,
+                       short4                        inv_dims_in,
+                       short4                        inv_dims_out,
+                       int                           input_line) {
 
     bool debug_stage_is_8 = false;
     if constexpr ( fft_debug_stage == 0 ) {
@@ -167,8 +166,9 @@ bool debug_partial_fft(Image<realType, complexType> test_image,
             // Inv transformed X, no transpose
             PrintArray(test_image.real_values, inv_dims_out.x, inv_dims_out.y, inv_dims_out.z, inv_dims_out.w);
     }
-    else if constexpr ( fft_debug_stage == 8 )
+    else if constexpr ( fft_debug_stage == 8 ) {
         debug_stage_is_8 = true;
+    }
     else
         MyTestPrintAndExit("FFT_DEBUG_STAGE not recognized " + std::to_string(FFT_DEBUG_STAGE));
 
