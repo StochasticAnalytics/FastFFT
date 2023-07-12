@@ -41,8 +41,6 @@ CUDA_BIN_DIR=$(shell dirname `which $(NVCC)`)
 CUDA_INCLUDE_DIR=$(CUDA_BIN_DIR)/../include
 
 
-SRCS=test.cu
-TARGETS=test
 
 # Debug level determines various asserts and print macros defined in FastFFT.cuh These should only be set when building tests and developing.
 ifeq (${FFT_DEBUG_LEVEL},)
@@ -83,36 +81,19 @@ ifeq (${HEAVYERRORCHECKING_FFT},)
 endif
 endif
 
-
+LIB_DIR=../src/fastfft
+TEST_DIR=../src/tests
 # Assuming make is being run from build
 TESTS_BUILD_DIR := ./tests
-EXAMPLE_BUILD_DIR := ./examples
+LIB_BUILD_DIR := ./lib
 BENCHMARK_BUILD_DIR := ./benchmarks
 
-LIBRARY_NAME := libFastFFT.a
-# Because I am linking test.cu.cpp -> test.cu as a cheap trick to get auto formatting in vs code, we can't include cpp in the src list
-LIBRARY_SRCS:= ../src/fastfft/Image.cu ../src/fastfft/FastFFT.cu
-TEST_SRCS := ../src/tests/test.cu 
-# LIBRARY_OBJS := ../src/fastfft/Image.o ../src/fastfft/FastFFT.o
-# LIBRARY_OBJS=$(patsubst %.cu,$(TESTS_BUILD_DIR)/%.o,$(notdir $(LIBRARY_SRCS)))
+LIBRARY_BASE_NAME := libFastFFT
+
+
 LIBRARY_OBJS=$(patsubst %.cu,$(TESTS_BUILD_DIR)/%.o,$(notdir $(LIBRARY_SRCS)))
-TEST_OBJS=$(patsubst %.cu,$(TESTS_BUILD_DIR)/%.o,$(notdir $(TEST_SRCS)))
-
-TEST_TARGETS=$(patsubst %.cu,$(TESTS_BUILD_DIR)/%, $(notdir $(TEST_SRCS)))
-
-
-
-
-printit:
-	@echo test SRCS $(TEST_SRCS)
-	@echo test TARGETS $(TEST_TARGETS)
-	@echo test OBJS $(TEST_OBJS)
-	@echo lib SRCS $(LIBRARY_SRCS)
-	@echo lib TARGETS $(LIBRARY_TARGET)
-	@echo lib OBJECTS $(LIBRARY_OBJS)
-
-
-all: $(TEST_TARGETS)
+TARGETS=tests/test1
+all: tests/test1
 ifeq (${remove_debug_file}, 0)
 	touch built_without_debug.txt
 else
@@ -122,38 +103,46 @@ endif
 # External libraries used for testing
 EXTERNAL_LIBS= -lfftw3f -lcufft_static -lculibos -lcudart_static -lrt
 
-$(TEST_TARGETS): $(LIBRARY_NAME) $(TEST_OBJS) 
-	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -L/scratch/salina/git/FastFFT/build -o $@ $(TEST_OBJS) -lFastFFT $(EXTERNAL_LIBS)
+# tests/test1: tests/test.o lib/libFastFFT.a
+# 	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -L/scratch/salina/git/FastFFT/build -o $@ $^ -lFastFFT $(EXTERNAL_LIBS)
+
+tests/test1: tests/linkedTest.o tests/test.o lib/FastFFT.o lib/Image.o 
+	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DFFT_DEBUG_STAGE=${debug_stage} -o $@ $^ $(EXTERNAL_LIBS)
+
+tests/linkedTest.o: tests/test.o lib/FastFFT.o lib/Image.o 
+	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DFFT_DEBUG_STAGE=${debug_stage} --device-link -o $@ $^ 
 
 # TODO: examples?
-$(TEST_OBJS): $(TEST_SRCS)
+tests/test.o: ../src/tests/test.cu
 	@mkdir -p $(TESTS_BUILD_DIR)
 	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DFFT_DEBUG_STAGE=${debug_stage} -o $@ $<
 
 
-# Make a static archive
-$(LIBRARY_NAME): $(LIBRARY_NAME:%.a=%.o)
-	$(NVCC) $(NVCC_FLAGS) --lib --output-file libFastFFT.a $(LIBRARY_OBJS) libFastFFT.o
+# # Make a static archive
+# lib/libFastFFT.a: lib/FastFFT.o lib/Image.o lib/libFastFFT.o
+# 	$(NVCC) $(NVCC_FLAGS) --lib --output-file $@ $^ $(EXTERNAL_LIBS)
 
-# Link the core lib together.
-# It is debatable whether the helper image class should really be in here as it is really just needed for testing and examples. I can imagine if 
-# someone had the static lib distribution and wanted to test a simple app without compiling everything, they might want it in there?
-$(LIBRARY_NAME:%.a=%.o): $(LIBRARY_OBJS)
-	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DFFT_DEBUG_STAGE=${debug_stage} --device-link -o $@ $(LIBRARY_OBJS) $(EXTERNAL_LIBS)
+# # Link the core lib together.
+# # It is debatable whether the helper image class should really be in here as it is really just needed for testing and examples. I can imagine if 
+# # someone had the static lib distribution and wanted to test a simple app without compiling everything, they might want it in there?
+# lib/libFastFFT.o: ../src/fastfft/FastFFT.o ../src/fastfft/Image.o
+# 	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DFFT_DEBUG_STAGE=${debug_stage} --device-link -o $@ $^ $(EXTERNAL_LIBS)
 	
 
 # # For some reason, I was getting an expansion that resulted in Image.o being built twice, once from Image.cu and once form FastFFT.cu, which obviously failed.
 # # This is a hack to get around that. I don't know why it was happening, but it was only happening when I was building the library.
-$(TESTS_BUILD_DIR)/$(notdir %.o): ../src/fastfft/%.cu
-	@mkdir -p $(TESTS_BUILD_DIR)
-	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DFFT_DEBUG_STAGE=${debug_stage} $< -o $@ 
+lib/FastFFT.o: ../src/fastfft/FastFFT.cu
+	@mkdir -p $(LIB_BUILD_DIR)
+	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DFFT_DEBUG_STAGE=${debug_stage} -o $@ $<  
 
-
+lib/Image.o: ../src/fastfft/Image.cu
+	@mkdir -p $(LIB_BUILD_DIR)
+	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DFFT_DEBUG_STAGE=${debug_stage} -o $@ $<  
 
 
 # remove all but the executables.
 clean:
-	rm -f $(TESTS_BUILD_DIR)/*.* 
+	rm -f tests/*.o lib/*.o *.a *.o
 	rm -f $(TEST_TARGETS)
 
 
