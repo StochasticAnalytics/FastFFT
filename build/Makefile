@@ -78,9 +78,7 @@ ifeq (${debug_stage}, 8)
 else
 	remove_debug_file=1
 ifeq (${HEAVYERRORCHECKING_FFT},)
-# Generally we want this to be enabled for anytime debug_stage < 8 (partial FFTs) for actual debugging
-# Sometimes, the synchronizations in HEAVYERRORCHECKING_FFT will hide problems that we need to isolate to a
-# particular debug stage. In that case, pre-define, for example HEAVYERRORCHECKING_FFT=-1 or anything really
+# If HEAVYERRORCHECKING_FFT is not already asked for, then add it anytime debug_stage < 8 (partial FFTs)
 	NVCC_FLAGS+=-DHEAVYERRORCHECKING_FFT
 endif
 endif
@@ -91,19 +89,22 @@ TESTS_BUILD_DIR := ./tests
 EXAMPLE_BUILD_DIR := ./examples
 BENCHMARK_BUILD_DIR := ./benchmarks
 
-LIBRARY_NAME := libFastFFT.a
+SRC_DIR  := ../src
+
+#TEST_SRCS=$(shell find $(SRC_DIR)/tests -name '*.cu' -or -name '*.cpp')
 # Because I am linking test.cu.cpp -> test.cu as a cheap trick to get auto formatting in vs code, we can't include cpp in the src list
-LIBRARY_SRCS:= ../src/fastfft/Image.cu ../src/fastfft/FastFFT.cu
-TEST_SRCS := ../src/tests/test.cu 
-# LIBRARY_OBJS := ../src/fastfft/Image.o ../src/fastfft/FastFFT.o
-# LIBRARY_OBJS=$(patsubst %.cu,$(TESTS_BUILD_DIR)/%.o,$(notdir $(LIBRARY_SRCS)))
-LIBRARY_OBJS=$(patsubst %.cu,%.o,$(notdir $(LIBRARY_SRCS)))
-TEST_OBJS=$(TEST_SRCS:%.cu=%.o)
-
-TEST_TARGETS=$(patsubst %.cu,$(TESTS_BUILD_DIR)/%, $(notdir $(TEST_SRCS)))
+TEST_SRCS=$(shell find $(SRC_DIR)/tests -name '*.cu')
+EXAMPLE_SRCS=$(shell find $(SRC_DIR)/cpp -name '*.cu' -or -name '*.cpp')
+BENCHMARK_SRCS=$(shell find $(SRC_DIR)/benchmarks -name '*.cu' -or -name '*.cpp')
 
 
+TEST_TARGETS=$(patsubst $(SRC_DIR)/tests/%.cu,$(TESTS_BUILD_DIR)/%,$(TEST_SRCS))
+EXAMPLE_TARGETS=$(patsubst %.cpp,%,$(EXAMPLE_SRCS))
+BENCHMARK_TARGETS=$(patsubst %.cu,%,$(BENCHMARK_SRCS))
 
+TEST_OBJS=$(patsubst %,%.o,$(TEST_TARGETS))
+EXAMPLE_OBJS=$(patsubst %,%.o,$(EXAMPLE_TARGETS))
+BENCHMARK_OBJS=$(patsubst %,%.o,$(BENCHMARK_TARGETS))
 
 printit:
 	@echo test SRCS $(TEST_SRCS)
@@ -115,48 +116,61 @@ printit:
 
 
 all: $(TEST_TARGETS)
-#
 ifeq (${remove_debug_file}, 0)
 	touch built_without_debug.txt
 else
 	rm -f built_without_debug.txt
 endif
 
-# External libraries used for testing
-EXTERNAL_LIBS= -lfftw3f -lcufft_static -lculibos -lcudart_static -lrt
+$(TEST_TARGETS): $(TEST_OBJS)
+	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -o $@ $< -lfftw3f -lcufft_static -lculibos -lcudart_static -lrt
 
-$(TEST_TARGETS): $(LIBRARY_NAME) $(TEST_OBJS) 
-	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -L/scratch/salina/git/FastFFT/build -o $@ $(TEST_OBJS) -lFastFFT $(EXTERNAL_LIBS)
-
-# TODO: examples?
 $(TEST_OBJS): $(TEST_SRCS)
-	@mkdir -p $(TESTS_BUILD_DIR)
+	mkdir -p $(TESTS_BUILD_DIR)
 	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DFFT_DEBUG_STAGE=${debug_stage} -o $@ $<
 
+# .PHONY: all examples tests benchmarks clean
 
-# Make a static archive
-$(LIBRARY_NAME): $(LIBRARY_NAME:%.a=%.o)
-	$(NVCC) --lib --output-file libFastFFT.a $(LIBRARY_OBJS) libFastFFT.o
+# all: build
 
-# Link the core lib together.
-# It is debatable whether the helper image class should really be in here as it is really just needed for testing and examples. I can imagine if 
-# someone had the static lib distribution and wanted to test a simple app without compiling everything, they might want it in there?
-$(LIBRARY_NAME:%.a=%.o): $(LIBRARY_OBJS)
-	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DFFT_DEBUG_STAGE=${debug_stage} --device-link -o $@ $< $(EXTERNAL_LIBS)
-	
+# build: simpleCUFFT_callback
 
-# # For some reason, I was getting an expansion that resulted in Image.o being built twice, once from Image.cu and once form FastFFT.cu, which obviously failed.
-# # This is a hack to get around that. I don't know why it was happening, but it was only happening when I was building the library.
-$(notdir %.o): ../src/fastfft/%.cu
-	@mkdir -p $(TESTS_BUILD_DIR)
-	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DFFT_DEBUG_STAGE=${debug_stage} $< -o $@ 
+# check.deps:
+# ifeq ($(SAMPLE_ENABLED),0)
+# 	@echo "Sample will be waived due to the above missing dependencies"
+# else
+# 	@echo "Sample is ready - all dependencies have been met"
+# endif
+
+# simpleCUFFT_callback.o:simpleCUFFT_callback.cu
+# 	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
+
+# simpleCUFFT_callback: simpleCUFFT_callback.o
+# 	$(EXEC) $(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
+# 	$(EXEC) mkdir -p ../../bin/$(TARGET_ARCH)/$(TARGET_OS)/$(BUILD_TYPE)
+# 	$(EXEC) cp $@ ../../bin/$(TARGET_ARCH)/$(TARGET_OS)/$(BUILD_TYPE)
+
+# all:
+# 	$(NVCC) -dc $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DDEBUG_FFT_STAGE=${debug_stage} -o test.o -c ../cpp/test.cu
+# 	$(NVCC) $(NVCC_FLAGS) -o test.app test.o -lfftw3f -lcufft_static -lculibos -lcudart_static -lrt
 
 
+# SRCS=$(filter-out nvrtc_*.cu, $(wildcard *.cu))
+# TARGETS=$(patsubst %.cu,%,$(SRCS))
+
+# NVRTC_SRCS=$(wildcard nvrtc_*.cu)
+# NVRTC_TARGETS=$(patsubst %.cu,%,$(NVRTC_SRCS))
+
+# $(TARGETS): %: %.cu
+# 	$(NVCC) -o $@ $< $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR)
+
+# $(NVRTC_TARGETS): %: %.cu
+# 	$(NVCC) -o $@ $< $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) $(NVRTC_DEFINES) -lnvrtc -lcuda
 
 
 # remove all but the executables.
 clean:
-	rm -f $(TESTS_BUILD_DIR)/*.* ../src/fastfft/Image.o ../src/fastfft/FastFFT.o ../src/tests/*.o libFastFFT.a libFastFFT.o $(TEST_OBJS) $(LIBRARY_OBJS)
+	rm -f $(TESTS_BUILD_DIR)/*.*
 	rm -f $(TEST_TARGETS)
 
 
