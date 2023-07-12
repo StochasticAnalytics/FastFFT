@@ -1,7 +1,5 @@
-// #include "../fastfft/Image.cuh"
-// #include "../../include/FastFFT.cuh"
-#include "../fastfft/Image.cu"
-#include "../fastfft/FastFFT.cu"
+#include "../fastfft/Image.cuh"
+#include "../../include/FastFFT.cuh"
 #include "../cpp/helper_functions.cuh"
 #include <cufft.h>
 #include <cufftXt.h>

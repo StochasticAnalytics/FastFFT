@@ -33,7 +33,7 @@ endif
 endif # GENCODE_FLAGS
 
 # FIXME: this is set in my own bashrc. Until cufftdx comes out of early release, this is fine.
-CUFFTDX_INCLUDE_DIR := $(FastFFT_cufftdx_dir)/include
+CUFFTDX_INCLUDE_DIR := ../include
 $(info $$CUFFTDX_INCLUDE_DIR is [${CUFFTDX_INCLUDE_DIR}])
 
 # TODO: check on cuda version (building with 11.3.1 r/n)
@@ -89,22 +89,19 @@ TESTS_BUILD_DIR := ./tests
 EXAMPLE_BUILD_DIR := ./examples
 BENCHMARK_BUILD_DIR := ./benchmarks
 
-SRC_DIR  := ../src
-
-#TEST_SRCS=$(shell find $(SRC_DIR)/tests -name '*.cu' -or -name '*.cpp')
+LIBRARY_NAME := libFastFFT.a
 # Because I am linking test.cu.cpp -> test.cu as a cheap trick to get auto formatting in vs code, we can't include cpp in the src list
-TEST_SRCS=$(shell find $(SRC_DIR)/tests -name '*.cu')
-EXAMPLE_SRCS=$(shell find $(SRC_DIR)/cpp -name '*.cu' -or -name '*.cpp')
-BENCHMARK_SRCS=$(shell find $(SRC_DIR)/benchmarks -name '*.cu' -or -name '*.cpp')
+LIBRARY_SRCS:= ../src/fastfft/Image.cu ../src/fastfft/FastFFT.cu
+TEST_SRCS := ../src/tests/test.cu 
+# LIBRARY_OBJS := ../src/fastfft/Image.o ../src/fastfft/FastFFT.o
+# LIBRARY_OBJS=$(patsubst %.cu,$(TESTS_BUILD_DIR)/%.o,$(notdir $(LIBRARY_SRCS)))
+LIBRARY_OBJS=$(patsubst %.cu,$(TESTS_BUILD_DIR)/%.o,$(notdir $(LIBRARY_SRCS)))
+TEST_OBJS=$(patsubst %.cu,$(TESTS_BUILD_DIR)/%.o,$(notdir $(TEST_SRCS)))
+
+TEST_TARGETS=$(patsubst %.cu,$(TESTS_BUILD_DIR)/%, $(notdir $(TEST_SRCS)))
 
 
-TEST_TARGETS=$(patsubst $(SRC_DIR)/tests/%.cu,$(TESTS_BUILD_DIR)/%,$(TEST_SRCS))
-EXAMPLE_TARGETS=$(patsubst %.cpp,%,$(EXAMPLE_SRCS))
-BENCHMARK_TARGETS=$(patsubst %.cu,%,$(BENCHMARK_SRCS))
 
-TEST_OBJS=$(patsubst %,%.o,$(TEST_TARGETS))
-EXAMPLE_OBJS=$(patsubst %,%.o,$(EXAMPLE_TARGETS))
-BENCHMARK_OBJS=$(patsubst %,%.o,$(BENCHMARK_TARGETS))
 
 printit:
 	@echo test SRCS $(TEST_SRCS)
@@ -122,55 +119,41 @@ else
 	rm -f built_without_debug.txt
 endif
 
-$(TEST_TARGETS): $(TEST_OBJS)
-	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -o $@ $< -lfftw3f -lcufft_static -lculibos -lcudart_static -lrt
+# External libraries used for testing
+EXTERNAL_LIBS= -lfftw3f -lcufft_static -lculibos -lcudart_static -lrt
 
+$(TEST_TARGETS): $(LIBRARY_NAME) $(TEST_OBJS) 
+	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -L/scratch/salina/git/FastFFT/build -o $@ $(TEST_OBJS) -lFastFFT $(EXTERNAL_LIBS)
+
+# TODO: examples?
 $(TEST_OBJS): $(TEST_SRCS)
-	mkdir -p $(TESTS_BUILD_DIR)
+	@mkdir -p $(TESTS_BUILD_DIR)
 	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DFFT_DEBUG_STAGE=${debug_stage} -o $@ $<
 
-# .PHONY: all examples tests benchmarks clean
 
-# all: build
+# Make a static archive
+$(LIBRARY_NAME): $(LIBRARY_NAME:%.a=%.o)
+	$(NVCC) $(NVCC_FLAGS) --lib --output-file libFastFFT.a $(LIBRARY_OBJS) libFastFFT.o
 
-# build: simpleCUFFT_callback
+# Link the core lib together.
+# It is debatable whether the helper image class should really be in here as it is really just needed for testing and examples. I can imagine if 
+# someone had the static lib distribution and wanted to test a simple app without compiling everything, they might want it in there?
+$(LIBRARY_NAME:%.a=%.o): $(LIBRARY_OBJS)
+	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DFFT_DEBUG_STAGE=${debug_stage} --device-link -o $@ $(LIBRARY_OBJS) $(EXTERNAL_LIBS)
+	
 
-# check.deps:
-# ifeq ($(SAMPLE_ENABLED),0)
-# 	@echo "Sample will be waived due to the above missing dependencies"
-# else
-# 	@echo "Sample is ready - all dependencies have been met"
-# endif
-
-# simpleCUFFT_callback.o:simpleCUFFT_callback.cu
-# 	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
-
-# simpleCUFFT_callback: simpleCUFFT_callback.o
-# 	$(EXEC) $(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
-# 	$(EXEC) mkdir -p ../../bin/$(TARGET_ARCH)/$(TARGET_OS)/$(BUILD_TYPE)
-# 	$(EXEC) cp $@ ../../bin/$(TARGET_ARCH)/$(TARGET_OS)/$(BUILD_TYPE)
-
-# all:
-# 	$(NVCC) -dc $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DDEBUG_FFT_STAGE=${debug_stage} -o test.o -c ../cpp/test.cu
-# 	$(NVCC) $(NVCC_FLAGS) -o test.app test.o -lfftw3f -lcufft_static -lculibos -lcudart_static -lrt
+# # For some reason, I was getting an expansion that resulted in Image.o being built twice, once from Image.cu and once form FastFFT.cu, which obviously failed.
+# # This is a hack to get around that. I don't know why it was happening, but it was only happening when I was building the library.
+$(TESTS_BUILD_DIR)/$(notdir %.o): ../src/fastfft/%.cu
+	@mkdir -p $(TESTS_BUILD_DIR)
+	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DFFT_DEBUG_STAGE=${debug_stage} $< -o $@ 
 
 
-# SRCS=$(filter-out nvrtc_*.cu, $(wildcard *.cu))
-# TARGETS=$(patsubst %.cu,%,$(SRCS))
-
-# NVRTC_SRCS=$(wildcard nvrtc_*.cu)
-# NVRTC_TARGETS=$(patsubst %.cu,%,$(NVRTC_SRCS))
-
-# $(TARGETS): %: %.cu
-# 	$(NVCC) -o $@ $< $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR)
-
-# $(NVRTC_TARGETS): %: %.cu
-# 	$(NVCC) -o $@ $< $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) $(NVRTC_DEFINES) -lnvrtc -lcuda
 
 
 # remove all but the executables.
 clean:
-	rm -f $(TESTS_BUILD_DIR)/*.*
+	rm -f $(TESTS_BUILD_DIR)/*.* 
 	rm -f $(TEST_TARGETS)
 
 
