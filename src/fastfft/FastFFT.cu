@@ -379,10 +379,10 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Fwd(P
     SetDimensions(FwdTransform);
 
     // All placeholders
-    constexpr bool use_thread_method         = false;
-    const bool     do_forward_transform      = true;
-    const bool     swap_real_space_quadrants = false;
-    const bool     transpose_output          = true;
+    constexpr bool use_thread_method    = false;
+    const bool     do_forward_transform = true;
+    // const bool     swap_real_space_quadrants = false;
+    // const bool transpose_output = true;
 
     // SetPrecisionAndExectutionMethod(KernelType kernel_type, bool do_forward_transform, bool use_thread_method)
     switch ( transform_dimension ) {
@@ -505,10 +505,10 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Inv(I
     SetDimensions(InvTransform);
 
     // All placeholders
-    constexpr bool use_thread_method         = false;
-    const bool     do_forward_transform      = false;
-    const bool     swap_real_space_quadrants = false;
-    const bool     transpose_output          = true;
+    constexpr bool use_thread_method    = false;
+    const bool     do_forward_transform = false;
+    // const bool     swap_real_space_quadrants = false;
+    // const bool     transpose_output          = true;
 
     switch ( transform_dimension ) {
         case 1: {
