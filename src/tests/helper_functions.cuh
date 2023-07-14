@@ -11,9 +11,6 @@
 
 #include <iostream>
 
-#include <cufft.h>
-#include <cufftXt.h>
-
 #include "../fastfft/Image.cuh"
 #include "../../include/FastFFT.cuh"
 
