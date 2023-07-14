@@ -2,7 +2,7 @@
 #include "tests.h"
 
 template <int Rank>
-bool const_image_test(std::vector<int> size, bool do_3d = false) {
+bool const_image_test(std::vector<int>& size) {
 
     bool              all_passed = true;
     std::vector<bool> init_passed(size.size( ), true);
@@ -15,7 +15,7 @@ bool const_image_test(std::vector<int> size, bool do_3d = false) {
         short4 input_size;
         short4 output_size;
         long   full_sum = long(size[n]);
-        if ( do_3d ) {
+        if ( Rank == 3 ) {
             input_size  = make_short4(size[n], size[n], size[n], 0);
             output_size = make_short4(size[n], size[n], size[n], 0);
             full_sum    = full_sum * full_sum * full_sum * full_sum * full_sum * full_sum;
@@ -120,7 +120,7 @@ bool const_image_test(std::vector<int> size, bool do_3d = false) {
         PrintArray(host_output.real_values, dims_out.x, dims_in.y, dims_in.z, dims_out.w);
         MyTestPrintAndExit("stage 0 ");
 #elif FFT_DEBUG_STAGE == 1
-        if ( do_3d ) {
+        if ( Rank == 3 ) {
             std::cout << " in 3d print " << std::endl;
             PrintArray(host_output.complex_values, dims_in.z, dims_in.y, dims_out.w);
         }
@@ -152,7 +152,7 @@ bool const_image_test(std::vector<int> size, bool do_3d = false) {
         PrintArray(host_output.complex_values, dims_out.y, dims_out.w, dims_out.z);
         MyTestPrintAndExit("stage 5 ");
 #elif FFT_DEBUG_STAGE == 6
-        if ( do_3d ) {
+        if ( Rank == 3 ) {
             std::cout << " in 3d print inv " << dims_out.w << "w" << std::endl;
             PrintArray(host_output.complex_values, dims_out.w, dims_out.y, dims_out.z);
         }
@@ -179,7 +179,7 @@ bool const_image_test(std::vector<int> size, bool do_3d = false) {
     } // loop over sizes
 
     if ( all_passed ) {
-        if ( do_3d )
+        if ( Rank == 3 )
             std::cout << "    All 3d const_image tests passed!" << std::endl;
         else
             std::cout << "    All 2d const_image tests passed!" << std::endl;
@@ -206,47 +206,16 @@ int main(int argc, char** argv) {
     bool run_2d_unit_tests = false;
     bool run_3d_unit_tests = false;
 
-    switch ( argc ) {
-        case 1: {
-            std::cout << "Running all tests" << std::endl;
-            run_2d_unit_tests = true;
-            run_3d_unit_tests = true;
-            break;
-        }
-        case 2: {
-            std::string test_name = argv[1];
-            if ( test_name == "--all" ) {
-                std::cout << "Running all tests" << std::endl;
-                run_2d_unit_tests = true;
-                run_3d_unit_tests = true;
-            }
-            else if ( test_name == "--2d" ) {
-                std::cout << "Running 2d unit tests" << std::endl;
-                run_2d_unit_tests = true;
-            }
-            else if ( test_name == "--3d" ) {
-                std::cout << "Running 3d unit tests" << std::endl;
-                run_3d_unit_tests = true;
-            }
-            else {
-                std::cout << "Usage: " << argv[0] << " < --all (default w/ no arg), --2d, --3d>" << std::endl;
-                std::exit(0);
-            }
-            break;
-        }
-        default: {
-            std::cout << "Usage: " << argv[0] << " < --all (default w/ no arg), --2d, --3d>" << std::endl;
-            std::exit(0);
-        }
-    };
+    const std::string_view text_line = "constant image";
+    FastFFT::CheckInputArgs(argc, argv, text_line, run_2d_unit_tests, run_3d_unit_tests);
 
     if ( run_2d_unit_tests ) {
-        if ( ! const_image_test<2>(FastFFT::test_size, false) )
+        if ( ! const_image_test<2>(FastFFT::test_size) )
             return 1;
     }
 
     if ( run_3d_unit_tests ) {
-        if ( ! const_image_test<3>(FastFFT::test_size_3d, true) )
+        if ( ! const_image_test<3>(FastFFT::test_size_3d) )
             return 1;
         // if (! unit_impulse_test(test_size_3d, true, true)) return 1;
     }
