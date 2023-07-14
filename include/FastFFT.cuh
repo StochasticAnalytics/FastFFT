@@ -4,6 +4,7 @@
 #ifndef Fast_FFT_cuh_
 #define Fast_FFT_cuh_
 
+#include <cuda_fp16.h>
 #include "cufftdx/include/cufftdx.hpp"
 
 // clang-format off

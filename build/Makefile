@@ -90,6 +90,7 @@ TEST_BUILD_DIR=tests
 TEST_SRC_DIR=../src/tests
 # Get all the test source files and remove cu extension
 TEST_TARGETS=$(patsubst %.cu,$(TEST_BUILD_DIR)/%,$(notdir $(wildcard $(TEST_SRC_DIR)/*.cu)))
+TEST_DEPS=$(wildcard $(TEST_SRC_DIR)/*.cuh)
 
 $(info $$TEST_TARGETS is [${TEST_TARGETS}])
 
@@ -101,12 +102,12 @@ else
 	rm -f built_without_debug.txt
 endif
 
-$(TEST_BUILD_DIR)/%:  $(TEST_BUILD_DIR)/%.o lib/Image.o libFastFFT.a
+$(TEST_BUILD_DIR)/%: $(TEST_BUILD_DIR)/%.o lib/Image.o libFastFFT.a
 	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -o $@ $< lib/Image.o -L$(PWD) -lFastFFT $(EXTERNAL_LIBS)
 # $(NVCC) $(NVCC_FLAGS) -dlto -arch=sm_86 -I$(CUFFTDX_INCLUDE_DIR) $(DEBUG_FLAGS) -o $@ $^ -lFastFFT $(EXTERNAL_LIBS)
 
 
-$(TEST_BUILD_DIR)/%.o: $(TEST_SRC_DIR)/%.cu $(TEST_SRC_DIR)/%.h
+$(TEST_BUILD_DIR)/%.o: $(TEST_SRC_DIR)/%.cu $(TEST_DEPS)
 	@mkdir -p tests
 	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) $(DEBUG_FLAGS) -o $@ $<
 
@@ -128,13 +129,11 @@ lib/Image.o: ../src/fastfft/Image.cu ../src/fastfft/Image.cuh
 	
 
 
-
-
 # Build the library, using static linking for now to make sure we're set to go with cisTEM
 libFastFFT.a: lib/FastFFT.o 
 	$(NVCC) $(NVCC_FLAGS) --lib $(GENCODE_FLAGS) $(DEBUG_FLAGS) -o $@ $^ $(EXTERNAL_LIBS)
 
-lib/FastFFT.o: ../src/fastfft/FastFFT.cu ../src/fastfft/FastFFT.cuh
+lib/FastFFT.o: ../src/fastfft/FastFFT.cu ../include/FastFFT.cuh
 	@mkdir -p lib
 	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) $(DEBUG_FLAGS) -o $@ $<  
  

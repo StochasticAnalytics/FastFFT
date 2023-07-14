@@ -85,10 +85,10 @@ bool unit_impulse_test(std::vector<int> size, bool do_increase_size) {
             CheckUnitImpulseRealImage(host_output, __LINE__);
 
             // TODO: remove me
-            if ( sum != 1 ) {
-                all_passed         = true;
-                init_passed[iSize] = true;
-            }
+            // if ( sum != 1 ) {
+            //     all_passed         = true;
+            //     init_passed[iSize] = true;
+            // }
 
             // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
             FT.CopyHostToDevice( );
@@ -111,7 +111,7 @@ bool unit_impulse_test(std::vector<int> size, bool do_increase_size) {
             FT.SetToConstant(host_output.real_values, host_output.real_memory_allocated, 2.0f);
 
             // This method will call the regular FFT kernels given the input/output dimensions are equal when the class is instantiated.
-            bool swap_real_space_quadrants = true;
+            // bool swap_real_space_quadrants = true;
 
             FT.FwdFFT( );
 

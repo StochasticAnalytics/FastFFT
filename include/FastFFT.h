@@ -5,10 +5,12 @@
 
 #include <chrono>
 #include <random>
+#include <iostream>
 
-// #include <cuda_runtime.h>
-// #include <cuda.h>
-#include <cuda_fp16.h>
+// Forward declaration so we can leave the inclusion of cuda_fp16.h to FastFFT.cu
+struct __half;
+struct __half2;
+// #include <cuda_fp16.h>
 
 #ifndef ENABLE_FastFFT // ifdef being used in cisTEM that defines these
 #if __cplusplus >= 202002L

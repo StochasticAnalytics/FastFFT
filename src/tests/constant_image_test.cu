@@ -102,7 +102,7 @@ bool const_image_test(std::vector<int>& size) {
         FT.SetToConstant(host_output.real_values, host_output.real_memory_allocated, 2.0f);
 
         // This method will call the regular FFT kernels given the input/output dimensions are equal when the class is instantiated.
-        bool swap_real_space_quadrants = false;
+        // bool swap_real_space_quadrants = false;
         FT.FwdFFT( );
 
         // in buffer, do not deallocate, do not unpin memory
