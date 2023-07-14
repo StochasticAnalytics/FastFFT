@@ -78,22 +78,17 @@ bool unit_impulse_test(std::vector<int> size, bool do_increase_size) {
             FT.SetToConstant(host_input.real_values, host_input.real_memory_allocated, 0.0f);
             FT.SetToConstant(host_output.real_values, host_output.real_memory_allocated, 0.0f);
 
-            sum = host_output.ReturnSumOfReal(host_output.real_values, dims_out);
-            // host_input.real_values[ dims_in.y/2 * (dims_in.x+host_input.padding_jump_value) + dims_in.x/2] = 1.0f;
-            // short4 wanted_center = make_short4(0,0,0,0);
-            // ClipInto(host_input.real_values, host_output.real_values, dims_in ,  dims_out,  wanted_center, 0.f);
-
-            // FT.SetToConstant(host_input.real_values, host_input.real_memory_allocated, 0.0f);
             host_input.real_values[0]  = 1.0f;
             host_output.real_values[0] = 1.0f;
 
-            sum = host_output.ReturnSumOfReal(host_output.real_values, dims_out);
-            if ( sum != 1 ) {
-                all_passed         = false;
-                init_passed[iSize] = false;
-            }
+            // This will exit if fail, so the following bools are not really needed any more.
+            CheckUnitImpulseRealImage(host_output, __LINE__);
 
-            // MyFFTDebugAssertTestTrue( sum == 1,"Unit impulse Init ");
+            // TODO: remove me
+            if ( sum != 1 ) {
+                all_passed         = true;
+                init_passed[iSize] = true;
+            }
 
             // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
             FT.CopyHostToDevice( );
@@ -112,6 +107,7 @@ bool unit_impulse_test(std::vector<int> size, bool do_increase_size) {
             // MyFFTDebugAssertTestTrue( std::abs(host_output.fftw_epsilon) < 1e-8 , "FFTW unit impulse forward FFT");
 
             // Just to make sure we don't get a false positive, set the host memory to some undesired value.
+            // FIXME: This wouldn't work for size decrease
             FT.SetToConstant(host_output.real_values, host_output.real_memory_allocated, 2.0f);
 
             // This method will call the regular FFT kernels given the input/output dimensions are equal when the class is instantiated.
@@ -119,94 +115,44 @@ bool unit_impulse_test(std::vector<int> size, bool do_increase_size) {
 
             FT.FwdFFT( );
 
-            if ( do_increase_size ) {
-                FT.CopyDeviceToHost(host_output.real_values, false, false);
-
-#if FFT_DEBUG_STAGE == 0
-                PrintArray(host_output.real_values, dims_in.x, dims_in.y, dims_in.z, dims_in.w);
-                MyTestPrintAndExit("stage 0 ");
-#elif FFT_DEBUG_STAGE == 1
-                // If we are doing a fwd increase, the data will have only been expanded along the (transposed) X dimension at this point
-                // So the (apparent) X is dims_in.y not dims_out.y
-                if ( Rank == 3 ) {
-                    std::cout << " in 3d print " << std::endl;
-                    PrintArray(host_output.complex_values, dims_in.z, dims_in.y, dims_out.w);
+            bool continue_debugging;
+            // We don't want this to break compilation of other tests, so only check at runtime.
+            if constexpr ( FFT_DEBUG_STAGE < 5 ) {
+                if ( do_increase_size ) {
+                    FT.CopyDeviceToHost(host_output.real_values, false, false);
+                    // Right now, only testing a size change on the forward transform,
+                    continue_debugging = debug_partial_fft<FFT_DEBUG_STAGE, Rank>(host_output, input_size, output_size, output_size, output_size, __LINE__);
+                    sum                = host_output.ReturnSumOfComplexAmplitudes(host_output.complex_values, host_output.real_memory_allocated / 2);
                 }
-                else
-                    PrintArray(host_output.complex_values, dims_in.y, dims_in.z, dims_out.w);
+                else {
+                    FT.CopyDeviceToHost(false, false, FT.ReturnInputMemorySize( ));
+                    continue_debugging = debug_partial_fft<FFT_DEBUG_STAGE, Rank>(host_input, input_size, output_size, output_size, output_size, __LINE__);
+                    sum                = host_input.ReturnSumOfComplexAmplitudes(host_input.complex_values, host_input.real_memory_allocated / 2);
+                }
 
-                MyTestPrintAndExit("stage 1 ");
-#elif FFT_DEBUG_STAGE == 2
-                // If we are doing a fwd increase, the data will have only been expanded along the (transposed) X dimension at this point
-                // So the (apparent) X is dims_in.y not dims_out.y
-                PrintArray(host_output.complex_values, dims_in.y, dims_out.z, dims_out.w);
-                MyTestPrintAndExit("stage 2 ");
-#elif FFT_DEBUG_STAGE == 3
-                // Now the array is fully expanded to dims_out, but still transposed
-                PrintArray(host_output.complex_values, dims_out.y, dims_out.z, dims_out.w);
-                MyTestPrintAndExit("stage 3 ");
-#endif
-                sum = host_output.ReturnSumOfComplexAmplitudes(host_output.complex_values, host_output.real_memory_allocated / 2);
+                sum -= (host_output.real_memory_allocated / 2);
+
+                // FIXME : shared comparison functions
+                if ( abs(sum) > 1e-8 ) {
+                    all_passed                    = false;
+                    FastFFT_forward_passed[iSize] = false;
+                }
             }
-            else {
-                FT.CopyDeviceToHost(false, false, FT.ReturnInputMemorySize( ));
-#if FFT_DEBUG_STAGE == 0
-                PrintArray(host_input.real_values, dims_in.x, dims_in.y, dims_in.z, dims_in.w);
-                MyTestPrintAndExit("stage 0 ");
-#elif FFT_DEBUG_STAGE == 1
-                // If we are doing a fwd increase, the data will have only been expanded along the (transposed) X dimension at this point
-                // So the (apparent) X is dims_in.y not dims_out.y
-                PrintArray(host_input.complex_values, dims_in.y, dims_in.z, dims_out.w);
-                MyTestPrintAndExit("stage 1 ");
-#elif FFT_DEBUG_STAGE == 2
-                // If we are doing a fwd increase, the data will have only been expanded along the (transposed) X dimension at this point
-                // So the (apparent) X is dims_in.y not dims_out.y
-                PrintArray(host_input.complex_values, dims_in.y, dims_out.z, dims_out.w);
-                MyTestPrintAndExit("stage 2 ");
-#elif FFT_DEBUG_STAGE == 3
-                // Now the array is fully expanded to dims_out, but still transposed
-                PrintArray(host_input.complex_values, dims_out.y, dims_out.z, dims_out.w);
-                MyTestPrintAndExit("stage 3 ");
-#endif
-                sum = host_input.ReturnSumOfComplexAmplitudes(host_input.complex_values, host_input.real_memory_allocated / 2);
-            }
-
-            sum -= (host_output.real_memory_allocated / 2);
-
-            // std::cout << "sum " << sum << std::endl;
-            // std::cout << "FFT Unit Impulse Forward FFT: " << sum <<  " epsilon " << host_output.fftw_epsilon << std::endl;
-            // std::cout << "epsilon " << abs(sum - host_output.fftw_epsilon) << std::endl;
-            if ( abs(sum) > 1e-8 ) {
-                all_passed                    = false;
-                FastFFT_forward_passed[iSize] = false;
-            }
-
             // MyFFTDebugAssertTestTrue( abs(sum - host_output.fftw_epsilon) < 1e-8, "FastFFT unit impulse forward FFT");
             FT.SetToConstant(host_output.real_values, host_output.real_memory_allocated, 2.0f);
 
             FT.InvFFT( );
             FT.CopyDeviceToHost(host_output.real_values, true, true);
 
-#if FFT_DEBUG_STAGE == 5
-            PrintArray(host_output.complex_values, dims_out.y, dims_out.z, dims_out.w);
-            MyTestPrintAndExit("stage 5 ");
-#endif
-#if FFT_DEBUG_STAGE == 6
-            PrintArray(host_output.complex_values, dims_out.y, dims_out.z, dims_out.w);
-            MyTestPrintAndExit("stage 6 ");
-#elif FFT_DEBUG_STAGE == 7
-            PrintArray(host_output.real_values, dims_out.x, dims_out.y, dims_out.z, dims_out.w);
-            MyTestPrintAndExit("stage 7 ");
-#elif FFT_DEBUG_STAGE > 7
-            // No debug, keep going
-#else
-            MyTestPrintAndExit(" This block is only valid for FFT_DEBUG_STAGE == 3 || 4 ");
-#endif
+            if constexpr ( FFT_DEBUG_STAGE > 4 ) {
+                // Right now, only testing a size change on the forward transform,
+                continue_debugging = debug_partial_fft<FFT_DEBUG_STAGE, Rank>(host_output, input_size, output_size, output_size, output_size, __LINE__);
 
-            sum = host_output.ReturnSumOfReal(host_output.real_values, dims_out);
-            if ( sum != dims_out.x * dims_out.y * dims_out.z ) {
-                all_passed                      = false;
-                FastFFT_roundTrip_passed[iSize] = false;
+                sum = host_output.ReturnSumOfReal(host_output.real_values, dims_out);
+                if ( sum != dims_out.x * dims_out.y * dims_out.z ) {
+                    all_passed                      = false;
+                    FastFFT_roundTrip_passed[iSize] = false;
+                }
             }
 
             // std::cout << "size in/out " << dims_in.x << ", " << dims_out.x << std::endl;

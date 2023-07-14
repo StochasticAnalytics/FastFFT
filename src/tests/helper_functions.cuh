@@ -91,7 +91,7 @@ void PrintArray_XZ(float2* array, short NX, short NY, short NZ, int line_wrappin
 };
 
 template <typename realType, typename complexType>
-void Check_impulse_real_image(Image<realType, complexType>& positive_control, int input_line) {
+void CheckUnitImpulseRealImage(Image<realType, complexType>& positive_control, int input_line) {
 
     long address = 0;
     // Loop over the real values z,y,x skipping the fft padding

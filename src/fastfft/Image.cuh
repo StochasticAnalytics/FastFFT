@@ -97,42 +97,4 @@ class Image {
   private:
 };
 
-//#define HEAVYERRORCHECKING_IMG
-
-// TODO: make sure clang-format has not already messed up the following macros
-// clang-format off
-// Note we are using std::cerr b/c the wxWidgets apps running in cisTEM are capturing std::cout
-#ifndef HEAVYERRORCHECKING_IMG
-#define postcheck_img
-#define cudaErr_img(error)                             \
-    {                                                  \
-        auto status = static_cast<cudaError_t>(error); \
-        { ; }                                          \
-    };
-#define precheck_img
-#else
-#define MyFFTPrintWithDetails(...) \
-    { std::cerr << __VA_ARGS__ << " From: " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; }
-#define postcheck_img                                                   \
-    {                                                                   \
-        cudaError_t error = cudaStreamSynchronize(cudaStreamPerThread); \
-        if ( error != cudaSuccess ) {                                   \
-            std::cerr << cudaGetErrorString(error) << std::endl;        \
-            MyFFTPrintWithDetails("");                                  \
-        }                                                               \
-    };
-#define cudaErr_img(error)                                        \
-    {                                                             \
-        auto status = static_cast<cudaError_t>(error);            \
-        if ( status != cudaSuccess ) {                            \
-            std::cerr << cudaGetErrorString(status) << std::endl; \
-            MyFFTPrintWithDetails("");                            \
-        }                                                         \
-    };
-#define precheck_img \
-    { cudaErr_img(cudaGetLastError( )); }
-#endif
-
-// clang-format on
-
 #endif // SRC_CPP_IMAGE_CUH_

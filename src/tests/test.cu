@@ -384,7 +384,7 @@ void compare_libraries(std::vector<int> size, bool do_3d, FastFFT::SizeChangeTyp
                 positive_control.MultiplyConjugateImage(target_search_image.complex_values);
             positive_control.InvFFT( );
 
-            Check_impulse_real_image(positive_control, __LINE__);
+            CheckUnitImpulseRealImage(positive_control, __LINE__);
 
             if ( positive_control.real_values[0] == positive_control.size.x * positive_control.size.y * positive_control.size.z * testVal_1 * testVal_2 ) {
                 if ( print_out_time ) {
@@ -448,10 +448,10 @@ void compare_libraries(std::vector<int> size, bool do_3d, FastFFT::SizeChangeTyp
             }
 
             if ( is_size_change_decrease ) {
-                Check_impulse_real_image(FT_input, __LINE__);
+                CheckUnitImpulseRealImage(FT_input, __LINE__);
             }
             else {
-                Check_impulse_real_image(FT_output, __LINE__);
+                CheckUnitImpulseRealImage(FT_output, __LINE__);
             }
 
             ////////////////////////////////////////
@@ -747,18 +747,8 @@ int main(int argc, char** argv) {
 
     if ( test_name == "--all" ) {
         std::cout << "Running all tests" << std::endl;
-        run_2d_unit_tests        = true;
-        run_3d_unit_tests        = true;
         run_2d_performance_tests = true;
         run_3d_performance_tests = true;
-    }
-    else if ( test_name == "--2d-unit-tests" ) {
-        std::cout << "Running 2d unit tests" << std::endl;
-        run_2d_unit_tests = true;
-    }
-    else if ( test_name == "--3d-unit-tests" ) {
-        std::cout << "Running 3d unit tests" << std::endl;
-        run_3d_unit_tests = true;
     }
     else if ( test_name == "--2d-performance-tests" ) {
         std::cout << "Running 2d performance tests" << std::endl;

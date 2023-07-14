@@ -108,6 +108,7 @@ bool const_image_test(std::vector<int>& size) {
         // in buffer, do not deallocate, do not unpin memory
         FT.CopyDeviceToHost(false, false);
         test_passed = true;
+        // FIXME: centralized test conditions
         for ( long index = 1; index < host_output.real_memory_allocated / 2; index++ ) {
             if ( host_output.complex_values[index].x != 0.0f && host_output.complex_values[index].y != 0.0f ) {
                 test_passed = false;
@@ -116,24 +117,11 @@ bool const_image_test(std::vector<int>& size) {
         if ( host_output.complex_values[0].x != (float)dims_out.x * (float)dims_out.y * (float)dims_out.z )
             test_passed = false;
 
-#if FFT_DEBUG_STAGE == 0
-        PrintArray(host_output.real_values, dims_out.x, dims_in.y, dims_in.z, dims_out.w);
-        MyTestPrintAndExit("stage 0 ");
-#elif FFT_DEBUG_STAGE == 1
-        if ( Rank == 3 ) {
-            std::cout << " in 3d print " << std::endl;
-            PrintArray(host_output.complex_values, dims_in.z, dims_in.y, dims_out.w);
+        bool continue_debugging;
+        // We don't want this to break compilation of other tests, so only check at runtime.
+        if constexpr ( FFT_DEBUG_STAGE < 5 ) {
+            continue_debugging = debug_partial_fft<FFT_DEBUG_STAGE, Rank>(host_output, dims_in, dims_out, dims_in, dims_out, __LINE__);
         }
-        else
-            PrintArray(host_output.complex_values, dims_in.y, dims_out.w, dims_in.z);
-        MyTestPrintAndExit("stage 1 ");
-#elif FFT_DEBUG_STAGE == 2
-        PrintArray(host_output.complex_values, dims_in.y, dims_out.w, dims_out.z);
-        MyTestPrintAndExit("stage 2 ");
-#elif FFT_DEBUG_STAGE == 3
-        PrintArray(host_output.complex_values, dims_in.y, dims_out.w, dims_out.z);
-        MyTestPrintAndExit("stage 3 ");
-#endif
 
         if ( test_passed == false ) {
             all_passed                = false;
@@ -145,28 +133,9 @@ bool const_image_test(std::vector<int>& size) {
         FT.InvFFT( );
         FT.CopyDeviceToHost(true, true);
 
-#if FFT_DEBUG_STAGE == 4
-        PrintArray(host_output.complex_values, dims_out.y, dims_out.w, dims_out.z);
-        MyTestPrintAndExit("stage 4 ");
-#elif FFT_DEBUG_STAGE == 5
-        PrintArray(host_output.complex_values, dims_out.y, dims_out.w, dims_out.z);
-        MyTestPrintAndExit("stage 5 ");
-#elif FFT_DEBUG_STAGE == 6
-        if ( Rank == 3 ) {
-            std::cout << " in 3d print inv " << dims_out.w << "w" << std::endl;
-            PrintArray(host_output.complex_values, dims_out.w, dims_out.y, dims_out.z);
+        if constexpr ( FFT_DEBUG_STAGE > 4 ) {
+            continue_debugging = debug_partial_fft<FFT_DEBUG_STAGE, Rank>(host_output, dims_in, dims_out, dims_in, dims_out, __LINE__);
         }
-        else
-            PrintArray(host_output.complex_values, dims_out.y, dims_out.w, dims_out.z);
-        MyTestPrintAndExit("stage 6 ");
-#elif FFT_DEBUG_STAGE == 7
-        PrintArray(host_output.real_values, dims_out.x, dims_out.y, dims_out.z, dims_out.w);
-        MyTestPrintAndExit("stage 7 ");
-#elif FFT_DEBUG_STAGE > 7
-        // No debug, keep going
-#else
-        MyTestPrintAndExit(" This block is only valid for FFT_DEBUG_STAGE == 4, 5, 7 ");
-#endif
 
         // Assuming the outputs are always even dimensions, padding_jump_val is always 2.
         sum = host_output.ReturnSumOfReal(host_output.real_values, dims_out, true);

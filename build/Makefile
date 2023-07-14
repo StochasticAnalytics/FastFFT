@@ -106,7 +106,7 @@ $(TEST_BUILD_DIR)/%:  $(TEST_BUILD_DIR)/%.o lib/Image.o libFastFFT.a
 # $(NVCC) $(NVCC_FLAGS) -dlto -arch=sm_86 -I$(CUFFTDX_INCLUDE_DIR) $(DEBUG_FLAGS) -o $@ $^ -lFastFFT $(EXTERNAL_LIBS)
 
 
-$(TEST_BUILD_DIR)/%.o: $(TEST_SRC_DIR)/%.cu
+$(TEST_BUILD_DIR)/%.o: $(TEST_SRC_DIR)/%.cu $(TEST_SRC_DIR)/%.h
 	@mkdir -p tests
 	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) $(DEBUG_FLAGS) -o $@ $<
 
@@ -122,7 +122,7 @@ $(TEST_BUILD_DIR)/%.o: $(TEST_SRC_DIR)/%.cu
 # 	@mkdir -p tests
 # 	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) $(DEBUG_FLAGS) -o $@ $<
 
-lib/Image.o: ../src/fastfft/Image.cu
+lib/Image.o: ../src/fastfft/Image.cu ../src/fastfft/Image.cuh
 	@mkdir -p lib
 	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) $(DEBUG_FLAGS) -o $@ $< 
 	
@@ -134,7 +134,7 @@ lib/Image.o: ../src/fastfft/Image.cu
 libFastFFT.a: lib/FastFFT.o 
 	$(NVCC) $(NVCC_FLAGS) --lib $(GENCODE_FLAGS) $(DEBUG_FLAGS) -o $@ $^ $(EXTERNAL_LIBS)
 
-lib/FastFFT.o: ../src/fastfft/FastFFT.cu
+lib/FastFFT.o: ../src/fastfft/FastFFT.cu ../src/fastfft/FastFFT.cuh
 	@mkdir -p lib
 	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) $(DEBUG_FLAGS) -o $@ $<  
  
