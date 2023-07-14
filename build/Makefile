@@ -81,33 +81,46 @@ ifeq (${FastFFT_sync_checking},1)
 	DEBUG_FLAGS+=-DHEAVYERRORCHECKING_FFT
 endif
 
+
+
+# External libraries used for testing
+EXTERNAL_LIBS= -lfftw3f -lcufft_static -lculibos -lcudart_static -lrt
+
+TEST_BUILD_DIR=tests
+TEST_SRC_DIR=../src/tests
+# Get all the test source files and remove cu extension
+TEST_TARGETS=$(patsubst %.cu,$(TEST_BUILD_DIR)/%,$(notdir $(wildcard $(TEST_SRC_DIR)/*.cu)))
+
+$(info $$TEST_TARGETS is [${TEST_TARGETS}])
+
 $(info )
-all: test1
+all: $(TEST_TARGETS)
 ifeq (${remove_debug_file}, 0)
 	touch built_without_debug.txt
 else
 	rm -f built_without_debug.txt
 endif
 
-# External libraries used for testing
-EXTERNAL_LIBS= -lfftw3f -lcufft_static -lculibos -lcudart_static -lrt
-
-
-# Build the tests
-# For now this is all in one file, but we will split this up into multiple tests.
-test1: tests/test1
-
-tests/test1: tests/linkedTest.o tests/test.o lib/Image.o libFastFFT.a
-	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -o $@ $^ -L$(PWD) -lFastFFT $(EXTERNAL_LIBS)
+$(TEST_BUILD_DIR)/%:  $(TEST_BUILD_DIR)/%.o lib/Image.o libFastFFT.a
+	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -o $@ $< lib/Image.o -L$(PWD) -lFastFFT $(EXTERNAL_LIBS)
 # $(NVCC) $(NVCC_FLAGS) -dlto -arch=sm_86 -I$(CUFFTDX_INCLUDE_DIR) $(DEBUG_FLAGS) -o $@ $^ -lFastFFT $(EXTERNAL_LIBS)
 
-tests/linkedTest.o: tests/test.o lib/Image.o 
-	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) $(DEBUG_FLAGS) --device-link -o $@ $^ 
-# $(NVCC) $(NVCC_FLAGS) -dlto -arch=sm_86 -I$(CUFFTDX_INCLUDE_DIR) $(DEBUG_FLAGS) --device-link -o $@ $^ 
 
-tests/test.o: ../src/tests/test.cu
+$(TEST_BUILD_DIR)/%.o: $(TEST_SRC_DIR)/%.cu
 	@mkdir -p tests
 	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) $(DEBUG_FLAGS) -o $@ $<
+
+# tests/test1: tests/linkedTest.o tests/test.o lib/Image.o libFastFFT.a
+# 	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -o $@ $^ -L$(PWD) -lFastFFT $(EXTERNAL_LIBS)
+# # $(NVCC) $(NVCC_FLAGS) -dlto -arch=sm_86 -I$(CUFFTDX_INCLUDE_DIR) $(DEBUG_FLAGS) -o $@ $^ -lFastFFT $(EXTERNAL_LIBS)
+
+# tests/linkedTest.o: tests/test.o lib/Image.o 
+# 	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) $(DEBUG_FLAGS) --device-link -o $@ $^ 
+# # $(NVCC) $(NVCC_FLAGS) -dlto -arch=sm_86 -I$(CUFFTDX_INCLUDE_DIR) $(DEBUG_FLAGS) --device-link -o $@ $^ 
+
+# tests/test.o: ../src/tests/test.cu
+# 	@mkdir -p tests
+# 	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) $(DEBUG_FLAGS) -o $@ $<
 
 lib/Image.o: ../src/fastfft/Image.cu
 	@mkdir -p lib

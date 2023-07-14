@@ -1,7 +1,19 @@
 #ifndef SRC_CPP_HELPER_FUNCTIONS_CUH_
 #define SRC_CPP_HELPER_FUNCTIONS_CUH_
 
+#ifndef FFT_DEBUG_LEVEL
+#error "FFT_DEBUG_LEVEL not defined"
+#endif
+
+#ifndef FFT_DEBUG_STAGE
+#error "FFT_DEBUG_STAGE not defined"
+#endif
+
 #include <iostream>
+
+#include <cufft.h>
+#include <cufftXt.h>
+
 #include "../fastfft/Image.cuh"
 #include "../../include/FastFFT.cuh"
 
