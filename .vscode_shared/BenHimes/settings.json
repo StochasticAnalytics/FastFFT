@@ -66,7 +66,13 @@
         "mutex": "cpp",
         "thread": "cpp",
         "cinttypes": "cpp",
-        "__nullptr": "cpp"
+        "__nullptr": "cpp",
+        "compare": "cpp",
+        "concepts": "cpp",
+        "set": "cpp",
+        "numbers": "cpp",
+        "semaphore": "cpp",
+        "stop_token": "cpp"
     },
     "C_Cpp.clang_format_path": "/usr/bin/clang-format-14",
     "editor.formatOnSave": true,

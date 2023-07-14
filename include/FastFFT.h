@@ -1,7 +1,7 @@
 // Insert some license stuff here
 
-#ifndef fast_FFT_H_
-#define fast_FFT_H_
+#ifndef _INCLUDE_FASTFFT_H
+#define _INCLUDE_FASTFFT_H
 
 #include <chrono>
 #include <random>
@@ -11,17 +11,22 @@
 #include <cuda_fp16.h>
 
 #ifndef ENABLE_FastFFT // ifdef being used in cisTEM that defines these
-#if __cplusplus > 201703L
+#if __cplusplus >= 202002L
 #include <numbers>
 using namespace std::numbers;
 #else
-// For now we do not have c++20 so we need to define this for constants. Modified from /usr/include/c++/11/numbers
-/// pi
+#if __cplusplus < 201703L
+#message "C++ is " __cplusplus
+#error "C++17 or later required"
+#else
 template <typename _Tp>
 // inline constexpr _Tp pi_v = _Enable_if_floating<_Tp>(3.141592653589793238462643383279502884L);
 inline constexpr _Tp pi_v = 3.141592653589793238462643383279502884L;
-#endif
-#endif
+#endif // __cplusplus require > 17
+#endif // __cplusplus 20 support
+#endif // enable FastFFT
+
+#include "../src/fastfft/types.cuh"
 
 // For testing/debugging it is convenient to execute and have print functions for partial transforms.
 // These will go directly in the kernels and also in the helper Image.cuh definitions for PrintArray.
@@ -170,48 +175,29 @@ struct DevicePointers<__half2*, __half*> {
 template <class ComputeType = float, class InputType = float, class OutputType = float, int Rank = 2>
 class FourierTransformer {
 
+  private:
+
   public:
-    // Used to specify input/calc/output data types
-    enum DataType { int4_2,
-                    uint8,
-                    int8,
-                    uint16,
-                    int16,
-                    fp16,
-                    bf16,
-                    tf32,
-                    uint32,
-                    int32,
-                    fp32 };
-
-    std::vector<std::string> DataTypeName{"int4_2", "uint8", "int8", "uint16", "int16", "fp16", "bf16", "tf32", "uint32", "int32", "fp32"};
-
-    enum OriginType { natural,
-                      centered,
-                      quadrant_swapped }; // Used to specify the origin of the data
-
-    std::vector<std::string> OriginTypeName{"natural", "centered", "quadrant_swapped"};
-
     // Using the enum directly from python is not something I've figured out yet. Just make simple methods.
     inline void SetOriginTypeNatural(bool set_input_type = true) {
         if ( set_input_type )
-            input_origin_type = natural;
+            input_origin_type = OriginType::natural;
         else
-            output_origin_type = natural;
+            output_origin_type = OriginType::natural;
     }
 
     inline void SetOriginTypeCentered(bool set_input_type = true) {
         if ( set_input_type )
-            input_origin_type = centered;
+            input_origin_type = OriginType::centered;
         else
-            output_origin_type = centered;
+            output_origin_type = OriginType::centered;
     }
 
     inline void SetOriginTypeQuadrantSwapped(bool set_input_type = true) {
         if ( set_input_type )
-            input_origin_type = quadrant_swapped;
+            input_origin_type = OriginType::quadrant_swapped;
         else
-            output_origin_type = quadrant_swapped;
+            output_origin_type = OriginType::quadrant_swapped;
     }
 
     short padding_jump_val;
@@ -388,16 +374,16 @@ class FourierTransformer {
         std::cerr << "fwd_size_change_type " << SizeChangeName[fwd_size_change_type] << std::endl;
         std::cerr << "inv_size_change_type " << SizeChangeName[inv_size_change_type] << std::endl;
         std::cerr << "transform stage complete " << TransformStageCompletedName[transform_stage_completed] << std::endl;
-        std::cerr << "input_origin_type " << OriginTypeName[input_origin_type] << std::endl;
-        std::cerr << "output_origin_type " << OriginTypeName[output_origin_type] << std::endl;
+        std::cerr << "input_origin_type " << OriginType::name[input_origin_type] << std::endl;
+        std::cerr << "output_origin_type " << OriginType::name[output_origin_type] << std::endl;
 
     }; // PrintState()
 
     // private:
 
-    DeviceProps device_properties;
-    OriginType  input_origin_type;
-    OriginType  output_origin_type;
+    DeviceProps      device_properties;
+    OriginType::Enum input_origin_type;
+    OriginType::Enum output_origin_type;
 
     // booleans to track state, could be bit fields but that seem opaque to me.
     bool is_in_memory_host_pointer; // To track allocation of host side memory
@@ -420,35 +406,21 @@ class FourierTransformer {
     FFT_Size transform_size;
     int      elements_per_thread_complex; // Set depending on the kernel and size of the transform.
 
-    // FIXME this seems like a bad idea. Added due to conflicing labels in switch statements, even with explicitly scope.
-    enum SizeChangeType : uint8_t { increase,
-                                    decrease,
-                                    no_change }; // Assumed to be the same for all dimesnions. This may be relaxed later.
-
     std::vector<std::string> SizeChangeName{"increase", "decrease", "no_change"};
-
-    enum TransformStageCompleted : uint8_t { none = 10,
-                                             fwd  = 11,
-                                             inv  = 12 }; // none must be greater than number of sizeChangeTypes, padding must match in TransformStageCompletedName vector
 
     std::vector<std::string> TransformStageCompletedName{"", "", "", "", "", // padding of 5
                                                          "", "", "", "", "", // padding of 5
                                                          "none", "fwd", "inv"};
-
-    enum DimensionCheckType : uint8_t { CopyFromHost,
-                                        CopyToHost,
-                                        FwdTransform,
-                                        InvTransform };
 
     std::vector<std::string> DimensionCheckName{"CopyFromHost", "CopyToHost", "FwdTransform", "InvTransform"};
 
     bool is_from_python_call;
     bool is_owner_of_memory;
 
-    SizeChangeType fwd_size_change_type;
-    SizeChangeType inv_size_change_type;
+    SizeChangeType::Enum fwd_size_change_type;
+    SizeChangeType::Enum inv_size_change_type;
 
-    TransformStageCompleted transform_stage_completed;
+    TransformStageCompleted::Enum transform_stage_completed;
 
     // dims_in may change during calculation, depending on padding, but is reset after each call.
     short4 dims_in;
@@ -467,7 +439,7 @@ class FourierTransformer {
 
     void SetDefaults( );
     void ValidateDimensions( );
-    void SetDimensions(DimensionCheckType check_op_type);
+    void SetDimensions(DimensionCheckType::Enum check_op_type);
 
     void SetDevicePointers(bool should_allocate_buffer_memory);
 
@@ -482,6 +454,7 @@ class FourierTransformer {
         d) IsForwardType()
         e) IsTransformAlongZ()
   */
+
     enum KernelType { r2c_decomposed, // Thread based, full length.
                       r2c_decomposed_transposed, // Thread based, full length, transposed.
                       r2c_none_XY,

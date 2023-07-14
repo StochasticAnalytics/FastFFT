@@ -5,13 +5,6 @@
 #include <cufftXt.h>
 
 // Define an enum for size change type to indecate a decrease, no change or increase
-namespace SizeChangeType {
-enum class Enum {
-    decrease,
-    no_change,
-    increase
-};
-}
 
 #ifndef FFT_DEBUG_LEVEL
 #error "FFT_DEBUG_LEVEL not defined"
@@ -640,9 +633,9 @@ bool unit_impulse_test(std::vector<int> size, bool do_3d, bool do_increase_size)
 }
 
 template <int Rank>
-void compare_libraries(std::vector<int> size, bool do_3d, SizeChangeType::Enum size_change_type, bool do_rectangle) {
+void compare_libraries(std::vector<int> size, bool do_3d, FastFFT::SizeChangeType::Enum size_change_type, bool do_rectangle) {
 
-    using SCT = SizeChangeType::Enum;
+    using SCT = FastFFT::SizeChangeType::Enum;
 
     constexpr bool skip_cufft_for_profiling = false;
     constexpr bool print_out_time           = true;
@@ -1189,7 +1182,7 @@ void print_options(char** argv) {
 
 int main(int argc, char** argv) {
 
-    using SCT = SizeChangeType::Enum;
+    using SCT = FastFFT::SizeChangeType::Enum;
 
     if ( argc != 2 ) {
         print_options(argv);

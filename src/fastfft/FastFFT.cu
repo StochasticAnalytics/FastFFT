@@ -74,7 +74,7 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetDefaults( 
     is_in_memory_host_pointer   = false; // To track allocation of host side memory
     is_in_memory_device_pointer = false; // To track allocation of device side memory.
     is_in_buffer_memory         = false; // To track whether the current result is in dev_ptr.position_space or dev_ptr.position_space_buffer (momemtum space/ momentum space buffer respectively.)
-    transform_stage_completed   = none;
+    transform_stage_completed   = TransformStageCompleted::none;
 
     is_host_memory_pinned = false; // Specified in the constructor. Assuming host memory won't be pinned for many applications.
 
@@ -252,7 +252,7 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetDevicePoin
         }
     }
     else {
-        SetDimensions(CopyFromHost);
+        SetDimensions(DimensionCheckType::CopyFromHost);
         if constexpr ( std::is_same<decltype(d_ptr.momentum_space), __half2>::value ) {
             d_ptr.momentum_space        = (__half2*)d_ptr.position_space;
             d_ptr.position_space_buffer = &d_ptr.position_space[buffer_address];
@@ -269,7 +269,7 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetDevicePoin
 template <class ComputeType, class InputType, class OutputType, int Rank>
 void FourierTransformer<ComputeType, InputType, OutputType, Rank>::CopyHostToDevice( ) {
 
-    SetDimensions(CopyFromHost);
+    SetDimensions(DimensionCheckType::CopyFromHost);
     MyFFTDebugAssertTrue(is_in_memory_host_pointer, "Host memory not allocated");
 
     // FIXME switch to stream ordered malloc
@@ -298,7 +298,7 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::CopyHostToDev
 template <class ComputeType, class InputType, class OutputType, int Rank>
 void FourierTransformer<ComputeType, InputType, OutputType, Rank>::CopyDeviceToHost(bool free_gpu_memory, bool unpin_host_memory, int n_elements_to_copy) {
 
-    SetDimensions(CopyToHost);
+    SetDimensions(DimensionCheckType::CopyToHost);
     if ( n_elements_to_copy != 0 )
         memory_size_to_copy = n_elements_to_copy;
 
@@ -333,7 +333,7 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::CopyDeviceToH
 template <class ComputeType, class InputType, class OutputType, int Rank>
 void FourierTransformer<ComputeType, InputType, OutputType, Rank>::CopyDeviceToHost(OutputType* output_pointer, bool free_gpu_memory, bool unpin_host_memory, int n_elements_to_copy) {
 
-    SetDimensions(CopyToHost);
+    SetDimensions(DimensionCheckType::CopyToHost);
     if ( n_elements_to_copy != 0 )
         memory_size_to_copy = n_elements_to_copy;
     MyFFTDebugAssertTrue(is_in_memory_device_pointer, "GPU memory not allocated");
@@ -376,7 +376,7 @@ template <class ComputeType, class InputType, class OutputType, int Rank>
 template <class PreOpType, class IntraOpType>
 void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Fwd(PreOpType pre_op, IntraOpType intra_op) {
 
-    SetDimensions(FwdTransform);
+    SetDimensions(DimensionCheckType::FwdTransform);
 
     // All placeholders
     constexpr bool use_thread_method    = false;
@@ -441,7 +441,7 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Fwd(P
         }
         case 2: {
             switch ( fwd_size_change_type ) {
-                case no_change: {
+                case SizeChangeType::no_change: {
                     // FIXME there is some redundancy in specifying _decomposed and use_thread_method
                     // Note: the only time the non-transposed method should be used is for 1d data.
                     if ( use_thread_method ) {
@@ -456,13 +456,13 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Fwd(P
                     }
                     break;
                 }
-                case increase: {
+                case SizeChangeType::increase: {
                     SetPrecisionAndExectutionMethod(r2c_increase);
                     transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
                     SetPrecisionAndExectutionMethod(c2c_fwd_increase);
                     break;
                 }
-                case decrease: {
+                case SizeChangeType::decrease: {
                     SetPrecisionAndExectutionMethod(r2c_decrease);
                     transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
                     SetPrecisionAndExectutionMethod(c2c_fwd_decrease);
@@ -473,14 +473,14 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Fwd(P
         }
         case 3: {
             switch ( fwd_size_change_type ) {
-                case no_change: {
+                case SizeChangeType::no_change: {
                     SetPrecisionAndExectutionMethod(r2c_none_XZ);
                     transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
                     SetPrecisionAndExectutionMethod(c2c_fwd_none_Z);
                     SetPrecisionAndExectutionMethod(c2c_fwd_none);
                     break;
                 }
-                case increase: {
+                case SizeChangeType::increase: {
                     SetPrecisionAndExectutionMethod(r2c_increase_XZ);
                     transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
                     SetPrecisionAndExectutionMethod(c2c_fwd_increase_Z);
@@ -488,7 +488,7 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Fwd(P
                     // SetPrecisionAndExectutionMethod(c2c_fwd_increase_Z);
                     break;
                 }
-                case decrease: {
+                case SizeChangeType::decrease: {
                     // Not yet supported
                     MyFFTRunTimeAssertTrue(false, "3D FFT fwd no change not yet supported");
                     break;
@@ -502,7 +502,7 @@ template <class ComputeType, class InputType, class OutputType, int Rank>
 template <class IntraOpType, class PostOpType>
 void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Inv(IntraOpType intra_op, PostOpType post_op) {
 
-    SetDimensions(InvTransform);
+    SetDimensions(DimensionCheckType::InvTransform);
 
     // All placeholders
     constexpr bool use_thread_method    = false;
@@ -566,7 +566,7 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Inv(I
         }
         case 2: {
             switch ( inv_size_change_type ) {
-                case no_change: {
+                case SizeChangeType::no_change: {
                     // FIXME there is some redundancy in specifying _decomposed and use_thread_method
                     // Note: the only time the non-transposed method should be used is for 1d data.
                     if ( use_thread_method ) {
@@ -581,13 +581,13 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Inv(I
                     }
                     break;
                 }
-                case increase: {
+                case SizeChangeType::increase: {
                     SetPrecisionAndExectutionMethod(c2c_inv_increase);
                     transform_stage_completed = TransformStageCompleted::inv; // technically not complete, needed for copy on validation of partial fft.
                     SetPrecisionAndExectutionMethod(c2r_increase);
                     break;
                 }
-                case decrease: {
+                case SizeChangeType::decrease: {
                     SetPrecisionAndExectutionMethod(c2c_inv_decrease);
                     transform_stage_completed = TransformStageCompleted::inv; // technically not complete, needed for copy on validation of partial fft.
                     SetPrecisionAndExectutionMethod(c2r_decrease);
@@ -602,20 +602,20 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Inv(I
         }
         case 3: {
             switch ( inv_size_change_type ) {
-                case no_change: {
+                case SizeChangeType::no_change: {
                     SetPrecisionAndExectutionMethod(c2c_inv_none_XZ);
                     transform_stage_completed = TransformStageCompleted::inv; // technically not complete, needed for copy on validation of partial fft.
                     SetPrecisionAndExectutionMethod(c2c_inv_none_Z);
                     SetPrecisionAndExectutionMethod(c2r_none);
                     break;
                 }
-                case increase: {
+                case SizeChangeType::increase: {
                     SetPrecisionAndExectutionMethod(r2c_increase);
                     transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
                     // SetPrecisionAndExectutionMethod(c2c_fwd_increase_Z);
                     break;
                 }
-                case decrease: {
+                case SizeChangeType::decrease: {
                     // Not yet supported
                     MyFFTRunTimeAssertTrue(false, "3D FFT inv no decrease not yet supported");
                     break;
@@ -814,7 +814,7 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Fwd_I
 
     // Set the member pointer to the passed pointer
     d_ptr.image_to_search = image_to_search;
-    SetDimensions(FwdTransform);
+    SetDimensions(DimensionCheckType::FwdTransform);
 
     switch ( transform_dimension ) {
         case 1: {
@@ -824,18 +824,18 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Fwd_I
         case 2: {
             ;
             switch ( fwd_size_change_type ) {
-                case no_change: {
+                case SizeChangeType::no_change: {
                     SetPrecisionAndExectutionMethod(r2c_none_XY, true);
                     switch ( inv_size_change_type ) {
-                        case no_change: {
+                        case SizeChangeType::no_change: {
                             MyFFTRunTimeAssertTrue(false, "2D FFT generic lambda no change/nochange not yet supported");
                             break;
                         }
-                        case increase: {
+                        case SizeChangeType::increase: {
                             MyFFTRunTimeAssertTrue(false, "2D FFT generic lambda no change/increase not yet supported");
                             break;
                         }
-                        case decrease: {
+                        case SizeChangeType::decrease: {
                             SetPrecisionAndExectutionMethod(xcorr_fwd_none_inv_decrease, true);
                             SetPrecisionAndExectutionMethod(c2r_decrease, false);
                             break;
@@ -847,23 +847,23 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Fwd_I
                     } // switch on inv size change type
                     break;
                 } // case fwd no change
-                case increase: {
+                case SizeChangeType::increase: {
                     SetPrecisionAndExectutionMethod(r2c_increase, true);
                     switch ( inv_size_change_type ) {
-                        case no_change: {
+                        case SizeChangeType::no_change: {
                             SetPrecisionAndExectutionMethod<false, PreOpType, IntraOpType, PostOpType>(generic_fwd_increase_op_inv_none, true, pre_op_lambda, intra_op_lambda, post_op_lambda);
                             SetPrecisionAndExectutionMethod(c2r_none_XY, false);
                             transform_stage_completed = TransformStageCompleted::inv;
                             break;
                         }
 
-                        case increase: {
+                        case SizeChangeType::increase: {
                             // I don't see where increase increase makes any sense
                             // FIXME add a check on this in the validation step.
                             MyFFTRunTimeAssertTrue(false, "2D FFT Cross correlation with fwd and inv size increase is not supported");
                             break;
                         }
-                        case decrease: {
+                        case SizeChangeType::decrease: {
                             // with FwdTransform set, call c2c
                             // Set InvTransform
                             // Call new kernel that handles the conj mul inv c2c trimmed, and inv c2r in one go.
@@ -877,22 +877,22 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Fwd_I
                     } // switch on inv size change type
                     break;
                 }
-                case decrease: {
+                case SizeChangeType::decrease: {
 
                     SetPrecisionAndExectutionMethod(r2c_decrease, true);
                     switch ( inv_size_change_type ) {
-                        case no_change: {
+                        case SizeChangeType::no_change: {
                             SetPrecisionAndExectutionMethod(xcorr_fwd_increase_inv_none, true);
                             SetPrecisionAndExectutionMethod(c2r_none_XY, false); // TODO the output could be smaller
                             transform_stage_completed = TransformStageCompleted::inv;
                             break;
                         }
-                        case increase: {
+                        case SizeChangeType::increase: {
 
                             MyFFTRunTimeAssertTrue(false, "2D FFT Cross correlation with fwd and inv size increase is not supported");
                             break;
                         }
-                        case decrease: {
+                        case SizeChangeType::decrease: {
 
                             MyFFTRunTimeAssertTrue(false, "2D FFT Cross correlation with fwd decrease and inv size decrease is a work in progress");
                             break;
@@ -912,29 +912,29 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Fwd_I
         }
         case 3: {
             switch ( fwd_size_change_type ) {
-                case no_change: {
+                case SizeChangeType::no_change: {
                     MyFFTDebugAssertTrue(false, "3D FFT Cross correlation fwd no change not yet supported");
                     switch ( inv_size_change_type ) {
-                        case no_change: {
+                        case SizeChangeType::no_change: {
                             break;
                         }
-                        case increase: {
+                        case SizeChangeType::increase: {
                             MyFFTDebugAssertTrue(false, "3D FFT Cross correlation with fwd and inv size increase is not supported");
                             break;
                         }
-                        case decrease: {
+                        case SizeChangeType::decrease: {
                             MyFFTDebugAssertTrue(false, "3D FFT Cross correlation with fwd and inv size decrease is not supported");
                             break;
                         }
                     }
                     break;
                 }
-                case increase: {
+                case SizeChangeType::increase: {
                     SetPrecisionAndExectutionMethod(r2c_increase_XZ);
                     transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
                     SetPrecisionAndExectutionMethod(c2c_fwd_increase_Z);
                     switch ( inv_size_change_type ) {
-                        case no_change: {
+                        case SizeChangeType::no_change: {
                             // TODO: will need a kernel for generic_fwd_increase_op_inv_none_XZ
                             SetPrecisionAndExectutionMethod(generic_fwd_increase_op_inv_none);
                             // SetPrecisionAndExectutionMethod(c2c_inv_none_XZ);
@@ -943,11 +943,11 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Fwd_I
                             SetPrecisionAndExectutionMethod(c2r_none);
                             break;
                         }
-                        case increase: {
+                        case SizeChangeType::increase: {
                             MyFFTDebugAssertTrue(false, "3D FFT Cross correlation with fwd and inv size increase is not supported");
                             break;
                         }
-                        case decrease: {
+                        case SizeChangeType::decrease: {
                             MyFFTDebugAssertTrue(false, "3D FFT Cross correlation with fwd and inv size decrease is not supported");
                             break;
                         }
@@ -957,17 +957,17 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::Generic_Fwd_I
                     }
                     break;
                 }
-                case decrease: {
+                case SizeChangeType::decrease: {
                     MyFFTDebugAssertTrue(false, "3D FFT Cross correlation fwd decrease not yet supported");
                     switch ( inv_size_change_type ) {
-                        case no_change: {
+                        case SizeChangeType::no_change: {
                             break;
                         }
-                        case increase: {
+                        case SizeChangeType::increase: {
                             MyFFTDebugAssertTrue(false, "3D FFT Cross correlation with fwd and inv size increase is not supported");
                             break;
                         }
-                        case decrease: {
+                        case SizeChangeType::decrease: {
                             MyFFTDebugAssertTrue(false, "3D FFT Cross correlation with fwd and inv size decrease is not supported");
                             break;
                         }
@@ -1009,7 +1009,7 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::ValidateDimen
         MyFFTDebugAssertTrue(fwd_dims_out.y >= fwd_dims_in.y, "If padding, all dimensions must be >=, y out < y in");
         MyFFTDebugAssertTrue(fwd_dims_out.z >= fwd_dims_in.z, "If padding, all dimensions must be >=, z out < z in");
 
-        fwd_size_change_type = increase;
+        fwd_size_change_type = SizeChangeType::increase;
     }
     else if ( fwd_dims_out.x < fwd_dims_in.x || fwd_dims_out.y < fwd_dims_in.y || fwd_dims_out.z < fwd_dims_in.z ) {
         // For now we must pad in all dimensions, this is not needed and should be lifted. FIXME
@@ -1017,10 +1017,10 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::ValidateDimen
         MyFFTDebugAssertTrue(fwd_dims_out.y <= fwd_dims_in.y, "If padding, all dimensions must be <=, y out > y in");
         MyFFTDebugAssertTrue(fwd_dims_out.z <= fwd_dims_in.z, "If padding, all dimensions must be <=, z out > z in");
 
-        fwd_size_change_type = decrease;
+        fwd_size_change_type = SizeChangeType::decrease;
     }
     else if ( fwd_dims_out.x == fwd_dims_in.x && fwd_dims_out.y == fwd_dims_in.y && fwd_dims_out.z == fwd_dims_in.z ) {
-        fwd_size_change_type = no_change;
+        fwd_size_change_type = SizeChangeType::no_change;
     }
     else {
         // TODO: if this is relaxed, the dimensionality check below will be invalid.
@@ -1034,13 +1034,13 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::ValidateDimen
         MyFFTDebugAssertTrue(inv_dims_out.y >= inv_dims_in.y, "If padding, all dimensions must be >=, y out < y in");
         MyFFTDebugAssertTrue(inv_dims_out.z >= inv_dims_in.z, "If padding, all dimensions must be >=, z out < z in");
 
-        inv_size_change_type = increase;
+        inv_size_change_type = SizeChangeType::increase;
     }
     else if ( inv_dims_out.x < inv_dims_in.x || inv_dims_out.y < inv_dims_in.y || inv_dims_out.z < inv_dims_in.z ) {
-        inv_size_change_type = decrease;
+        inv_size_change_type = SizeChangeType::decrease;
     }
     else if ( inv_dims_out.x == inv_dims_in.x && inv_dims_out.y == inv_dims_in.y && inv_dims_out.z == inv_dims_in.z ) {
-        inv_size_change_type = no_change;
+        inv_size_change_type = SizeChangeType::no_change;
     }
     else {
         // TODO: if this is relaxed, the dimensionality check below will be invalid.
@@ -1072,33 +1072,33 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::ValidateDimen
 }
 
 template <class ComputeType, class InputType, class OutputType, int Rank>
-void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetDimensions(DimensionCheckType check_op_type) {
+void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetDimensions(DimensionCheckType::Enum check_op_type) {
     // This should be run inside any public method call to ensure things ar properly setup.
     if ( ! is_size_validated ) {
         ValidateDimensions( );
     }
 
     switch ( check_op_type ) {
-        case CopyFromHost: {
+        case DimensionCheckType::CopyFromHost: {
             // MyFFTDebugAssertTrue(transform_stage_completed == none, "When copying from host, the transform stage should be none, something has gone wrong.");
             // FIXME: is this the right thing to do? Maybe this should be explicitly "reset" when the input image is "refereshed."
-            transform_stage_completed = none;
+            transform_stage_completed = TransformStageCompleted::none;
             memory_size_to_copy       = input_memory_allocated;
             break;
         }
 
-        case CopyToHost: {
+        case DimensionCheckType::CopyToHost: {
             // FIXME currently there is no check that the right amount of memory is allocated on the host side array.
             switch ( transform_stage_completed ) {
-                case no_change: {
+                case SizeChangeType::no_change: {
                     memory_size_to_copy = input_memory_allocated;
                     break;
                 }
-                case fwd: {
+                case TransformStageCompleted::fwd: {
                     memory_size_to_copy = fwd_output_memory_allocated;
                     break;
                 }
-                case inv: {
+                case TransformStageCompleted::inv: {
                     memory_size_to_copy = inv_output_memory_allocated;
                     break;
                 }
@@ -1106,12 +1106,12 @@ void FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetDimensions
             break;
         } // case CopToHose
 
-        case FwdTransform: {
+        case DimensionCheckType::FwdTransform: {
             MyFFTDebugAssertTrue(transform_stage_completed == none || transform_stage_completed == inv, "When doing a forward transform, the transform stage completed should be none, something has gone wrong.");
             break;
         }
 
-        case InvTransform: {
+        case DimensionCheckType::InvTransform: {
             MyFFTDebugAssertTrue(transform_stage_completed == fwd, "When doing an inverse transform, the transform stage completed should be fwd, something has gone wrong.");
             break;
         }
@@ -3074,7 +3074,7 @@ LaunchParams FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetLa
     // Set the twiddle factor, only differ in sign between fwd/inv transforms.
     // For mixed kernels (eg. xcorr_* the size type is defined by where the size change happens.
     // FIXME fwd_increase (oversampling) xcorr -> inv decrease (peak search) is a likely algorithm, that will not fit with this logic.
-    SizeChangeType size_change_type;
+    SizeChangeType::Enum size_change_type;
     if ( IsForwardType(kernel_type) ) {
         size_change_type = fwd_size_change_type;
         L.twiddle_in = L.twiddle_in = -2 * pi_v<float> / transform_size.N;
@@ -3089,7 +3089,7 @@ LaunchParams FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetLa
         L.threadsPerBlock = dim3(transform_size.Q, 1, 1);
     }
     else {
-        if ( size_change_type == decrease ) {
+        if ( size_change_type == SizeChangeType::decrease ) {
             L.threadsPerBlock = dim3(transform_size.P / ept, 1, transform_size.Q);
         }
         else {
@@ -3100,14 +3100,14 @@ LaunchParams FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetLa
 
     // Set the shared mem sizes, which depend on the size_change_type
     switch ( size_change_type ) {
-        case no_change: {
+        case SizeChangeType::no_change: {
             // no shared memory is needed outside that for the FFT itself.
             // For C2C kernels of size_type increase, the shared output may be reset below in order to store for coalesced global writes.
             L.mem_offsets.shared_input  = 0;
             L.mem_offsets.shared_output = 0;
             break;
         }
-        case decrease: {
+        case SizeChangeType::decrease: {
             // Prior to reduction, we must be able to store the full transform. An alternate algorithm with multiple reads would relieve this dependency and
             // may be worth considering if L2 cache residence on Ampere is an effective way to reduce repeated Globabl memory access.
             // Note: that this shared memory is not static, in the sense that it is used both for temporory fast storage, as well as the calculation of the FFT. The max of those two requirments is calculated per kernel.
@@ -3120,7 +3120,7 @@ LaunchParams FourierTransformer<ComputeType, InputType, OutputType, Rank>::SetLa
             } // TODO this line is just from case increase, haven't thought about it.
             break;
         }
-        case increase: {
+        case SizeChangeType::increase: {
             // We want to re-use the input memory as we loop over construction of the full FFT. This shared memory is independent of the
             // memory used for the FFT itself.
             L.mem_offsets.shared_input = transform_size.P;
