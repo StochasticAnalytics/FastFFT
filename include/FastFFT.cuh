@@ -96,8 +96,8 @@ constexpr inline bool IS_IKF_t( ) {
             #define postcheck
             #define precheck
         #else
-            #define postcheck  { cudaErr(cudaPeekAtLastError( )); cudaError_t error = cudaStreamSynchronize(cudaStreamPerThread); cudaErr(error); };
-            #define precheck { cudaErr(cudaGetLastError( )); }
+            #define postcheck  { cudaErr(cudaPeekAtLastError( )); cudaError_t error = cudaStreamSynchronize(cudaStreamPerThread); cudaErr(error) }
+            #define precheck { cudaErr(cudaGetLastError( )) }
         #endif
     #endif
 #endif
@@ -123,6 +123,19 @@ __device__ __forceinline__ void SINCOS(float arg, float* s, float* c) {
 #endif
 
 namespace FastFFT {
+
+template <typename T>
+bool pointer_is_in_memory_and_registered(T ptr, const char* ptr_name = nullptr) {
+    cudaPointerAttributes attr;
+    cudaErr(cudaPointerGetAttributes(&attr, ptr));
+
+    if ( attr.type == 1 && attr.devicePointer == attr.hostPointer ) {
+        return true;
+    }
+    else {
+        return false;
+    }
+}
 
 __device__ __forceinline__ int
 d_ReturnReal1DAddressFromPhysicalCoord(int3 coords, short4 img_dims) {
@@ -283,8 +296,9 @@ class my_functor<T, 2, IKF_t::CONJ_MUL> final {
             T
             operator( )(float& template_fft_x, float& template_fft_y, const float& target_fft_x, const float& target_fft_y) {
         // Is there a better way than declaring this variable each time?
+        // This is target * conj(template)
         float tmp      = (template_fft_x * target_fft_x + template_fft_y * target_fft_y);
-        template_fft_y = (template_fft_y * target_fft_x - template_fft_x * target_fft_y);
+        template_fft_y = (template_fft_x * target_fft_y - template_fft_y * target_fft_x);
         template_fft_x = tmp;
     }
 };
@@ -370,7 +384,7 @@ template <class FFT, class invFFT, class ComplexType = typename FFT::value_type,
 __launch_bounds__(FFT::max_threads_per_block) __global__
         void block_fft_kernel_C2C_FWD_INCREASE_OP_INV_NONE(const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values,
                                                            Offsets mem_offsets, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv,
-                                                           PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda);
+                                                           PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
 
 template <class FFT, class invFFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
@@ -751,12 +765,12 @@ struct io {
     template <class FunctionType>
     static inline __device__ void load_shared(const complex_type* image_to_search,
                                               complex_type*       thread_data,
-                                              FunctionType        intra_op_lambda = nullptr) {
+                                              FunctionType        intra_op_functor = nullptr) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         if constexpr ( IS_IKF_t<FunctionType>( ) ) {
             for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
-                intra_op_lambda(thread_data[i].x, thread_data[i].y, image_to_search[index].x, image_to_search[index].y); //ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
+                intra_op_functor(thread_data[i].x, thread_data[i].y, image_to_search[index].x, image_to_search[index].y); //ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
                 index += stride;
             }
         }
@@ -1012,20 +1026,20 @@ struct io {
         }
     }
 
-    //  TODO: set pre_op_lambda to default=false and get rid of other load
+    //  TODO: set pre_op_functor to default=false and get rid of other load
     template <class FunctionType>
     static inline __device__ void load(const complex_type* input,
                                        complex_type*       thread_data,
                                        int                 last_index_to_load,
-                                       FunctionType        pre_op_lambda = nullptr) {
+                                       FunctionType        pre_op_functor = nullptr) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         if constexpr ( IS_IKF_t<FunctionType>( ) ) {
             for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
                 if ( index < last_index_to_load )
-                    thread_data[i] = pre_op_lambda(input[index]);
+                    thread_data[i] = pre_op_functor(input[index]);
                 else
-                    thread_data[i] = pre_op_lambda(complex_type(0.0f, 0.0f));
+                    thread_data[i] = pre_op_functor(complex_type(0.0f, 0.0f));
                 index += stride;
             }
         }
@@ -1082,12 +1096,12 @@ struct io {
     template <class FunctionType = std::nullptr_t>
     static inline __device__ void store(const complex_type* thread_data,
                                         complex_type*       output,
-                                        FunctionType        post_op_lambda = nullptr) {
+                                        FunctionType        post_op_functor = nullptr) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         if constexpr ( IS_IKF_t<FunctionType>( ) ) {
             for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
-                output[index] = post_op_lambda(thread_data[i]);
+                output[index] = post_op_functor(thread_data[i]);
                 index += stride;
             }
         }

@@ -39,8 +39,8 @@ bool const_image_test(std::vector<int>& size) {
         FastFFT::FourierTransformer<float, float, float, Rank> FT;
 
         // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
-        FT.SetForwardFFTPlan(input_size.x, input_size.y, input_size.z, output_size.x, output_size.y, output_size.z, true, false);
-        FT.SetInverseFFTPlan(output_size.x, output_size.y, output_size.z, output_size.x, output_size.y, output_size.z, true);
+        FT.SetForwardFFTPlan(input_size.x, input_size.y, input_size.z, output_size.x, output_size.y, output_size.z);
+        FT.SetInverseFFTPlan(output_size.x, output_size.y, output_size.z, output_size.x, output_size.y, output_size.z);
 
         // The padding (dims.w) is calculated based on the setup
         short4 dims_in  = FT.ReturnFwdInputDimensions( );
@@ -78,7 +78,7 @@ bool const_image_test(std::vector<int>& size) {
         // MyFFTDebugAssertTestTrue( sum == dims_out.x*dims_out.y*dims_out.z,"Unit impulse Init ");
 
         // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
-        FT.CopyHostToDevice( );
+        FT.CopyHostToDevice(host_output.real_values);
 
         host_output.FwdFFT( );
 
@@ -106,7 +106,7 @@ bool const_image_test(std::vector<int>& size) {
         FT.FwdFFT( );
 
         // in buffer, do not deallocate, do not unpin memory
-        FT.CopyDeviceToHost(false, false);
+        FT.CopyDeviceToHostAndSynchronize(host_output.real_values, false);
         test_passed = true;
         // FIXME: centralized test conditions
         for ( long index = 1; index < host_output.real_memory_allocated / 2; index++ ) {
@@ -131,7 +131,7 @@ bool const_image_test(std::vector<int>& size) {
         FT.SetToConstant(host_input.real_values, host_input.real_memory_allocated, 2.0f);
 
         FT.InvFFT( );
-        FT.CopyDeviceToHost(true, true);
+        FT.CopyDeviceToHostAndSynchronize(host_output.real_values, true);
 
         if constexpr ( FFT_DEBUG_STAGE > 4 ) {
             continue_debugging = debug_partial_fft<FFT_DEBUG_STAGE, Rank>(host_output, dims_in, dims_out, dims_in, dims_out, __LINE__);

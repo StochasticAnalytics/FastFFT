@@ -181,7 +181,7 @@ bool debug_partial_fft(Image<realType, complexType>& test_image,
     else
         MyTestPrintAndExit("FFT_DEBUG_STAGE not recognized " + std::to_string(FFT_DEBUG_STAGE));
 
-    std::cerr << "Debug stage " << fft_debug_stage << " passed." << std::endl;
+    // std::cerr << "Debug stage " << fft_debug_stage << " passed." << std::endl;
     return debug_stage_is_8;
 
     if ( ! debug_stage_is_8 )

@@ -48,8 +48,8 @@ bool unit_impulse_test(std::vector<int> size, bool do_increase_size) {
             // For the time being input and output are also float. TODO calc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
             FastFFT::FourierTransformer<float, float, float, Rank> FT;
             // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
-            FT.SetForwardFFTPlan(input_size.x, input_size.y, input_size.z, output_size.x, output_size.y, output_size.z, true, false);
-            FT.SetInverseFFTPlan(output_size.x, output_size.y, output_size.z, output_size.x, output_size.y, output_size.z, true);
+            FT.SetForwardFFTPlan(input_size.x, input_size.y, input_size.z, output_size.x, output_size.y, output_size.z);
+            FT.SetInverseFFTPlan(output_size.x, output_size.y, output_size.z, output_size.x, output_size.y, output_size.z);
 
             // The padding (dims.w) is calculated based on the setup
             short4 dims_in  = FT.ReturnFwdInputDimensions( );
@@ -91,7 +91,7 @@ bool unit_impulse_test(std::vector<int> size, bool do_increase_size) {
             // }
 
             // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
-            FT.CopyHostToDevice( );
+            FT.CopyHostToDevice(host_input.real_values);
 
             host_output.FwdFFT( );
 
@@ -119,13 +119,13 @@ bool unit_impulse_test(std::vector<int> size, bool do_increase_size) {
             // We don't want this to break compilation of other tests, so only check at runtime.
             if constexpr ( FFT_DEBUG_STAGE < 5 ) {
                 if ( do_increase_size ) {
-                    FT.CopyDeviceToHost(host_output.real_values, false, false);
+                    FT.CopyDeviceToHostAndSynchronize(host_output.real_values, false);
                     // Right now, only testing a size change on the forward transform,
                     continue_debugging = debug_partial_fft<FFT_DEBUG_STAGE, Rank>(host_output, input_size, output_size, output_size, output_size, __LINE__);
                     sum                = host_output.ReturnSumOfComplexAmplitudes(host_output.complex_values, host_output.real_memory_allocated / 2);
                 }
                 else {
-                    FT.CopyDeviceToHost(false, false, FT.ReturnInputMemorySize( ));
+                    FT.CopyDeviceToHostAndSynchronize(host_input.real_values, FT.ReturnInputMemorySize( ));
                     continue_debugging = debug_partial_fft<FFT_DEBUG_STAGE, Rank>(host_input, input_size, output_size, output_size, output_size, __LINE__);
                     sum                = host_input.ReturnSumOfComplexAmplitudes(host_input.complex_values, host_input.real_memory_allocated / 2);
                 }
@@ -142,7 +142,7 @@ bool unit_impulse_test(std::vector<int> size, bool do_increase_size) {
             FT.SetToConstant(host_output.real_values, host_output.real_memory_allocated, 2.0f);
 
             FT.InvFFT( );
-            FT.CopyDeviceToHost(host_output.real_values, true, true);
+            FT.CopyDeviceToHostAndSynchronize(host_output.real_values, true);
 
             if constexpr ( FFT_DEBUG_STAGE > 4 ) {
                 // Right now, only testing a size change on the forward transform,

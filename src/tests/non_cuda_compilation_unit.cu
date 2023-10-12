@@ -10,7 +10,7 @@ int main(int argc, char** argv) {
 
     FastFFT::FourierTransformer<float, float, float, 2> FT;
     // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
-    FT.SetForwardFFTPlan(input_size, input_size, 1, input_size, input_size, 1, true, false);
+    FT.SetForwardFFTPlan(input_size, input_size, 1, input_size, input_size, 1, true);
     FT.SetInverseFFTPlan(input_size, input_size, 1, input_size, input_size, 1, false);
 
     // The padding (dims.w) is calculated based on the setup
@@ -57,14 +57,14 @@ int main(int argc, char** argv) {
     host_input.at(0) = 1.0f;
 
     // Copy to the device
-    FT.CopyHostToDevice( );
+    FT.CopyHostToDevice(host_input.data( ));
 
     // Do a round trip FFT
     FT.FwdFFT( );
     FT.InvFFT( );
 
     // Now copy back to the output array (still set to -1)
-    FT.CopyDeviceToHost(host_output.data( ), true, true, host_input_real_memory_allocated);
+    FT.CopyDeviceToHost(host_output.data( ), true, host_input_real_memory_allocated);
     if ( host_output.at(0) == input_size * input_size ) {
         std::cout << "Success: output memory copied back correctly after fft/ifft pair" << std::endl;
     }

@@ -54,12 +54,14 @@ void Image<wanted_real_type, wanted_complex_type>::SetClipIntoMask(short4 input_
     int   n_values = output_size.w * 2 * output_size.y;
     bool* tmpMask  = new bool[n_values];
 
-    precheck
-            cudaErr(cudaMalloc(&clipIntoMask, (n_values) * sizeof(bool)));
-    postcheck
+    precheck;
+    cudaErr(cudaMalloc(&clipIntoMask, (n_values) * sizeof(bool)));
+    postcheck;
 
-            if ( output_size.x % 2 == 0 ) pjv = 2;
-    else pjv                                  = 1;
+    if ( output_size.x % 2 == 0 )
+        pjv = 2;
+    else
+        pjv = 1;
 
     for ( int j = 0; j < output_size.y; j++ ) {
         for ( int i = 0; i < output_size.x; i++ ) {
@@ -276,27 +278,27 @@ __device__ cufftCallbackLoadR d_realLoadAndClipInto = CB_realLoadAndClipInto;
 //   CB_realLoadAndClipInto_params* d_params;
 //   CB_realLoadAndClipInto_params h_params;
 
-//   precheck
+//   precheck;
 //   h_params.target = (cufftReal *)image_to_insert;
 //   h_params.mask = (bool*) clipIntoMask;
 //   cudaErr(cudaMalloc((void **)&d_params,sizeof(CB_realLoadAndClipInto_params)));
-//   postcheck
+//   postcheck;
 
-//   precheck
+//   precheck;
 //   cudaErr(cudaMemcpyAsync(d_params, &h_params, sizeof(CB_realLoadAndClipInto_params), cudaMemcpyHostToDevice, cudaStreamPerThread));
-//   postcheck
+//   postcheck;
 
-//   precheck
+//   precheck;
 //   cudaErr(cudaMemcpyFromSymbol(&h_realLoadAndClipInto,d_realLoadAndClipInto, sizeof(h_realLoadAndClipInto)));
-//   postcheck
+//   postcheck;
 
-//   precheck
+//   precheck;
 //   cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
-//   postcheck
+//   postcheck;
 
-//   precheck
+//   precheck;
 //   cudaErr(cufftXtSetCallback(cuda_plan_forward, (void **)&h_realLoadAndClipInto, CUFFT_CB_LD_REAL, (void **)&d_params));
-//   postcheck
+//   postcheck;
 
 // }
 
