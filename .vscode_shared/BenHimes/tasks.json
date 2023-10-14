@@ -14,7 +14,12 @@
     {
       "label": "Book_build",
       "type": "shell",
-      "command": "${HOME}/.FastFFTDocs/bin/jupyter-book build --all ./docs && firefox ./docs/_build/html/index.html"
+      "command": "${HOME}/.FastFFTDocs/bin/jupyter-book build --all ./docs && firefox ./docs/_build/html/index.html",
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
     },
     {
       "label": "Book_publish",
