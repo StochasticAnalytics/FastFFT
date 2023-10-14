@@ -1,4 +1,4 @@
-# TODO: nvc++ ?
+
 NVCC=nvcc
 # TODO: test with gcc and clang
 NVCC_FLAGS=-ccbin=g++ -t 8 
@@ -14,26 +14,24 @@ NVCC_FLAGS+=-DCUFFTDX_DISABLE_RUNTIME_ASSERTS
 # Gencode arguments, only supporting Volta or newer
 # SMS ?= 70 75 80 86
 # In initial dev, only compile for 70 or 86 depending on which workstation I'm on, b/c it is faster.
-SMS ?=  70 86
+SMS ?=  86
 
-# Need to 
-# GENCODE_FLAGS := -gencode arch=compute_86,code=lto_86
-# GENCODE_FLAGS := -gencode arch=compute_86,code=lto_86
-
-ifeq ($(GENCODE_FLAGS),)
-# Generate SASS code for each SM architecture listed in $(SMS)
-$(foreach sm,$(SMS),$(eval GENCODE_FLAGS += -gencode arch=compute_$(sm),code=sm_$(sm)))
-
-
-# Generate PTX code from the highest SM architecture in $(SMS) to guarantee forward-compatibility
-HIGHEST_SM := $(lastword $(sort $(SMS)))
-ifneq ($(HIGHEST_SM),)
-GENCODE_FLAGS += -gencode arch=compute_$(HIGHEST_SM),code=sm_$(HIGHEST_SM)
+ifeq (${FastFFT_lto},1)
+$(info "Building with LTO")
+GENCODE_FLAGS := -gencode arch=compute_86,code=lto_86
+else
+$(info "Building without LTO")
+GENCODE_FLAGS := -gencode arch=compute_86,code=sm_86
 endif
-endif # GENCODE_FLAGS
+
+
+# TODO:
+# Lets first clean this up to have several targets, one for the library, one for the tests and move the helper Image object to the tests.
+# Lets then get set lto as an option using an environment (or cli) variable. Print this out and alter the binary name.
+# For now, just build with 86 for speed.
 
 # FIXME: this is set in my own bashrc. Until cufftdx comes out of early release, this is fine.
-CUFFTDX_INCLUDE_DIR := $(FastFFT_cufftdx_dir)/include
+CUFFTDX_INCLUDE_DIR := ../include
 $(info $$CUFFTDX_INCLUDE_DIR is [${CUFFTDX_INCLUDE_DIR}])
 
 # TODO: check on cuda version (building with 11.3.1 r/n)
@@ -41,9 +39,7 @@ CUDA_BIN_DIR=$(shell dirname `which $(NVCC)`)
 CUDA_INCLUDE_DIR=$(CUDA_BIN_DIR)/../include
 
 
-SRCS=test.cu
-TARGETS=test
-
+DEBUG_FLAGS :=  
 # Debug level determines various asserts and print macros defined in FastFFT.cuh These should only be set when building tests and developing.
 ifeq (${FFT_DEBUG_LEVEL},)
 debug_level=0
@@ -52,7 +48,7 @@ else
 debug_level=${FFT_DEBUG_LEVEL}
 $(info $$debug_level is  [${FFT_DEBUG_LEVEL}])
 endif
-NVCC_FLAGS+=-DFFT_DEBUG_LEVEL=${debug_level}
+DEBUG_FLAGS+=-DFFT_DEBUG_LEVEL=${debug_level}
 
 # For testing/debugging it is convenient to execute and have print functions for partial transforms.
 # These will go directly in the kernels and also in the helper Image.cuh definitions for PrintArray.
@@ -61,17 +57,14 @@ NVCC_FLAGS+=-DFFT_DEBUG_LEVEL=${debug_level}
 # 4 intermediate ops, like conj multiplication
 # Inv 5, 6, 7 ( original y, z, x)
 
-ifeq (${DEBUG_STAGE},)
+ifeq (${FFT_DEBUG_STAGE},)
 debug_stage=8
-$(info $$DEBUG_STAGE is not defined, setting to 8)
+$(info $$FFT_DEBUG_STAGE is not defined, setting to 8)
 else
-debug_stage=${DEBUG_STAGE}
-$(info $$debug_stage is  [${DEBUG_STAGE}])
+debug_stage=${FFT_DEBUG_STAGE}
+$(info $$debug_stage is  [${FFT_DEBUG_STAGE}])
 endif
-
-ifneq (${HEAVYERRORCHECKING_FFT},)
-NVCC_FLAGS+=-DHEAVYERRORCHECKING_FFT
-endif
+DEBUG_FLAGS+=-DFFT_DEBUG_STAGE=${debug_stage}
 
 # Track what the last build did so that the pre-commit hook can skip re-building if there is no debug included.
 remove_debug_file=0
@@ -81,41 +74,27 @@ ifeq (${debug_stage}, 8)
 	endif
 else
 	remove_debug_file=1
-ifeq (${HEAVYERRORCHECKING_FFT},)
+endif
+
+ifeq (${FastFFT_sync_checking},1)
 # If HEAVYERRORCHECKING_FFT is not already asked for, then add it anytime debug_stage < 8 (partial FFTs)
-	NVCC_FLAGS+=-DHEAVYERRORCHECKING_FFT
+	DEBUG_FLAGS+=-DHEAVYERRORCHECKING_FFT
 endif
-endif
 
 
-# Assuming make is being run from build
-TESTS_BUILD_DIR := ./tests
-EXAMPLE_BUILD_DIR := ./examples
-BENCHMARK_BUILD_DIR := ./benchmarks
 
-SRC_DIR  := ../src
+# External libraries used for testing
+EXTERNAL_LIBS= -lfftw3f -lcufft_static -lculibos -lcudart_static -lrt
 
-#TEST_SRCS=$(shell find $(SRC_DIR)/tests -name '*.cu' -or -name '*.cpp')
-# Because I am linking test.cu.cpp -> test.cu as a cheap trick to get auto formatting in vs code, we can't include cpp in the src list
-TEST_SRCS=$(shell find $(SRC_DIR)/tests -name '*.cu')
-EXAMPLE_SRCS=$(shell find $(SRC_DIR)/cpp -name '*.cu' -or -name '*.cpp')
-BENCHMARK_SRCS=$(shell find $(SRC_DIR)/benchmarks -name '*.cu' -or -name '*.cpp')
+TEST_BUILD_DIR=tests
+TEST_SRC_DIR=../src/tests
+# Get all the test source files and remove cu extension
+TEST_TARGETS=$(patsubst %.cu,$(TEST_BUILD_DIR)/%,$(notdir $(wildcard $(TEST_SRC_DIR)/*.cu)))
+TEST_DEPS=$(wildcard $(TEST_SRC_DIR)/*.cuh)
 
+$(info $$TEST_TARGETS is [${TEST_TARGETS}])
 
-TEST_TARGETS=$(patsubst $(SRC_DIR)/tests/%.cu,$(TESTS_BUILD_DIR)/%,$(TEST_SRCS))
-EXAMPLE_TARGETS=$(patsubst %.cpp,%,$(EXAMPLE_SRCS))
-BENCHMARK_TARGETS=$(patsubst %.cu,%,$(BENCHMARK_SRCS))
-
-TEST_OBJS=$(patsubst %,%.o,$(TEST_TARGETS))
-EXAMPLE_OBJS=$(patsubst %,%.o,$(EXAMPLE_TARGETS))
-BENCHMARK_OBJS=$(patsubst %,%.o,$(BENCHMARK_TARGETS))
-
-printit:
-	echo This is $(TEST_SRCS)
-	echo $(TEST_TARGETS)
-	echo $(TEST_OBJS)
-
-
+$(info )
 all: $(TEST_TARGETS)
 ifeq (${remove_debug_file}, 0)
 	touch built_without_debug.txt
@@ -123,63 +102,54 @@ else
 	rm -f built_without_debug.txt
 endif
 
-$(TEST_TARGETS): $(TEST_OBJS)
-	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -o $@ $< -lfftw3f -lcufft_static -lculibos -lcudart_static -lrt
-
-$(TEST_OBJS): $(TEST_SRCS)
-	mkdir -p $(TESTS_BUILD_DIR)
-	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DDEBUG_FFT_STAGE=${debug_stage} -o $@ $<
-
-# .PHONY: all examples tests benchmarks clean
-
-# all: build
-
-# build: simpleCUFFT_callback
-
-# check.deps:
-# ifeq ($(SAMPLE_ENABLED),0)
-# 	@echo "Sample will be waived due to the above missing dependencies"
-# else
-# 	@echo "Sample is ready - all dependencies have been met"
-# endif
-
-# simpleCUFFT_callback.o:simpleCUFFT_callback.cu
-# 	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
-
-# simpleCUFFT_callback: simpleCUFFT_callback.o
-# 	$(EXEC) $(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
-# 	$(EXEC) mkdir -p ../../bin/$(TARGET_ARCH)/$(TARGET_OS)/$(BUILD_TYPE)
-# 	$(EXEC) cp $@ ../../bin/$(TARGET_ARCH)/$(TARGET_OS)/$(BUILD_TYPE)
-
-# all:
-# 	$(NVCC) -dc $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) -DDEBUG_FFT_STAGE=${debug_stage} -o test.o -c ../cpp/test.cu
-# 	$(NVCC) $(NVCC_FLAGS) -o test.app test.o -lfftw3f -lcufft_static -lculibos -lcudart_static -lrt
+$(TEST_BUILD_DIR)/%: $(TEST_BUILD_DIR)/%.o lib/Image.o libFastFFT.a
+	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -o $@ $< lib/Image.o -L$(PWD) -lFastFFT $(EXTERNAL_LIBS)
+# $(NVCC) $(NVCC_FLAGS) -dlto -arch=sm_86 -I$(CUFFTDX_INCLUDE_DIR) $(DEBUG_FLAGS) -o $@ $^ -lFastFFT $(EXTERNAL_LIBS)
 
 
-# SRCS=$(filter-out nvrtc_*.cu, $(wildcard *.cu))
-# TARGETS=$(patsubst %.cu,%,$(SRCS))
+$(TEST_BUILD_DIR)/%.o: $(TEST_SRC_DIR)/%.cu $(TEST_DEPS)
+	@mkdir -p tests
+	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) $(DEBUG_FLAGS) -o $@ $<
 
-# NVRTC_SRCS=$(wildcard nvrtc_*.cu)
-# NVRTC_TARGETS=$(patsubst %.cu,%,$(NVRTC_SRCS))
+# tests/test1: tests/linkedTest.o tests/test.o lib/Image.o libFastFFT.a
+# 	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -o $@ $^ -L$(PWD) -lFastFFT $(EXTERNAL_LIBS)
+# # $(NVCC) $(NVCC_FLAGS) -dlto -arch=sm_86 -I$(CUFFTDX_INCLUDE_DIR) $(DEBUG_FLAGS) -o $@ $^ -lFastFFT $(EXTERNAL_LIBS)
 
-# $(TARGETS): %: %.cu
-# 	$(NVCC) -o $@ $< $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR)
+# tests/linkedTest.o: tests/test.o lib/Image.o 
+# 	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) $(DEBUG_FLAGS) --device-link -o $@ $^ 
+# # $(NVCC) $(NVCC_FLAGS) -dlto -arch=sm_86 -I$(CUFFTDX_INCLUDE_DIR) $(DEBUG_FLAGS) --device-link -o $@ $^ 
 
-# $(NVRTC_TARGETS): %: %.cu
-# 	$(NVCC) -o $@ $< $(NVCC_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) $(NVRTC_DEFINES) -lnvrtc -lcuda
+# tests/test.o: ../src/tests/test.cu
+# 	@mkdir -p tests
+# 	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) $(DEBUG_FLAGS) -o $@ $<
+
+lib/Image.o: ../src/fastfft/Image.cu ../src/fastfft/Image.cuh
+	@mkdir -p lib
+	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) $(DEBUG_FLAGS) -o $@ $< 
+	
+
+
+# Build the library, using static linking for now to make sure we're set to go with cisTEM
+libFastFFT.a: lib/FastFFT.o 
+	$(NVCC) $(NVCC_FLAGS) --lib $(GENCODE_FLAGS) $(DEBUG_FLAGS) -o $@ $^ $(EXTERNAL_LIBS)
+
+lib/FastFFT.o: ../src/fastfft/FastFFT.cu ../include/FastFFT.cuh
+	@mkdir -p lib
+	$(NVCC) -dc $(NVCC_FLAGS) $(GENCODE_FLAGS) -I$(CUFFTDX_INCLUDE_DIR) $(DEBUG_FLAGS) -o $@ $<  
+ 
 
 
 # remove all but the executables.
+.PHONY: clean
 clean:
-	rm -f $(TESTS_BUILD_DIR)/*.*
+	rm -f tests/*.o lib/*.o *.a *.o
 	rm -f $(TEST_TARGETS)
 
 
 # clean out everything.
-clobber:
-ifneq ($(TESTS_BUILD_DIR),)
-	rm -f $(TESTS_BUILD_DIR)/*
-	rmdir $(TESTS_BUILD_DIR)
-endif
+.PHONY: clobber
+clobber: clean
+	rm -f libFastFFT.a
+
 
 .DEFAULT_GOAL := all

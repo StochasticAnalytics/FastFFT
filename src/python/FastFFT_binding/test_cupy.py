@@ -11,7 +11,7 @@ a[0][0] = 1.0
 print("Cupy array is {}".format(a))
 
 # Setup the plans
-FT.SetForwardFFTPlan(16,16,1,16,16,1, True, True)
+FT.SetForwardFFTPlan(16,16,1,16,16,1, True)
 FT.Wait()
 FT.SetInverseFFTPlan(16,16,1,16,16,1, True)
 FT.Wait()

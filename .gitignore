@@ -45,4 +45,5 @@ build/*
 !build/build
 
 include/nvidia-mathdx-*
+include/cufftdx/
 

@@ -10,7 +10,6 @@ In src/FastFFT.cuh the HEAVYERRORCHECKING_FFT should be defined whenever definin
 Without these guards, it can be very difficult to know where errors are actually coming from!
 ```
 
-
 ```c++
 // When defined Turns on synchronization based checking for all FFT kernels as well as cudaErr macros
 #define HEAVYERRORCHECKING_FFT
@@ -24,8 +23,8 @@ Without these guards, it can be very difficult to know where errors are actually
 #define postcheck 
 #define precheck 
 #else
-#define postcheck { cudaErr(cudaPeekAtLastError()); cudaError_t error = cudaStreamSynchronize(cudaStreamPerThread); cudaErr(error); };
-#define precheck { cudaErr(cudaGetLastError()); }
+#define postcheck { cudaErr(cudaPeekAtLastError()); cudaError_t error = cudaStreamSynchronize(cudaStreamPerThread); cudaErr(error) }
+#define precheck { cudaErr(cudaGetLastError()) }
 #endif
 
 inline void checkCudaErr(cudaError_t err) 
@@ -37,6 +36,7 @@ inline void checkCudaErr(cudaError_t err)
   } 
 };
 ```
+
 ## Cuda error checking (API)
 
 calls to any cuda or cuda library API should be enclosed with cudaErr(), which will check for errors and print them to std::cerr.
@@ -46,7 +46,7 @@ calls to any cuda or cuda library API should be enclosed with cudaErr(), which w
 Old school, yes. Effective, also yes. Print out a message, what line and file the statement came from.
 
 ```c++
-#define MyFFTPrintWithDetails(...)	{std::cerr << __VA_ARGS__  << " From: " << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl;}
+#define MyFFTPrintWithDetails(...) {std::cerr << __VA_ARGS__  << " From: " << __FILE__  << " " << __LINE__  << " " << __PRETTY_FUNCTION__ << std::endl;}
 
 ```
 
@@ -62,8 +62,7 @@ As much as possible is statically checked. This is not always possible, so runti
 
 ## Partial transform checkpoints
 
-Because the size and order of the data are changed inbetween different steps of a multi-dimensional trasnform, isolating bugs requires some method to do so. Right now, this is achieved by setting the debug_stage manually in build/Makefile. 
-
+Because the size and order of the data are changed inbetween different steps of a multi-dimensional trasnform, isolating bugs requires some method to do so. Right now, this is achieved by setting the debug_stage manually in build/Makefile.
 
 ```c++
 # For testing/debugging it is convenient to execute and have print functions for partial transforms.
@@ -81,6 +80,7 @@ debug_stage=3
 ## Other printing based debug tools
 
 FastFFT::PrintVector()
+
 - print vectors of different type and number of elements
 - can be used directly, however, it is generally used indirectly via either
 
@@ -104,7 +104,6 @@ FastFFT::PrintState()
     std::cout << "is_in_memory_host_pointer " << is_in_memory_host_pointer << std::endl;
     std::cout << "is_in_memory_device_pointer " << is_in_memory_device_pointer << std::endl;
     std::cout << "is_in_buffer_memory " << is_in_buffer_memory << std::endl;
-    std::cout << "is_host_memory_pinned " << is_host_memory_pinned << std::endl;
     std::cout << "is_fftw_padded_input " << is_fftw_padded_input << std::endl;
     std::cout << "is_fftw_padded_output " << is_fftw_padded_output << std::endl;
     std::cout << "is_real_valued_input " << is_real_valued_input << std::endl;
@@ -138,7 +137,6 @@ FastFFT::PrintState()
   ```
 
   or
-
 
 FastFFT::PrintLaunchParameters()
 

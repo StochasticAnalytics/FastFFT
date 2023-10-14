@@ -4,7 +4,7 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
-                "/groups/himesb/git/gemmi/include/**"
+                "/usr/local/cuda/include/**"
             ],
             "defines": [
                 "_FILE_OFFSET_BITS=64",
@@ -12,7 +12,6 @@
                 "__WXGTK__",
                 "DEBUG"
             ],
-            "compilerPath": "/groups/himesb/intel/compilers_and_libraries_2020.2.254/linux/bin/intel64/icpc",
             "cStandard": "c17",
             "cppStandard": "c++17",
             "browse": {

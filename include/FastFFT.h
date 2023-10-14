@@ -1,27 +1,34 @@
 // Insert some license stuff here
 
-#ifndef fast_FFT_H_
-#define fast_FFT_H_
+#ifndef _INCLUDE_FASTFFT_H
+#define _INCLUDE_FASTFFT_H
 
 #include <chrono>
 #include <random>
+#include <iostream>
 
-// #include <cuda_runtime.h>
-// #include <cuda.h>
-#include <cuda_fp16.h>
+// Forward declaration so we can leave the inclusion of cuda_fp16.h to FastFFT.cu
+struct __half;
+struct __half2;
+// #include <cuda_fp16.h>
 
 #ifndef ENABLE_FastFFT // ifdef being used in cisTEM that defines these
-#if __cplusplus > 201703L
+#if __cplusplus >= 202002L
 #include <numbers>
 using namespace std::numbers;
 #else
-// For now we do not have c++20 so we need to define this for constants. Modified from /usr/include/c++/11/numbers
-/// pi
+#if __cplusplus < 201703L
+#message "C++ is " __cplusplus
+#error "C++17 or later required"
+#else
 template <typename _Tp>
 // inline constexpr _Tp pi_v = _Enable_if_floating<_Tp>(3.141592653589793238462643383279502884L);
 inline constexpr _Tp pi_v = 3.141592653589793238462643383279502884L;
-#endif
-#endif
+#endif // __cplusplus require > 17
+#endif // __cplusplus 20 support
+#endif // enable FastFFT
+
+#include "../src/fastfft/types.cuh"
 
 // For testing/debugging it is convenient to execute and have print functions for partial transforms.
 // These will go directly in the kernels and also in the helper Image.cuh definitions for PrintArray.
@@ -29,7 +36,7 @@ inline constexpr _Tp pi_v = 3.141592653589793238462643383279502884L;
 // Fwd 0, 1, 2, 3( none, x, z, original y)
 // 4 intermediate ops, like conj multiplication
 // Inv 5, 6, 7 ( original y, z, x)
-// Defined in make by setting environmental variable  DEBUG_FFT_STAGE
+// Defined in make by setting environmental variable  FFT_DEBUG_STAGE
 
 // #include <iostream>
 /*
@@ -170,48 +177,29 @@ struct DevicePointers<__half2*, __half*> {
 template <class ComputeType = float, class InputType = float, class OutputType = float, int Rank = 2>
 class FourierTransformer {
 
+  private:
+
   public:
-    // Used to specify input/calc/output data types
-    enum DataType { int4_2,
-                    uint8,
-                    int8,
-                    uint16,
-                    int16,
-                    fp16,
-                    bf16,
-                    tf32,
-                    uint32,
-                    int32,
-                    fp32 };
-
-    std::vector<std::string> DataTypeName{"int4_2", "uint8", "int8", "uint16", "int16", "fp16", "bf16", "tf32", "uint32", "int32", "fp32"};
-
-    enum OriginType { natural,
-                      centered,
-                      quadrant_swapped }; // Used to specify the origin of the data
-
-    std::vector<std::string> OriginTypeName{"natural", "centered", "quadrant_swapped"};
-
     // Using the enum directly from python is not something I've figured out yet. Just make simple methods.
     inline void SetOriginTypeNatural(bool set_input_type = true) {
         if ( set_input_type )
-            input_origin_type = natural;
+            input_origin_type = OriginType::natural;
         else
-            output_origin_type = natural;
+            output_origin_type = OriginType::natural;
     }
 
     inline void SetOriginTypeCentered(bool set_input_type = true) {
         if ( set_input_type )
-            input_origin_type = centered;
+            input_origin_type = OriginType::centered;
         else
-            output_origin_type = centered;
+            output_origin_type = OriginType::centered;
     }
 
     inline void SetOriginTypeQuadrantSwapped(bool set_input_type = true) {
         if ( set_input_type )
-            input_origin_type = quadrant_swapped;
+            input_origin_type = OriginType::quadrant_swapped;
         else
-            output_origin_type = quadrant_swapped;
+            output_origin_type = OriginType::quadrant_swapped;
     }
 
     short padding_jump_val;
@@ -232,18 +220,18 @@ class FourierTransformer {
     // This is pretty similar to an FFT plan, I should probably make it align with CufftPlan
     void SetForwardFFTPlan(size_t input_logical_x_dimension, size_t input_logical_y_dimension, size_t input_logical_z_dimension,
                            size_t output_logical_x_dimension, size_t output_logical_y_dimension, size_t output_logical_z_dimension,
-                           bool is_padded_output,
-                           bool is_host_memory_pinned);
+                           bool is_padded_output = true);
 
     void SetInverseFFTPlan(size_t input_logical_x_dimension, size_t input_logical_y_dimension, size_t input_logical_z_dimension,
                            size_t output_logical_x_dimension, size_t output_logical_y_dimension, size_t output_logical_z_dimension,
-                           bool is_padded_output);
+                           bool is_padded_output = true);
 
     // For the time being, the caller is responsible for having the memory allocated for any of these input/output pointers.
     void SetInputPointer(InputType* input_pointer, bool is_input_on_device);
     // When passing in a pointer from python (cupy or pytorch) it is a long, and needs to be cast to input type.
     // For now, we are assuming memory ops are all handled in the python code.
     void SetInputPointer(long input_pointer);
+    void SetCallerPinnedInputPointer(InputType* input_pointer);
 
     ///////////////////////////////////////////////
     // Public actions:
@@ -252,13 +240,27 @@ class FourierTransformer {
     ///////////////////////////////////////////////
     inline void Wait( ) { cudaStreamSynchronize(cudaStreamPerThread); };
 
-    void CopyHostToDevice( );
-    // By default we are blocking with a stream sync until complete for simplicity. This is overkill and should FIXME.
+    void CopyHostToDevceAndSynchronize(InputType* input_pointer, int n_elements_to_copy = 0);
+    void CopyHostToDevice(InputType* input_pointer, int n_elements_to_copy = 0);
     // If int n_elements_to_copy = 0 the appropriate size will be determined by the state of the transform completed (none, fwd, inv.)
     // For partial increase/decrease transforms, needed for testing, this will be invalid, so specify the int n_elements_to_copy.
-    void CopyDeviceToHost(bool free_gpu_memory, bool unpin_host_memory, int n_elements_to_copy = 0);
     // When the size changes, we need a new host pointer
-    void CopyDeviceToHost(OutputType* output_pointer, bool free_gpu_memory = true, bool unpin_host_memory = true, int n_elements_to_copy = 0);
+    void CopyDeviceToHostAndSynchronize(OutputType* output_pointer, bool free_gpu_memory = true, int n_elements_to_copy = 0);
+    void CopyDeviceToHost(OutputType* output_pointer, bool free_gpu_memory = true, int n_elements_to_copy = 0);
+
+    // Ideally, in addition to position/momentum space (buffer) ponters, there would also be a input pointer, which may point
+    // to a gpu address that is from an external process or to the FastFFT buffer space. This way, when calling CopyHostToDevice,
+    // that input is set to the FastFFT buffer space, data is copied and the first Fwd kernels are called as they are currently.
+    // This would also allow the input pointer to point to a different address than the FastFFT buffer only accessed on initial kernel
+    // calls and read only. In turn we could skip the device to device transfer we are doing in the following method.
+    void CopyDeviceToDeviceFromNonOwningAddress(InputType* input_pointer, int n_elements_to_copy = 0);
+
+    // Here we may be copying input data type from another GPU buffer, OR output data type to another GPU buffer.
+    // Check in these methods that the types match
+    template <class TransferDataType>
+    void CopyDeviceToDeviceAndSynchronize(TransferDataType* input_pointer, bool free_gpu_memory = true, int n_elements_to_copy = 0);
+    template <class TransferDataType>
+    void CopyDeviceToDevice(TransferDataType* input_pointer, bool free_gpu_memory = true, int n_elements_to_copy = 0);
     // FFT calls
 
     //   void FwdFFT(bool swap_real_space_quadrants = false, bool transpose_output = true);
@@ -351,7 +353,6 @@ class FourierTransformer {
         std::cerr << "is_in_memory_host_pointer " << is_in_memory_host_pointer << std::endl;
         std::cerr << "is_in_memory_device_pointer " << is_in_memory_device_pointer << std::endl;
         std::cerr << "is_in_buffer_memory " << is_in_buffer_memory << std::endl;
-        std::cerr << "is_host_memory_pinned " << is_host_memory_pinned << std::endl;
         std::cerr << "is_fftw_padded_input " << is_fftw_padded_input << std::endl;
         std::cerr << "is_fftw_padded_output " << is_fftw_padded_output << std::endl;
         std::cerr << "is_real_valued_input " << is_real_valued_input << std::endl;
@@ -388,23 +389,21 @@ class FourierTransformer {
         std::cerr << "fwd_size_change_type " << SizeChangeName[fwd_size_change_type] << std::endl;
         std::cerr << "inv_size_change_type " << SizeChangeName[inv_size_change_type] << std::endl;
         std::cerr << "transform stage complete " << TransformStageCompletedName[transform_stage_completed] << std::endl;
-        std::cerr << "input_origin_type " << OriginTypeName[input_origin_type] << std::endl;
-        std::cerr << "output_origin_type " << OriginTypeName[output_origin_type] << std::endl;
+        std::cerr << "input_origin_type " << OriginType::name[input_origin_type] << std::endl;
+        std::cerr << "output_origin_type " << OriginType::name[output_origin_type] << std::endl;
 
     }; // PrintState()
 
     // private:
 
-    DeviceProps device_properties;
-    OriginType  input_origin_type;
-    OriginType  output_origin_type;
+    DeviceProps      device_properties;
+    OriginType::Enum input_origin_type;
+    OriginType::Enum output_origin_type;
 
     // booleans to track state, could be bit fields but that seem opaque to me.
     bool is_in_memory_host_pointer; // To track allocation of host side memory
     bool is_in_memory_device_pointer; // To track allocation of device side memory.
     bool is_in_buffer_memory; // To track whether the current result is in dev_ptr.position_space or dev_ptr.position_space_buffer (momemtum space/ momentum space buffer respectively.)
-
-    bool is_host_memory_pinned; // Specified in the constructor. Assuming host memory won't be pinned for many applications.
 
     bool is_fftw_padded_input; // Padding for in place r2c transforms
     bool is_fftw_padded_output; // Currently the output state will match the input state, otherwise it is an error.
@@ -420,35 +419,21 @@ class FourierTransformer {
     FFT_Size transform_size;
     int      elements_per_thread_complex; // Set depending on the kernel and size of the transform.
 
-    // FIXME this seems like a bad idea. Added due to conflicing labels in switch statements, even with explicitly scope.
-    enum SizeChangeType : uint8_t { increase,
-                                    decrease,
-                                    no_change }; // Assumed to be the same for all dimesnions. This may be relaxed later.
-
     std::vector<std::string> SizeChangeName{"increase", "decrease", "no_change"};
-
-    enum TransformStageCompleted : uint8_t { none = 10,
-                                             fwd  = 11,
-                                             inv  = 12 }; // none must be greater than number of sizeChangeTypes, padding must match in TransformStageCompletedName vector
 
     std::vector<std::string> TransformStageCompletedName{"", "", "", "", "", // padding of 5
                                                          "", "", "", "", "", // padding of 5
                                                          "none", "fwd", "inv"};
-
-    enum DimensionCheckType : uint8_t { CopyFromHost,
-                                        CopyToHost,
-                                        FwdTransform,
-                                        InvTransform };
 
     std::vector<std::string> DimensionCheckName{"CopyFromHost", "CopyToHost", "FwdTransform", "InvTransform"};
 
     bool is_from_python_call;
     bool is_owner_of_memory;
 
-    SizeChangeType fwd_size_change_type;
-    SizeChangeType inv_size_change_type;
+    SizeChangeType::Enum fwd_size_change_type;
+    SizeChangeType::Enum inv_size_change_type;
 
-    TransformStageCompleted transform_stage_completed;
+    TransformStageCompleted::Enum transform_stage_completed;
 
     // dims_in may change during calculation, depending on padding, but is reset after each call.
     short4 dims_in;
@@ -467,7 +452,7 @@ class FourierTransformer {
 
     void SetDefaults( );
     void ValidateDimensions( );
-    void SetDimensions(DimensionCheckType check_op_type);
+    void SetDimensions(DimensionCheckType::Enum check_op_type);
 
     void SetDevicePointers(bool should_allocate_buffer_memory);
 
@@ -482,6 +467,7 @@ class FourierTransformer {
         d) IsForwardType()
         e) IsTransformAlongZ()
   */
+
     enum KernelType { r2c_decomposed, // Thread based, full length.
                       r2c_decomposed_transposed, // Thread based, full length, transposed.
                       r2c_none_XY,
@@ -676,30 +662,30 @@ class FourierTransformer {
     // 1.
     // First call passed from a public transform function, selects block or thread and the transform precision.
     template <bool use_thread_method = false, class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t> // bool is just used as a dummy type
-    void SetPrecisionAndExectutionMethod(KernelType kernel_type, bool do_forward_transform = true, PreOpType pre_op_lambda = nullptr, IntraOpType intra_op_lambda = nullptr, PostOpType post_op_lambda = nullptr);
+    void SetPrecisionAndExectutionMethod(KernelType kernel_type, bool do_forward_transform = true, PreOpType pre_op_functor = nullptr, IntraOpType intra_op_functor = nullptr, PostOpType post_op_functor = nullptr);
 
     // 2. // TODO: remove this now that the functors are working
     // Check to see if any intra kernel functions are wanted, and if so set the appropriate device pointers.
     template <class FFT_base, class PreOpType, class IntraOpType, class PostOpType>
-    void SetIntraKernelFunctions(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda);
+    void SetIntraKernelFunctions(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
 
     // 3.
     // Second call, sets size of the transform kernel, selects the appropriate GPU arch
 
     // template <class FFT_base, class PreOpType, class IntraOpType, class PostOpType>
-    // void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda);
+    // void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
     // This allows us to iterate through a set of constexpr sizes passed as a template parameter pack. The value is in providing a means to have different size packs
     // for different fft configurations, eg. 2d vs 3d
     template <class FFT_base, class PreOpType, class IntraOpType, class PostOpType>
-    void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda);
+    void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
 
     template <class FFT_base, class PreOpType, class IntraOpType, class PostOpType, unsigned int SizeValue, unsigned int Ept, unsigned int... OtherValues>
-    void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda);
+    void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
 
     // 3.
     // Third call, sets the input and output dimensions and type
     template <class FFT_base_arch, class PreOpType, class IntraOpType, class PostOpType>
-    void SetAndLaunchKernel(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_lambda, IntraOpType intra_op_lambda, PostOpType post_op_lambda);
+    void SetAndLaunchKernel(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
 
     void PrintLaunchParameters(LaunchParams LP) {
         std::cerr << "Launch parameters: " << std::endl;
