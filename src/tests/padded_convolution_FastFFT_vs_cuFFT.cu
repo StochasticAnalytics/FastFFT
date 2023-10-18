@@ -97,7 +97,7 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
             Image<float, float2> positive_control(target_size);
 
             // We just make one instance of the FourierTransformer class, with calc type float.
-            // For the time being input and output are also float. TODO calc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
+            // For the time being input and output are also float. TODO caFlc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
             FastFFT::FourierTransformer<float, float, float, Rank> FT;
             // Create an instance to copy memory also for the cufft tests.
             FastFFT::FourierTransformer<float, float, float, Rank> cuFFT;
@@ -219,7 +219,7 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
                     std::cout << "2D test " << std::endl;
                 }
 
-                cuFFT_input.MakeCufftPlan( );
+                cuFFT_input.Make    CufftPlan( );
                 cuFFT_output.MakeCufftPlan( );
             }
 
