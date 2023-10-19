@@ -74,7 +74,8 @@
         "semaphore": "cpp",
         "stop_token": "cpp",
         "complex": "cpp",
-        "unordered_set": "cpp"
+        "unordered_set": "cpp",
+        "__config": "cpp"
     },
     "C_Cpp.clang_format_path": "/usr/bin/clang-format-14",
     "editor.formatOnSave": true,
