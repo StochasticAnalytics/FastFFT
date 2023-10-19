@@ -219,7 +219,7 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
                     std::cout << "2D test " << std::endl;
                 }
 
-                cuFFT_input.Make    CufftPlan( );
+                cuFFT_input.MakeCufftPlan( );
                 cuFFT_output.MakeCufftPlan( );
             }
 

@@ -17,6 +17,8 @@
 #include <cufft.h>
 #include <cufftXt.h>
 
+#include "../../include/ieee-754-half/half.hpp"
+
 // A simple class to represent image objects needed for testing FastFFT.
 
 template <class wanted_real_type, class wanted_complex_type>
@@ -93,6 +95,10 @@ class Image {
     float2 ReturnSumOfComplex(float2* input, int n_to_print);
     float  ReturnSumOfComplexAmplitudes(float2* input, int n_to_print);
     void   ClipInto(const float* array_to_paste, float* array_to_paste_into, short4 size_from, short4 size_into, short4 wanted_center, float wanted_padding_value);
+
+    bool data_is_fp16;
+    void ConvertFP32ToFP16( );
+    void ConvertFP16ToFP32( );
 
   private:
 };
