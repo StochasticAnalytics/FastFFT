@@ -155,9 +155,9 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
 
             // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
             // ensures faster transfer. If false, it will be pinned for you.
-            FT.SetInputPointer(FT_input.real_values, false);
-            cuFFT.SetInputPointer(cuFFT_input.real_values, false);
-            targetFT.SetInputPointer(target_search_image.real_values, false);
+            FT.SetInputPointer(FT_input.real_values);
+            cuFFT.SetInputPointer(cuFFT_input.real_values);
+            targetFT.SetInputPointer(target_search_image.real_values);
 
             // Set a unit impulse at the center of the input array.
             // For now just considering the real space image to have been implicitly quadrant swapped so the center is at the origin.

@@ -74,7 +74,7 @@ bool random_image_test(std::vector<int> size, bool do_3d = false) {
 
         // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
         // ensures faster transfer. If false, it will be pinned for you.
-        FT.SetInputPointer(host_output.real_values, false);
+        FT.SetInputPointer(host_output.real_values);
 
         // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
         FT.CopyHostToDevice(host_output.real_values);
@@ -229,8 +229,8 @@ void run_oned(std::vector<int> size) {
 
         // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
         // ensures faster transfer. If false, it will be pinned for you.
-        FT.SetInputPointer(FT_input.real_values, false);
-        FT_complex.SetInputPointer(FT_input_complex.complex_values, false);
+        FT.SetInputPointer(FT_input.real_values);
+        FT_complex.SetInputPointer(FT_input_complex.complex_values);
 
         FT.SetToConstant(FT_input.real_values, FT_input.real_memory_allocated, 1.f);
 
@@ -298,7 +298,7 @@ int main(int argc, char** argv) {
     std::vector<int> test_size_3d        = {32, 64, 128, 256, 512};
     // std::vector<int> test_size_3d ={512};
 
-    // The launch parameters fail for 4096 -> < 64 for r2c_decrease, not sure if it is the elements_per_thread or something else.
+    // The launch parameters fail for 4096 -> < 64 for r2c_decrease_XY, not sure if it is the elements_per_thread or something else.
     // For now, just over-ride these small sizes
     std::vector<int> test_size_for_decrease = {64, 128, 256, 512, 1024, 2048, 4096};
 

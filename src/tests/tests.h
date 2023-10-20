@@ -14,7 +14,7 @@ std::vector<int> test_size_rectangle = {64, 128, 256, 512, 1024, 2048, 4096};
 std::vector<int> test_size_3d        = {32, 64, 128, 256, 512};
 // std::vector<int> test_size_3d ={512};
 
-// The launch parameters fail for 4096 -> < 64 for r2c_decrease, not sure if it is the elements_per_thread or something else.
+// The launch parameters fail for 4096 -> < 64 for r2c_decrease_XY, not sure if it is the elements_per_thread or something else.
 // For now, just over-ride these small sizes
 std::vector<int> test_size_for_decrease = {64, 128, 256, 512, 1024, 2048, 4096};
 

@@ -67,7 +67,7 @@ bool const_image_test(std::vector<int>& size) {
 
         // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
         // ensures faster transfer. If false, it will be pinned for you.
-        FT.SetInputPointer(host_output.real_values, false);
+        FT.SetInputPointer(host_output.real_values);
         sum = host_output.ReturnSumOfReal(host_output.real_values, dims_out);
 
         if ( sum != long(dims_in.x) * long(dims_in.y) * long(dims_in.z) ) {

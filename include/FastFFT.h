@@ -124,62 +124,93 @@ typedef struct __align__(64) _LaunchParams {
 
 LaunchParams;
 
-template <typename I, typename C>
+template <typename I, typename C, typename O>
 struct DevicePointers {
     // Use this to catch unsupported input/ compute types and throw exception.
-    int* position_space        = nullptr;
-    int* position_space_buffer = nullptr;
-    int* momentum_space        = nullptr;
-    int* momentum_space_buffer = nullptr;
-    int* image_to_search       = nullptr;
+    int* position_space          = nullptr;
+    int* position_space_buffer   = nullptr;
+    int* momentum_space          = nullptr;
+    int* momentum_space_buffer   = nullptr;
+    int* image_to_search         = nullptr;
+    int* external_input          = nullptr;
+    int* external_output         = nullptr;
+    int* external_output_complex = nullptr;
 };
 
-// Input real, compute single-precision
+// Input real-fp32, compute fp32, output real/complex fp32
 template <>
-struct DevicePointers<float*, float*> {
-    float*  position_space;
-    float*  position_space_buffer;
-    float2* momentum_space;
-    float2* momentum_space_buffer;
-    float2* image_to_search;
+struct DevicePointers<float*, float*, float*> {
+    float*  position_space          = nullptr;
+    float*  position_space_buffer   = nullptr;
+    float2* momentum_space          = nullptr;
+    float2* momentum_space_buffer   = nullptr;
+    float2* image_to_search         = nullptr;
+    float*  external_input          = nullptr;
+    float*  external_output         = nullptr;
+    float2* external_output_complex = nullptr;
 };
 
-// Input real, compute half-precision FP16
+// Input real fp16, compute fp32, output real/complex fp16
+// Assuming the image to search has the same base type as the input and wil
+// be promoted for search if needed
 template <>
-struct DevicePointers<__half*, __half*> {
-    __half*  position_space;
-    __half*  position_space_buffer;
-    __half2* momentum_space;
-    __half2* momentum_space_buffer;
-    __half2* image_to_search;
+struct DevicePointers<__half*, float*, __half*> {
+    __half*  position_space          = nullptr;
+    __half*  position_space_buffer   = nullptr;
+    float2*  momentum_space          = nullptr;
+    float2*  momentum_space_buffer   = nullptr;
+    __half2* image_to_search         = nullptr;
+    __half*  external_input          = nullptr;
+    __half*  external_output         = nullptr;
+    __half2* external_output_complex = nullptr;
 };
 
-// Input complex, compute single-precision
-template <>
-struct DevicePointers<float2*, float*> {
-    float2* position_space;
-    float2* position_space_buffer;
-    float2* momentum_space;
-    float2* momentum_space_buffer;
-    float2* image_to_search;
-};
+// // Input real half-precision, compute  FP16
+// template <>
+// struct DevicePointers<__half*, float*> {
+//     __half* position_space;
+//     __half* position_space_buffer;
+//     float2* momentum_space;
+//     float2* momentum_space_buffer;
+//     float2* image_to_search;
+// };
 
-// Input complex, compute half-precision FP16
-template <>
-struct DevicePointers<__half2*, __half*> {
-    __half2* position_space;
-    __half2* position_space_buffer;
-    __half2* momentum_space;
-    __half2* momentum_space_buffer;
-    __half2* image_to_search;
-};
+// // Input complex, compute single-precision
+// template <>
+// struct DevicePointers<float2*, float*> {
+//     float2* position_space;
+//     float2* position_space_buffer;
+//     float2* momentum_space;
+//     float2* momentum_space_buffer;
+//     float2* image_to_search;
+// };
 
-template <class ComputeType = float, class InputType = float, class OutputType = float, int Rank = 2>
+// // Input complex, compute half-precision FP16
+// template <>
+// struct DevicePointers<__half2*, __half*> {
+//     __half2* position_space;
+//     __half2* position_space_buffer;
+//     __half2* momentum_space;
+//     __half2* momentum_space_buffer;
+//     __half2* image_to_search;
+// };
+
+/**
+ * @brief Construct a new Fourier Transformer< Compute Type,  Input Type,  Output Type,  Rank>:: Fourier Transformer object
+ * 
+ * 
+ * @tparam ComputeBaseType - float. Support for ieee half precision is not yet implemented.
+ * @tparam InputType - __half or float for real valued input, __half2 or float2 for complex valued input images.
+ * @tparam OutputBaseType - __half or float. Actual type depends on position/momentum space representation.
+ * @tparam Rank - only 2,3 supported. Support for 3d is partial
+ */
+template <class ComputeBaseType = float, class InputType = float, class OutputBaseType = float, int Rank = 2>
 class FourierTransformer {
 
-  private:
-
   public:
+    // Input is real or complex inferred from InputType
+    DevicePointers<InputType, ComputeBaseType, OutputBaseType> d_ptr;
+
     // Using the enum directly from python is not something I've figured out yet. Just make simple methods.
     inline void SetOriginTypeNatural(bool set_input_type = true) {
         if ( set_input_type )
@@ -203,10 +234,10 @@ class FourierTransformer {
     }
 
     short padding_jump_val;
-    int   input_memory_allocated;
-    int   fwd_output_memory_allocated;
-    int   inv_output_memory_allocated;
-    int   compute_memory_allocated;
+    int   input_memory_wanted;
+    int   fwd_output_memory_wanted;
+    int   inv_output_memory_wanted;
+    int   compute_memory_wanted;
     int   memory_size_to_copy;
 
     ///////////////////////////////////////////////
@@ -227,26 +258,33 @@ class FourierTransformer {
                            bool is_padded_output = true);
 
     // For the time being, the caller is responsible for having the memory allocated for any of these input/output pointers.
-    void SetInputPointer(InputType* input_pointer, bool is_input_on_device);
+    void SetInputPointer(InputType* input_pointer);
+
+    template <typename ExternalImageType>
+    void SetOutputPointer(ExternalImageType* output_pointer);
+
+    template <typename ExternalImageType>
+    void SetExternalImagePointer(ExternalImageType* output_pointer);
     // When passing in a pointer from python (cupy or pytorch) it is a long, and needs to be cast to input type.
     // For now, we are assuming memory ops are all handled in the python code.
-    void SetInputPointer(long input_pointer);
-    void SetCallerPinnedInputPointer(InputType* input_pointer);
+    void SetInputPointerFromPython(long input_pointer);
 
     ///////////////////////////////////////////////
     // Public actions:
     // ALL public actions should call ::CheckDimensions() to ensure the meta data are properly intialized.
     // this ensures the prior three methods have been called and are valid.
     ///////////////////////////////////////////////
-    inline void Wait( ) { cudaStreamSynchronize(cudaStreamPerThread); };
+    inline void Wait( ) {
+        cudaStreamSynchronize(cudaStreamPerThread);
+    };
 
-    void CopyHostToDevceAndSynchronize(InputType* input_pointer, int n_elements_to_copy = 0);
+    void CopyHostToDeviceAndSynchronize(InputType* input_pointer, int n_elements_to_copy = 0);
     void CopyHostToDevice(InputType* input_pointer, int n_elements_to_copy = 0);
     // If int n_elements_to_copy = 0 the appropriate size will be determined by the state of the transform completed (none, fwd, inv.)
     // For partial increase/decrease transforms, needed for testing, this will be invalid, so specify the int n_elements_to_copy.
     // When the size changes, we need a new host pointer
-    void CopyDeviceToHostAndSynchronize(OutputType* output_pointer, bool free_gpu_memory = true, int n_elements_to_copy = 0);
-    void CopyDeviceToHost(OutputType* output_pointer, bool free_gpu_memory = true, int n_elements_to_copy = 0);
+    void CopyDeviceToHostAndSynchronize(OutputBaseType* output_pointer, bool free_gpu_memory = true, int n_elements_to_copy = 0);
+    void CopyDeviceToHost(OutputBaseType* output_pointer, bool free_gpu_memory = true, int n_elements_to_copy = 0);
 
     // Ideally, in addition to position/momentum space (buffer) ponters, there would also be a input pointer, which may point
     // to a gpu address that is from an external process or to the FastFFT buffer space. This way, when calling CopyHostToDevice,
@@ -261,6 +299,7 @@ class FourierTransformer {
     void CopyDeviceToDeviceAndSynchronize(TransferDataType* input_pointer, bool free_gpu_memory = true, int n_elements_to_copy = 0);
     template <class TransferDataType>
     void CopyDeviceToDevice(TransferDataType* input_pointer, bool free_gpu_memory = true, int n_elements_to_copy = 0);
+
     // FFT calls
 
     //   void FwdFFT(bool swap_real_space_quadrants = false, bool transpose_output = true);
@@ -268,9 +307,10 @@ class FourierTransformer {
     // void CrossCorrelate(float2* image_to_search, bool swap_real_space_quadrants);
     // void CrossCorrelate(__half2* image_to_search, bool swap_real_space_quadrants);
 
-    // could float2* be replaced with decltype(DevicePointers.momentum_space)
+    // If the user doesn't specify input/output pointers, assume the are copied into the FastFFT bufferspace.
+    // TODO: this will only work for 2d as the output in 3d should be in d_ptr.position_space_buffer
     template <class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t>
-    void Generic_Fwd_Image_Inv(float2* data, PreOpType pre_op = nullptr, IntraOpType intra_op = nullptr, PostOpType post_op = nullptr);
+    void Generic_Fwd_Image_Inv(pre_op = nullptr, IntraOpType intra_op = nullptr, PostOpType post_op = nullptr);
 
     template <class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t>
     void Generic_Fwd(PreOpType pre_op = nullptr, IntraOpType intra_op = nullptr);
@@ -280,29 +320,47 @@ class FourierTransformer {
 
     // Alias for FwdFFT, is there any overhead?
     template <class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t>
-    void FwdFFT(PreOpType pre_op = nullptr, IntraOpType intra_op = nullptr) { Generic_Fwd<PreOpType, IntraOpType>(pre_op, intra_op); }
+    void FwdFFT(PreOpType pre_op = nullptr, IntraOpType intra_op = nullptr) {
+        Generic_Fwd<PreOpType, IntraOpType>(pre_op, intra_op);
+    }
 
     template <class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t>
-    void InvFFT(IntraOpType intra_op = nullptr, PostOpType post_op = nullptr) { Generic_Inv<IntraOpType, PostOpType>(intra_op, post_op); }
+    void InvFFT(IntraOpType intra_op = nullptr, PostOpType post_op = nullptr) {
+        Generic_Inv<IntraOpType, PostOpType>(intra_op, post_op);
+    }
 
     void ClipIntoTopLeft( );
     void ClipIntoReal(int wanted_coordinate_of_box_center_x, int wanted_coordinate_of_box_center_y, int wanted_coordinate_of_box_center_z);
 
     // For all real valued inputs, assumed for any InputType that is not float2 or __half2
 
-    int inline ReturnInputMemorySize( ) { return input_memory_allocated; }
+    int inline ReturnInputMemorySize( ) {
+        return input_memory_wanted;
+    }
 
-    int inline ReturnFwdOutputMemorySize( ) { return fwd_output_memory_allocated; }
+    int inline ReturnFwdOutputMemorySize( ) {
+        return fwd_output_memory_wanted;
+    }
 
-    int inline ReturnInvOutputMemorySize( ) { return inv_output_memory_allocated; }
+    int inline ReturnInvOutputMemorySize( ) {
+        return inv_output_memory_wanted;
+    }
 
-    short4 inline ReturnFwdInputDimensions( ) { return fwd_dims_in; }
+    short4 inline ReturnFwdInputDimensions( ) {
+        return fwd_dims_in;
+    }
 
-    short4 inline ReturnFwdOutputDimensions( ) { return fwd_dims_out; }
+    short4 inline ReturnFwdOutputDimensions( ) {
+        return fwd_dims_out;
+    }
 
-    short4 inline ReturnInvInputDimensions( ) { return inv_dims_in; }
+    short4 inline ReturnInvInputDimensions( ) {
+        return inv_dims_in;
+    }
 
-    short4 inline ReturnInvOutputDimensions( ) { return inv_dims_out; }
+    short4 inline ReturnInvOutputDimensions( ) {
+        return inv_dims_out;
+    }
 
     template <typename T, bool is_on_host = true>
     void SetToConstant(T* input_pointer, int N_values, const T& wanted_value) {
@@ -333,9 +391,6 @@ class FourierTransformer {
         }
     }
 
-    // Input is real or complex inferred from InputType
-    DevicePointers<InputType*, ComputeType*> d_ptr;
-
     void PrintState( ) {
         std::cerr << "================================================================" << std::endl;
         std::cerr << "Device Properties: " << std::endl;
@@ -350,16 +405,14 @@ class FourierTransformer {
 
         std::cerr << "State Variables:\n"
                   << std::endl;
-        std::cerr << "is_in_memory_host_pointer " << is_in_memory_host_pointer << std::endl;
         std::cerr << "is_in_memory_device_pointer " << is_in_memory_device_pointer << std::endl;
-        std::cerr << "is_in_buffer_memory " << is_in_buffer_memory << std::endl;
+        std::cerr << "is_in_second_buffer_partition " << is_in_second_buffer_partition << std::endl;
         std::cerr << "is_fftw_padded_input " << is_fftw_padded_input << std::endl;
         std::cerr << "is_fftw_padded_output " << is_fftw_padded_output << std::endl;
         std::cerr << "is_real_valued_input " << is_real_valued_input << std::endl;
         std::cerr << "is_set_input_params " << is_set_input_params << std::endl;
         std::cerr << "is_set_output_params " << is_set_output_params << std::endl;
         std::cerr << "is_size_validated " << is_size_validated << std::endl;
-        std::cerr << "is_set_input_pointer " << is_set_input_pointer << std::endl;
         std::cerr << std::endl;
 
         std::cerr << "Size variables:\n"
@@ -384,7 +437,7 @@ class FourierTransformer {
 
         std::cerr << "Misc:\n"
                   << std::endl;
-        std::cerr << "compute_memory_allocated " << compute_memory_allocated << std::endl;
+        std::cerr << "compute_memory_wanted " << compute_memory_wanted << std::endl;
         std::cerr << "memory size to copy " << memory_size_to_copy << std::endl;
         std::cerr << "fwd_size_change_type " << SizeChangeName[fwd_size_change_type] << std::endl;
         std::cerr << "inv_size_change_type " << SizeChangeName[inv_size_change_type] << std::endl;
@@ -401,9 +454,8 @@ class FourierTransformer {
     OriginType::Enum output_origin_type;
 
     // booleans to track state, could be bit fields but that seem opaque to me.
-    bool is_in_memory_host_pointer; // To track allocation of host side memory
     bool is_in_memory_device_pointer; // To track allocation of device side memory.
-    bool is_in_buffer_memory; // To track whether the current result is in dev_ptr.position_space or dev_ptr.position_space_buffer (momemtum space/ momentum space buffer respectively.)
+    bool is_in_second_buffer_partition; // To track whether the current result is in dev_ptr.position_space or dev_ptr.position_space_buffer (momemtum space/ momentum space buffer respectively.)
 
     bool is_fftw_padded_input; // Padding for in place r2c transforms
     bool is_fftw_padded_output; // Currently the output state will match the input state, otherwise it is an error.
@@ -413,7 +465,6 @@ class FourierTransformer {
     bool is_set_input_params; // Yes, yes, "are" set.
     bool is_set_output_params;
     bool is_size_validated; // Defaults to false, set after both input/output dimensions are set and checked.
-    bool is_set_input_pointer; // May be on the host of the device.
 
     int      transform_dimension; // 1,2,3d.
     FFT_Size transform_size;
@@ -426,9 +477,6 @@ class FourierTransformer {
                                                          "none", "fwd", "inv"};
 
     std::vector<std::string> DimensionCheckName{"CopyFromHost", "CopyToHost", "FwdTransform", "InvTransform"};
-
-    bool is_from_python_call;
-    bool is_owner_of_memory;
 
     SizeChangeType::Enum fwd_size_change_type;
     SizeChangeType::Enum inv_size_change_type;
@@ -444,7 +492,6 @@ class FourierTransformer {
     short4 inv_dims_in;
     short4 inv_dims_out;
 
-    InputType* host_pointer;
     InputType* pinnedPtr;
 
     void Deallocate( );
@@ -454,7 +501,7 @@ class FourierTransformer {
     void ValidateDimensions( );
     void SetDimensions(DimensionCheckType::Enum check_op_type);
 
-    void SetDevicePointers(bool should_allocate_buffer_memory);
+    void SetDevicePointers( );
 
     /*
     IMPORTANT: if you add a kernel, you need to modify
@@ -468,21 +515,42 @@ class FourierTransformer {
         e) IsTransformAlongZ()
   */
 
-    enum KernelType { r2c_decomposed, // Thread based, full length.
-                      r2c_decomposed_transposed, // Thread based, full length, transposed.
-                      r2c_none_XY,
-                      r2c_none_XZ,
-                      r2c_decrease,
-                      r2c_increase,
+    /*
+    MEANING of KERNEL TYPE NAMES:
+    
+    - r2c and c2r are for real valued input/output images
+
+    - any kernel with "decomposed" is a thread based routine (not currently supported)
+
+    - if a kernel is part of a size change routine it is specified as none/increase/decrease
+    
+    - if 2 axes are specified, those dimensions are transposed.
+        - 1d - this is meaningless
+        - 2d - should always be XY
+        - 3d - should always be XZ
+
+    - if 3 axes are specified, those dimensions are permuted XYZ (only 3d)
+
+    - any c2c FWD method without an axes is a terminal stage of a forward transform
+    - any c2c INV method without an axes is a initial stage of an inverse transform
+
+ */
+
+    enum KernelType { r2c_decomposed, // 1D fwd
+                      r2c_decomposed_transposed, // 2d fwd 1st stage
+                      r2c_none_XY, // 1d fwd  //  2d fwd 1st stage
+                      r2c_none_XZ, // 3d fwd 1st stage
+                      r2c_decrease_XY,
+                      r2c_increase_XY,
                       r2c_increase_XZ,
-                      c2c_fwd_none,
-                      c2c_fwd_none_Z,
+                      c2c_fwd_none, // 1d complex valued input, or final stage of Fwd 2d or 3d
+                      c2c_fwd_none_XYZ,
                       c2c_fwd_decrease,
                       c2c_fwd_increase,
-                      c2c_fwd_increase_Z,
+                      c2c_fwd_increase_XYZ,
                       c2c_inv_none,
                       c2c_inv_none_XZ,
-                      c2c_inv_none_Z,
+                      c2c_inv_none_XYZ,
                       c2c_inv_decrease,
                       c2c_inv_increase,
                       c2c_decomposed,
@@ -490,7 +558,7 @@ class FourierTransformer {
                       c2r_decomposed_transposed,
                       c2r_none,
                       c2r_none_XY,
-                      c2r_decrease,
+                      c2r_decrease_XY,
                       c2r_increase,
                       xcorr_fwd_increase_inv_none, //  (e.g. template matching)
                       xcorr_fwd_decrease_inv_none, // (e.g. Fourier cropping)
@@ -504,13 +572,13 @@ class FourierTransformer {
             KernelName{"r2c_decomposed",
                        "r2c_decomposed_transposed",
                        "r2c_none_XY", "r2c_none_XZ",
-                       "r2c_decrease", "r2c_increase", "r2c_increase_XZ",
-                       "c2c_fwd_none", "c2c_fwd_none_Z", "c2c_fwd_increase", "c2c_fwd_increase", "c2c_fwd_increase_Z",
-                       "c2c_inv_none", "c2c_inv_none_XZ", "c2c_inv_none_Z", "c2c_inv_increase", "c2c_inv_increase",
+                       "r2c_decrease_XY", "r2c_increase_XY", "r2c_increase_XZ",
+                       "c2c_fwd_none", "c2c_fwd_none_XYZ", "c2c_fwd_increase", "c2c_fwd_increase", "c2c_fwd_increase_XYZ",
+                       "c2c_inv_none", "c2c_inv_none_XZ", "c2c_inv_none_XYZ", "c2c_inv_increase", "c2c_inv_increase",
                        "c2c_decomposed",
                        "c2r_decomposed",
                        "c2r_decomposed_transposed",
-                       "c2r_none", "c2r_none_XY", "c2r_decrease", "c2r_increase",
+                       "c2r_none", "c2r_none_XY", "c2r_decrease_XY", "c2r_increase",
                        "xcorr_fwd_increase_inv_none",
                        "xcorr_fwd_decrease_inv_none",
                        "xcorr_fwd_none_inv_decrease",
@@ -526,13 +594,13 @@ class FourierTransformer {
         }
 
         else if ( kernel_type == r2c_none_XY || kernel_type == r2c_none_XZ ||
-                  kernel_type == r2c_decrease || kernel_type == r2c_increase || kernel_type == r2c_increase_XZ ||
-                  kernel_type == c2c_fwd_none || c2c_fwd_none_Z ||
+                  kernel_type == r2c_decrease_XY || kernel_type == r2c_increase_XY || kernel_type == r2c_increase_XZ ||
+                  kernel_type == c2c_fwd_none || c2c_fwd_none_XYZ ||
                   kernel_type == c2c_fwd_decrease ||
-                  kernel_type == c2c_fwd_increase || kernel_type == c2c_fwd_increase_Z ||
-                  kernel_type == c2c_inv_none || kernel_type == c2c_inv_none_XZ || kernel_type == c2c_inv_none_Z ||
+                  kernel_type == c2c_fwd_increase || kernel_type == c2c_fwd_increase_XYZ ||
+                  kernel_type == c2c_inv_none || kernel_type == c2c_inv_none_XZ || kernel_type == c2c_inv_none_XYZ ||
                   kernel_type == c2c_inv_decrease || kernel_type == c2c_inv_increase ||
-                  kernel_type == c2r_none || kernel_type == c2r_none_XY || kernel_type == c2r_decrease || kernel_type == c2r_increase ||
+                  kernel_type == c2r_none || kernel_type == c2r_none_XY || kernel_type == c2r_decrease_XY || kernel_type == c2r_increase ||
                   kernel_type == xcorr_fwd_increase_inv_none || kernel_type == xcorr_fwd_decrease_inv_none || kernel_type == xcorr_fwd_none_inv_decrease || kernel_type == xcorr_fwd_decrease_inv_decrease ||
                   kernel_type == generic_fwd_increase_op_inv_none ) {
             return false;
@@ -546,7 +614,7 @@ class FourierTransformer {
     inline bool IsR2CType(KernelType kernel_type) {
         if ( kernel_type == r2c_decomposed || kernel_type == r2c_decomposed_transposed ||
              kernel_type == r2c_none_XY || kernel_type == r2c_none_XZ ||
-             kernel_type == r2c_decrease || kernel_type == r2c_increase || kernel_type == r2c_increase_XZ ) {
+             kernel_type == r2c_decrease_XY || kernel_type == r2c_increase_XY || kernel_type == r2c_increase_XZ ) {
             return true;
         }
         else
@@ -555,7 +623,7 @@ class FourierTransformer {
 
     inline bool IsC2RType(KernelType kernel_type) {
         if ( kernel_type == c2r_decomposed || kernel_type == c2r_decomposed_transposed ||
-             kernel_type == c2r_none || kernel_type == c2r_none_XY || kernel_type == c2r_decrease || kernel_type == c2r_increase ) {
+             kernel_type == c2r_none || kernel_type == c2r_none_XY || kernel_type == c2r_decrease_XY || kernel_type == c2r_increase ) {
             return true;
         }
         else
@@ -567,8 +635,8 @@ class FourierTransformer {
     inline bool IsForwardType(KernelType kernel_type) {
         if ( kernel_type == r2c_decomposed || kernel_type == r2c_decomposed_transposed ||
              kernel_type == r2c_none_XY || kernel_type == r2c_none_XZ ||
-             kernel_type == r2c_decrease || kernel_type == r2c_increase || kernel_type == r2c_increase_XZ ||
-             kernel_type == c2c_fwd_none || kernel_type == c2c_fwd_none_Z || kernel_type == c2c_fwd_increase_Z ||
+             kernel_type == r2c_decrease_XY || kernel_type == r2c_increase_XY || kernel_type == r2c_increase_XZ ||
+             kernel_type == c2c_fwd_none || kernel_type == c2c_fwd_none_XYZ || kernel_type == c2c_fwd_increase_XYZ ||
              kernel_type == c2c_fwd_decrease ||
              kernel_type == c2c_fwd_increase ||
              kernel_type == xcorr_fwd_decrease_inv_none || kernel_type == xcorr_fwd_increase_inv_none ||
@@ -582,8 +650,8 @@ class FourierTransformer {
     }
 
     inline bool IsTransormAlongZ(KernelType kernel_type) {
-        if ( kernel_type == c2c_fwd_none_Z || kernel_type == c2c_fwd_increase_Z ||
-             kernel_type == c2c_inv_none_Z ) {
+        if ( kernel_type == c2c_fwd_none_XYZ || kernel_type == c2c_fwd_increase_XYZ ||
+             kernel_type == c2c_inv_none_XYZ ) {
             return true;
         }
         else
@@ -592,8 +660,8 @@ class FourierTransformer {
 
     inline bool IsRank3(KernelType kernel_type) {
         if ( kernel_type == r2c_none_XZ || kernel_type == r2c_increase_XZ ||
-             kernel_type == c2c_fwd_increase_Z || kernel_type == c2c_inv_none_XZ ||
-             kernel_type == c2c_fwd_none_Z || kernel_type == c2c_inv_none_Z ) {
+             kernel_type == c2c_fwd_increase_XYZ || kernel_type == c2c_inv_none_XZ ||
+             kernel_type == c2c_fwd_none_XYZ || kernel_type == c2c_inv_none_XYZ ) {
             return true;
         }
         else
@@ -627,8 +695,10 @@ class FourierTransformer {
 
     inline int ReturnPaddedMemorySize(short4& wanted_dims) {
         // Assumes a) SetInputDimensionsAndType has been called and is_fftw_padded is set before this call. (Currently RuntimeAssert to die if false) FIXME
-        int wanted_memory = 0;
-
+        int           wanted_memory                        = 0;
+        constexpr int scale_compute_base_type_to_full_type = 2;
+        // is_real_valued_input is set in the constructor based on the template arg InputDataType.
+        // The odd sized block is probably not needed.
         if ( is_real_valued_input ) {
             if ( wanted_dims.x % 2 == 0 ) {
                 padding_jump_val = 2;
@@ -640,17 +710,17 @@ class FourierTransformer {
             }
 
             wanted_memory *= wanted_dims.y * wanted_dims.z; // other dimensions
-            wanted_memory *= 2; // room for complex
-            wanted_dims.w            = (wanted_dims.x + padding_jump_val) / 2; // number of complex elements in the X dimesnions after FFT.
-            compute_memory_allocated = std::max(compute_memory_allocated, 2 * wanted_memory); // scaling by 2 making room for the buffer.
+            wanted_dims.w = (wanted_dims.x + padding_jump_val) / 2; // number of complex elements in the X dimesnions after FFT.
+
+            .
         }
         else {
             wanted_memory = wanted_dims.x * wanted_dims.y * wanted_dims.z;
             wanted_dims.w = wanted_dims.x; // pitch is constant
-            // We allocate using sizeof(ComputeType) which is either __half or float, so we need an extra factor of 2
-            // Note: this must be considered when setting the address of the buffer memory based on the address of the regular memory.
-            compute_memory_allocated = std::max(compute_memory_allocated, 4 * wanted_memory);
         }
+
+        wanted_memory *= scale_compute_base_type_to_full_type; // room for full complex type
+        compute_memory_wanted = std::max(compute_memory_wanted, 2 * wanted_memory); // scaling by 2 making room for the out of place buffer
         return wanted_memory;
     }
 
@@ -701,6 +771,13 @@ class FourierTransformer {
         std::cerr << "  physical_x_output: " << LP.mem_offsets.physical_x_output << std::endl;
     };
 
+    // TODO: start hiding things that should not be public
+
+  private:
+    bool input_data_is_on_device;
+    bool output_data_is_on_device;
+    bool external_image_is_on_device;
+    void AllocateBufferMemory( );
 }; // class Fourier Transformer
 
 } // namespace FastFFT

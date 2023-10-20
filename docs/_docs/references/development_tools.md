@@ -101,16 +101,14 @@ FastFFT::PrintState()
     std::cout << std::endl;
 
     std::cout << "State Variables:\n" << std::endl;
-    std::cout << "is_in_memory_host_pointer " << is_in_memory_host_pointer << std::endl;
     std::cout << "is_in_memory_device_pointer " << is_in_memory_device_pointer << std::endl;
-    std::cout << "is_in_buffer_memory " << is_in_buffer_memory << std::endl;
+    std::cout << "is_in_second_buffer_partition " << is_in_second_buffer_partition << std::endl;
     std::cout << "is_fftw_padded_input " << is_fftw_padded_input << std::endl;
     std::cout << "is_fftw_padded_output " << is_fftw_padded_output << std::endl;
     std::cout << "is_real_valued_input " << is_real_valued_input << std::endl;
     std::cout << "is_set_input_params " << is_set_input_params << std::endl;
     std::cout << "is_set_output_params " << is_set_output_params << std::endl;
     std::cout << "is_size_validated " << is_size_validated << std::endl;
-    std::cout << "is_set_input_pointer " << is_set_input_pointer << std::endl;
     std::cout << std::endl;
 
     std::cout << "Size variables:\n" << std::endl;
@@ -125,7 +123,7 @@ FastFFT::PrintState()
     std::cout << std::endl;
 
     std::cout << "Misc:\n" << std::endl;
-    std::cout << "compute_memory_allocated " << compute_memory_allocated << std::endl;
+    std::cout << "compute_memory_wanted " << compute_memory_wanted << std::endl;
     std::cout << "memory size to copy " << memory_size_to_copy << std::endl;
     std::cout << "fwd_size_change_type " << SizeChangeName[fwd_size_change_type] << std::endl;
     std::cout << "inv_size_change_type " << SizeChangeName[inv_size_change_type] << std::endl;

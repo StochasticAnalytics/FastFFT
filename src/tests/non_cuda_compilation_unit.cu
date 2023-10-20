@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
 
     // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
     // ensures faster transfer. If false, it will be pinned for you.
-    FT.SetInputPointer(host_input.data( ), false);
+    FT.SetInputPointer(host_input.data( ));
 
     // Check basic initialization function
     FT.SetToConstant(host_input.data( ), host_output_real_memory_allocated, 3.14f);

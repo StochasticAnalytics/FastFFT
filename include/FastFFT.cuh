@@ -122,14 +122,31 @@ __device__ __forceinline__ void SINCOS(float arg, float* s, float* c) {
 }
 #endif
 
+
+
 namespace FastFFT {
 
 template <typename T>
-bool pointer_is_in_memory_and_registered(T ptr, const char* ptr_name = nullptr) {
+inline bool pointer_is_in_memory_and_registered(T ptr) {
+    // FIXME: I don't think this is thread safe, add a mutex as in cistem::GpuImage
     cudaPointerAttributes attr;
     cudaErr(cudaPointerGetAttributes(&attr, ptr));
 
     if ( attr.type == 1 && attr.devicePointer == attr.hostPointer ) {
+        return true;
+    }
+    else {
+        return false;
+    }
+}
+
+template <typename T>
+inline bool pointer_is_in_device_memory(T ptr) {
+    // FIXME: I don't think this is thread safe, add a mutex as in cistem::GpuImage
+    cudaPointerAttributes attr;
+    cudaErr(cudaPointerGetAttributes(&attr, ptr));
+
+    if ( attr.type == 2 || attr.type == 3) {
         return true;
     }
     else {
@@ -375,14 +392,14 @@ template <class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
         void block_fft_kernel_C2C_WithPadding_SwapRealSpaceQuadrants(const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 
-template <class FFT, class invFFT, class ComplexType = typename FFT::value_type>
+template <class ExternalImageType, class FFT, class invFFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-        void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul(const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values,
+        void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul(const ExternalImageType* __restrict__ image_to_search, const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values,
                                                                 Offsets mem_offsets, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv);
 
-template <class FFT, class invFFT, class ComplexType = typename FFT::value_type, class PreOpType, class IntraOpType, class PostOpType>
+template <class ExternalImageType, class FFT, class invFFT, class ComplexType = typename FFT::value_type, class PreOpType, class IntraOpType, class PostOpType>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-        void block_fft_kernel_C2C_FWD_INCREASE_OP_INV_NONE(const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values,
+        void block_fft_kernel_C2C_FWD_INCREASE_OP_INV_NONE(const ExternalImageType* __restrict__ image_to_search, const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values,
                                                            Offsets mem_offsets, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv,
                                                            PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
 
@@ -391,8 +408,8 @@ __launch_bounds__(FFT::max_threads_per_block) __global__
         void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul_SwapRealSpaceQuadrants(const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values,
                                                                                        Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv);
 
-template <class FFT, class invFFT, class ComplexType = typename FFT::value_type>
-__global__ void block_fft_kernel_C2C_FWD_NONE_INV_DECREASE_ConjMul(const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values,
+template <class ExternalImageType, class FFT, class invFFT, class ComplexType = typename FFT::value_type>
+__global__ void block_fft_kernel_C2C_FWD_NONE_INV_DECREASE_ConjMul(const ExternalImageType* __restrict__ image_to_search, const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values,
                                                                    Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv);
 
 template <class FFT, class ComplexType = typename FFT::value_type>
@@ -464,17 +481,17 @@ __global__ void thread_fft_kernel_C2R_decomposed_transposed(const ComplexType* _
 // End FFT Kernels
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template <class InputType, class OutputType>
-__global__ void clip_into_top_left_kernel(InputType* input_values, OutputType* output_values, const short4 dims);
+template <class InputType, class OutputBaseType>
+__global__ void clip_into_top_left_kernel(InputType* input_values, OutputBaseType* output_values, const short4 dims);
 
 // Modified from GpuImage::ClipIntoRealKernel
-template <typename InputType, typename OutputType>
+template <typename InputType, typename OutputBaseType>
 __global__ void clip_into_real_kernel(InputType*  real_values_gpu,
-                                      OutputType* other_image_real_values_gpu,
+                                      OutputBaseType* other_image_real_values_gpu,
                                       short4      dims,
                                       short4      other_dims,
                                       int3        wanted_coordinate_of_box_center,
-                                      OutputType  wanted_padding_value);
+                                      OutputBaseType  wanted_padding_value);
 
 //////////////////////////////////////////////
 // IO functions adapted from the cufftdx examples
@@ -747,32 +764,49 @@ struct io {
         }
     }
 
-    static inline __device__ void load_shared_and_conj_multiply(const complex_type* image_to_search,
+    template < class ExternalImageType >
+    static inline __device__ void load_shared_and_conj_multiply(const ExternalImageType* image_to_search,
                                                                 complex_type*       thread_data) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         complex_type       c;
-        for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
-            c.x = (thread_data[i].x * image_to_search[index].x + thread_data[i].y * image_to_search[index].y);
-            c.y = (thread_data[i].y * image_to_search[index].x - thread_data[i].x * image_to_search[index].y);
-            // a * conj b
-            thread_data[i] = c; //ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
-            index += stride;
+        if constexpr (std::is_same_v<ExternalImageType, __half2>){
+            for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
+                thread_data[i].x = (thread_data[i].x * __low2float(image_to_search[index]) + thread_data[i].y * __high2float(image_to_search[index].y));
+                thread_data[i].y = (thread_data[i].y * __low2float(image_to_search[index]) - thread_data[i].x * __high2float(image_to_search[index].y));
+                index += stride;
+            }
+        }
+        else {
+            for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
+                thread_data[i].x = (thread_data[i].x * image_to_search[index].x + thread_data[i].y * image_to_search[index].y);
+                thread_data[i].y = (thread_data[i].y * image_to_search[index].x - thread_data[i].x * image_to_search[index].y);
+                index += stride;
+            }
         }
     }
 
     // TODO: set user lambda to default = false, then get rid of other load_shared
-    template <class FunctionType>
-    static inline __device__ void load_shared(const complex_type* image_to_search,
+    template <class FunctionType, class ExternalImageType>
+    static inline __device__ void load_shared(const ExternalImageType* image_to_search,
                                               complex_type*       thread_data,
                                               FunctionType        intra_op_functor = nullptr) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         if constexpr ( IS_IKF_t<FunctionType>( ) ) {
-            for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
-                intra_op_functor(thread_data[i].x, thread_data[i].y, image_to_search[index].x, image_to_search[index].y); //ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
-                index += stride;
+            if constexpr (std::is_same_v<ExternalImageType, __half2>){
+                for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
+                    intra_op_functor(thread_data[i].x, thread_data[i].y, __low2float(image_to_search[index]), __high2float(image_to_search[index])); //ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
+                    index += stride;
+                }
             }
+            else {
+                for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
+                    intra_op_functor(thread_data[i].x, thread_data[i].y, image_to_search[index].x, image_to_search[index].y); //ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
+                    index += stride;
+                }
+            }
+
         }
         else {
             for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
@@ -1483,19 +1517,28 @@ struct io_thread {
         }
     }
 
-    static inline __device__ void load_shared_and_conj_multiply(const complex_type* image_to_search,
+    template <typename ExternalImageType>
+    static inline __device__ void load_shared_and_conj_multiply(const ExternalImageType* image_to_search,
                                                                 const complex_type* shared_mem,
                                                                 complex_type*       thread_data,
                                                                 const int           stride) {
         unsigned int index = threadIdx.x;
-        complex_type c;
-        for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
-            c.x = (shared_mem[index].x * image_to_search[index].x + shared_mem[index].y * image_to_search[index].y);
-            c.y = (shared_mem[index].y * image_to_search[index].x - shared_mem[index].x * image_to_search[index].y);
-            // a * conj b
-            thread_data[i] = c; //ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
-            index += stride;
+        if constexpr (std::is_same_v<ExternalImageType, __half2>){
+
+            for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
+                thread_data[i].x = (shared_mem[index].x * __low2float(image_to_search[index]) + shared_mem[index].y * __high2float(image_to_search[index]));
+                thread_data[i].y = (shared_mem[index].y * __low2float(image_to_search[index]) - shared_mem[index].x * __high2float(image_to_search[index]));
+                index += stride;
+            }
         }
+        else {
+            for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
+                thread_data[i].x = (shared_mem[index].x * image_to_search[index].x + shared_mem[index].y * image_to_search[index].y);
+                thread_data[i].y = (shared_mem[index].y * image_to_search[index].x - shared_mem[index].x * image_to_search[index].y);
+                index += stride;
+            }
+        }
+
         __syncthreads( );
     }
 }; // struct thread_io
