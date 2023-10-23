@@ -62,6 +62,11 @@ If the enclosing function is an instantiation of a function template or a member
 */
 namespace FastFFT {
 
+// To limit which kernels are instantiated, define a set of constants for the FFT method to be used at compile time.
+constexpr int Generic_Fwd_FFT           = 1;
+constexpr int Generic_Inv_FFT           = 2;
+constexpr int Generic_Fwd_Image_Inv_FFT = 3;
+
 // For debugging
 
 inline void PrintVectorType(int3 input) {
@@ -140,14 +145,14 @@ struct DevicePointers {
 // Input real-fp32, compute fp32, output real/complex fp32
 template <>
 struct DevicePointers<float*, float*, float*> {
-    float*  position_space          = nullptr;
-    float*  position_space_buffer   = nullptr;
-    float2* momentum_space          = nullptr;
-    float2* momentum_space_buffer   = nullptr;
-    float2* image_to_search         = nullptr;
-    float*  external_input          = nullptr;
-    float*  external_output         = nullptr;
-    float2* external_output_complex = nullptr;
+    float*  position_space;
+    float*  position_space_buffer;
+    float2* momentum_space;
+    float2* momentum_space_buffer;
+    float2* image_to_search;
+    float*  external_input;
+    float*  external_output;
+    float2* external_output_complex;
 };
 
 // Input real fp16, compute fp32, output real/complex fp16
@@ -155,14 +160,14 @@ struct DevicePointers<float*, float*, float*> {
 // be promoted for search if needed
 template <>
 struct DevicePointers<__half*, float*, __half*> {
-    __half*  position_space          = nullptr;
-    __half*  position_space_buffer   = nullptr;
-    float2*  momentum_space          = nullptr;
-    float2*  momentum_space_buffer   = nullptr;
-    __half2* image_to_search         = nullptr;
-    __half*  external_input          = nullptr;
-    __half*  external_output         = nullptr;
-    __half2* external_output_complex = nullptr;
+    __half*  position_space;
+    __half*  position_space_buffer;
+    float2*  momentum_space;
+    float2*  momentum_space_buffer;
+    __half2* image_to_search;
+    __half*  external_input;
+    __half*  external_output;
+    __half2* external_output_complex;
 };
 
 // // Input real half-precision, compute  FP16
@@ -209,7 +214,7 @@ class FourierTransformer {
 
   public:
     // Input is real or complex inferred from InputType
-    DevicePointers<InputType, ComputeBaseType, OutputBaseType> d_ptr;
+    DevicePointers<InputType*, ComputeBaseType*, OutputBaseType*> d_ptr;
 
     // Using the enum directly from python is not something I've figured out yet. Just make simple methods.
     inline void SetOriginTypeNatural(bool set_input_type = true) {
@@ -260,11 +265,11 @@ class FourierTransformer {
     // For the time being, the caller is responsible for having the memory allocated for any of these input/output pointers.
     void SetInputPointer(InputType* input_pointer);
 
-    template <typename ExternalImageType>
-    void SetOutputPointer(ExternalImageType* output_pointer);
+    template <typename ExternalImagePtr_t>
+    void SetOutputPointer(ExternalImagePtr_t output_pointer);
 
-    template <typename ExternalImageType>
-    void SetExternalImagePointer(ExternalImageType* output_pointer);
+    template <typename ExternalImagePtr_t>
+    void SetExternalImagePointer(ExternalImagePtr_t output_pointer);
     // When passing in a pointer from python (cupy or pytorch) it is a long, and needs to be cast to input type.
     // For now, we are assuming memory ops are all handled in the python code.
     void SetInputPointerFromPython(long input_pointer);
@@ -302,22 +307,6 @@ class FourierTransformer {
 
     // FFT calls
 
-    //   void FwdFFT(bool swap_real_space_quadrants = false, bool transpose_output = true);
-    //   void InvFFT(bool transpose_output = true);
-    // void CrossCorrelate(float2* image_to_search, bool swap_real_space_quadrants);
-    // void CrossCorrelate(__half2* image_to_search, bool swap_real_space_quadrants);
-
-    // If the user doesn't specify input/output pointers, assume the are copied into the FastFFT bufferspace.
-    // TODO: this will only work for 2d as the output in 3d should be in d_ptr.position_space_buffer
-    template <class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t>
-    void Generic_Fwd_Image_Inv(pre_op = nullptr, IntraOpType intra_op = nullptr, PostOpType post_op = nullptr);
-
-    template <class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t>
-    void Generic_Fwd(PreOpType pre_op = nullptr, IntraOpType intra_op = nullptr);
-
-    template <class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t>
-    void Generic_Inv(IntraOpType intra_op = nullptr, PostOpType post_op = nullptr);
-
     // Alias for FwdFFT, is there any overhead?
     template <class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t>
     void FwdFFT(PreOpType pre_op = nullptr, IntraOpType intra_op = nullptr) {
@@ -327,6 +316,11 @@ class FourierTransformer {
     template <class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t>
     void InvFFT(IntraOpType intra_op = nullptr, PostOpType post_op = nullptr) {
         Generic_Inv<IntraOpType, PostOpType>(intra_op, post_op);
+    }
+
+    template <class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t>
+    void FwdImageInvFFT(PreOpType pre_op = nullptr, IntraOpType intra_op = nullptr, PostOpType post_op = nullptr) {
+        Generic_Fwd_Image_Inv<PreOpType, IntraOpType, PostOpType>(pre_op, intra_op, post_op);
     }
 
     void ClipIntoTopLeft( );
@@ -711,8 +705,6 @@ class FourierTransformer {
 
             wanted_memory *= wanted_dims.y * wanted_dims.z; // other dimensions
             wanted_dims.w = (wanted_dims.x + padding_jump_val) / 2; // number of complex elements in the X dimesnions after FFT.
-
-            .
         }
         else {
             wanted_memory = wanted_dims.x * wanted_dims.y * wanted_dims.z;
@@ -731,12 +723,12 @@ class FourierTransformer {
 
     // 1.
     // First call passed from a public transform function, selects block or thread and the transform precision.
-    template <bool use_thread_method = false, class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t> // bool is just used as a dummy type
+    template <int FFT_TYPE, bool use_thread_method = false, class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t> // bool is just used as a dummy type
     void SetPrecisionAndExectutionMethod(KernelType kernel_type, bool do_forward_transform = true, PreOpType pre_op_functor = nullptr, IntraOpType intra_op_functor = nullptr, PostOpType post_op_functor = nullptr);
 
     // 2. // TODO: remove this now that the functors are working
     // Check to see if any intra kernel functions are wanted, and if so set the appropriate device pointers.
-    template <class FFT_base, class PreOpType, class IntraOpType, class PostOpType>
+    template <int FFT_TYPE, class FFT_base, class PreOpType, class IntraOpType, class PostOpType>
     void SetIntraKernelFunctions(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
 
     // 3.
@@ -746,15 +738,15 @@ class FourierTransformer {
     // void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
     // This allows us to iterate through a set of constexpr sizes passed as a template parameter pack. The value is in providing a means to have different size packs
     // for different fft configurations, eg. 2d vs 3d
-    template <class FFT_base, class PreOpType, class IntraOpType, class PostOpType>
+    template <int FFT_TYPE, class FFT_base, class PreOpType, class IntraOpType, class PostOpType>
     void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
 
-    template <class FFT_base, class PreOpType, class IntraOpType, class PostOpType, unsigned int SizeValue, unsigned int Ept, unsigned int... OtherValues>
+    template <int FFT_TYPE, class FFT_base, class PreOpType, class IntraOpType, class PostOpType, unsigned int SizeValue, unsigned int Ept, unsigned int... OtherValues>
     void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
 
     // 3.
     // Third call, sets the input and output dimensions and type
-    template <class FFT_base_arch, class PreOpType, class IntraOpType, class PostOpType>
+    template <int FFT_TYPE, class FFT_base_arch, class PreOpType, class IntraOpType, class PostOpType>
     void SetAndLaunchKernel(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
 
     void PrintLaunchParameters(LaunchParams LP) {
@@ -778,6 +770,17 @@ class FourierTransformer {
     bool output_data_is_on_device;
     bool external_image_is_on_device;
     void AllocateBufferMemory( );
+
+    // If the user doesn't specify input/output pointers, assume the are copied into the FastFFT bufferspace.
+    // TODO: this will only work for 2d as the output in 3d should be in d_ptr.position_space_buffer
+    template <class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t>
+    void Generic_Fwd_Image_Inv(PreOpType pre_op = nullptr, IntraOpType intra_op = nullptr, PostOpType post_op = nullptr);
+
+    template <class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t>
+    void Generic_Fwd(PreOpType pre_op = nullptr, IntraOpType intra_op = nullptr);
+
+    template <class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t>
+    void Generic_Inv(IntraOpType intra_op = nullptr, PostOpType post_op = nullptr);
 }; // class Fourier Transformer
 
 } // namespace FastFFT

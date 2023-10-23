@@ -186,6 +186,8 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
 
             targetFT.CopyHostToDevice(target_search_image.real_values);
 
+            FT.SetExternalImagePointer(targetFT.d_ptr.momentum_space);
+
             // Wait on the transfers to finish.
             cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
 
@@ -235,11 +237,11 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
             if ( set_conjMult_callback || is_size_change_decrease ) {
                 // FT.CrossCorrelate(targetFT.d_ptr.momentum_space, false);
                 // Will type deduction work here?
-                MyFFTDebugPrintWithDetails("Calling Generic_Fwd_Image_Inv");
-                FT.Generic_Fwd_Image_Inv(targetFT.d_ptr.momentum_space, noop, conj_mul, noop);
+                MyFFTDebugPrintWithDetails("Calling FwdImageInvFFT");
+                FT.FwdImageInvFFT(noop, conj_mul, noop);
             }
             else {
-                MyFFTDebugPrintWithDetails("Calling Generic_Fwd_Image_Inv");
+                MyFFTDebugPrintWithDetails("Calling Fwd then Inv");
                 FT.FwdFFT( );
                 FT.InvFFT( );
             }
@@ -305,7 +307,7 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
                 if ( set_conjMult_callback || is_size_change_decrease ) {
                     //   FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
                     // Will type deduction work here?
-                    FT.Generic_Fwd_Image_Inv(targetFT.d_ptr.momentum_space, noop, conj_mul, noop);
+                    FT.FwdImageInvFFT(noop, conj_mul, noop);
                 }
                 else {
                     FT.FwdFFT( );
