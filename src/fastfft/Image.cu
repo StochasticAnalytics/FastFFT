@@ -19,10 +19,13 @@ Image<wanted_real_type, wanted_complex_type>::Image(short4 wanted_size) {
     is_fftw_planned       = false;
     data_is_fp16          = false;
     real_memory_allocated = size.w * size.y * size.z * 2;
+    is_registered         = false;
 }
 
 template <class wanted_real_type, class wanted_complex_type>
 Image<wanted_real_type, wanted_complex_type>::~Image( ) {
+
+    UnRegisterPageLockedMemory( );
 
     if ( is_in_memory ) {
         delete[] real_values;
@@ -104,11 +107,13 @@ void Image<wanted_real_type, wanted_complex_type>::Allocate( ) {
     complex_values  = (wanted_complex_type*)real_values; // Set the complex_values to point at the newly allocated real values;
     is_fftw_planned = false;
     is_in_memory    = true;
+
+    RegisterPageLockedMemory( );
 }
 
 template <class wanted_real_type, class wanted_complex_type>
 void Image<wanted_real_type, wanted_complex_type>::Allocate(bool set_fftw_plan) {
-    real_values = new wanted_real_type[real_memory_allocated];
+    real_values = new wanted_real_type[real_memory_allocated + 2];
     // real_values = (wanted_real_type *) fftw_malloc(sizeof(wanted_real_type) * real_memory_allocated);
     complex_values = (wanted_complex_type*)real_values; // Set the complex_values to point at the newly allocated real values;
 
@@ -120,6 +125,8 @@ void Image<wanted_real_type, wanted_complex_type>::Allocate(bool set_fftw_plan) 
     }
 
     is_in_memory = true;
+
+    RegisterPageLockedMemory( );
 }
 
 template <class wanted_real_type, class wanted_complex_type>
@@ -486,6 +493,21 @@ void Image<wanted_real_type, wanted_complex_type>::ConvertFP16ToFP32( ) {
     }
     delete[] tmp;
     data_is_fp16 = false;
+}
+
+template <class wanted_real_type, class wanted_complex_type>
+void Image<wanted_real_type, wanted_complex_type>::RegisterPageLockedMemory( ) {
+    if ( ! is_registered ) {
+        cudaErr(cudaHostRegister(real_values, sizeof(wanted_real_type) * real_memory_allocated, cudaHostRegisterDefault));
+        is_registered = true;
+    }
+}
+
+template <class wanted_real_type, class wanted_complex_type>
+void Image<wanted_real_type, wanted_complex_type>::UnRegisterPageLockedMemory( ) {
+    if ( is_registered ) {
+        cudaErr(cudaHostUnregister(real_values));
+    }
 }
 
 template class Image<float, float2>;

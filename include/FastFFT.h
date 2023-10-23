@@ -723,12 +723,12 @@ class FourierTransformer {
 
     // 1.
     // First call passed from a public transform function, selects block or thread and the transform precision.
-    template <int FFT_TYPE, bool use_thread_method = false, class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t> // bool is just used as a dummy type
+    template <int FFT_ALGO_t, bool use_thread_method = false, class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t> // bool is just used as a dummy type
     void SetPrecisionAndExectutionMethod(KernelType kernel_type, bool do_forward_transform = true, PreOpType pre_op_functor = nullptr, IntraOpType intra_op_functor = nullptr, PostOpType post_op_functor = nullptr);
 
     // 2. // TODO: remove this now that the functors are working
     // Check to see if any intra kernel functions are wanted, and if so set the appropriate device pointers.
-    template <int FFT_TYPE, class FFT_base, class PreOpType, class IntraOpType, class PostOpType>
+    template <int FFT_ALGO_t, class FFT_base, class PreOpType, class IntraOpType, class PostOpType>
     void SetIntraKernelFunctions(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
 
     // 3.
@@ -738,15 +738,15 @@ class FourierTransformer {
     // void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
     // This allows us to iterate through a set of constexpr sizes passed as a template parameter pack. The value is in providing a means to have different size packs
     // for different fft configurations, eg. 2d vs 3d
-    template <int FFT_TYPE, class FFT_base, class PreOpType, class IntraOpType, class PostOpType>
+    template <int FFT_ALGO_t, class FFT_base, class PreOpType, class IntraOpType, class PostOpType>
     void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
 
-    template <int FFT_TYPE, class FFT_base, class PreOpType, class IntraOpType, class PostOpType, unsigned int SizeValue, unsigned int Ept, unsigned int... OtherValues>
+    template <int FFT_ALGO_t, class FFT_base, class PreOpType, class IntraOpType, class PostOpType, unsigned int SizeValue, unsigned int Ept, unsigned int... OtherValues>
     void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
 
     // 3.
     // Third call, sets the input and output dimensions and type
-    template <int FFT_TYPE, class FFT_base_arch, class PreOpType, class IntraOpType, class PostOpType>
+    template <int FFT_ALGO_t, class FFT_base_arch, class PreOpType, class IntraOpType, class PostOpType>
     void SetAndLaunchKernel(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
 
     void PrintLaunchParameters(LaunchParams LP) {

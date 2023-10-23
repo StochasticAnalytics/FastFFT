@@ -101,6 +101,11 @@ class Image {
     void ConvertFP16ToFP32( );
 
   private:
+    // Note; this is not thread safe
+    bool is_registered;
+
+    void RegisterPageLockedMemory( );
+    void UnRegisterPageLockedMemory( );
 };
 
 #endif // SRC_CPP_IMAGE_CUH_

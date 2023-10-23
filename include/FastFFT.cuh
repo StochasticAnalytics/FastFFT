@@ -45,15 +45,15 @@ constexpr inline bool IS_IKF_t( ) {
 
 #else
 // Minimally define asserts that check state variables and setup.
-#define MyFFTDebugAssertTrue(cond, msg, ...) { if ( (cond) != true ) { std::cerr << msg << std::endl << " Failed Assert at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1); } }
-#define MyFFTDebugAssertFalse(cond, msg, ...) { if ( (cond) == true ) { std::cerr << msg << std::endl  << " Failed Assert at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;  exit(-1); } }                                                                                                    
+#define MyFFTDebugAssertTrue(cond, msg, ...) { if ( (cond) != true ) { std::cerr << msg << std::endl << " Failed Assert at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; std::abort(); } }
+#define MyFFTDebugAssertFalse(cond, msg, ...) { if ( (cond) == true ) { std::cerr << msg << std::endl  << " Failed Assert at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;  std::abort(); } }                                                                                                    
                                                                                                                     
 #endif
 
 #if FFT_DEBUG_LEVEL > 1
 // Turn on checkpoints in the testing functions.
-#define MyFFTDebugAssertTestTrue(cond, msg, ...)  { if ( (cond) != true ) { std::cerr << "    Test " << msg << " FAILED!" << std::endl  << "  at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;exit(-1); } else { std::cerr << "    Test " << msg << " passed!" << std::endl; }}
-#define MyFFTDebugAssertTestFalse(cond, msg, ...)  { if ( (cond) == true ) {  std::cerr << "    Test " << msg << " FAILED!" << std::endl   << " at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;   exit(-1);  } else {  std::cerr << "    Test " << msg << " passed!" << std::endl;  } }
+#define MyFFTDebugAssertTestTrue(cond, msg, ...)  { if ( (cond) != true ) { std::cerr << "    Test " << msg << " FAILED!" << std::endl  << "  at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;std::abort(); } else { std::cerr << "    Test " << msg << " passed!" << std::endl; }}
+#define MyFFTDebugAssertTestFalse(cond, msg, ...)  { if ( (cond) == true ) {  std::cerr << "    Test " << msg << " FAILED!" << std::endl   << " at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;   std::abort();  } else {  std::cerr << "    Test " << msg << " passed!" << std::endl;  } }
 
 #endif
 
@@ -77,8 +77,8 @@ constexpr inline bool IS_IKF_t( ) {
 // Always in use
 #define MyFFTPrint(...) { std::cerr << __VA_ARGS__ << std::endl; }
 #define MyFFTPrintWithDetails(...) { std::cerr << __VA_ARGS__ << " From: " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; }
-#define MyFFTRunTimeAssertTrue(cond, msg, ...) { if ( (cond) != true ) { std::cerr << msg << std::endl << " Failed Assert at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;exit(-1); }  }
-#define MyFFTRunTimeAssertFalse(cond, msg, ...) { if ( (cond) == true ) {std::cerr << msg << std::endl << " Failed Assert at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;exit(-1);  } }                                                                                                               
+#define MyFFTRunTimeAssertTrue(cond, msg, ...) { if ( (cond) != true ) { std::cerr << msg << std::endl << " Failed Assert at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;std::abort(); }  }
+#define MyFFTRunTimeAssertFalse(cond, msg, ...) { if ( (cond) == true ) {std::cerr << msg << std::endl << " Failed Assert at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;std::abort();  } }                                                                                                               
 
 
 

@@ -26,8 +26,7 @@ bool const_image_test(std::vector<int>& size) {
             full_sum    = full_sum * full_sum * full_sum * full_sum;
         }
 
-        float sum;
-
+        float                sum;
         Image<float, float2> host_input(input_size);
         Image<float, float2> host_output(output_size);
         Image<float, float2> device_output(output_size);
@@ -78,7 +77,7 @@ bool const_image_test(std::vector<int>& size) {
         // MyFFTDebugAssertTestTrue( sum == dims_out.x*dims_out.y*dims_out.z,"Unit impulse Init ");
 
         // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
-        FT.CopyHostToDevice(host_output.real_values);
+        FT.CopyHostToDeviceAndSynchronize(host_output.real_values);
 
         host_output.FwdFFT( );
 
@@ -117,11 +116,13 @@ bool const_image_test(std::vector<int>& size) {
         if ( host_output.complex_values[0].x != (float)dims_out.x * (float)dims_out.y * (float)dims_out.z )
             test_passed = false;
 
-        bool continue_debugging;
+        bool continue_debugging = true;
         // We don't want this to break compilation of other tests, so only check at runtime.
         if constexpr ( FFT_DEBUG_STAGE < 5 ) {
             continue_debugging = debug_partial_fft<FFT_DEBUG_STAGE, Rank>(host_output, dims_in, dims_out, dims_in, dims_out, __LINE__);
         }
+        if ( ! continue_debugging )
+            std::abort( );
 
         if ( test_passed == false ) {
             all_passed                = false;
@@ -136,6 +137,8 @@ bool const_image_test(std::vector<int>& size) {
         if constexpr ( FFT_DEBUG_STAGE > 4 ) {
             continue_debugging = debug_partial_fft<FFT_DEBUG_STAGE, Rank>(host_output, dims_in, dims_out, dims_in, dims_out, __LINE__);
         }
+        if ( ! continue_debugging )
+            std::abort( );
 
         // Assuming the outputs are always even dimensions, padding_jump_val is always 2.
         sum = host_output.ReturnSumOfReal(host_output.real_values, dims_out, true);

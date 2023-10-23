@@ -756,6 +756,7 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::Gener
                             break;
                         }
                     } // switch on inv size change type
+                    break;
                 } // case fwd no change
                 case SizeChangeType::increase: {
                     SetPrecisionAndExectutionMethod<Generic_Fwd_FFT>(r2c_increase_XY, true);
@@ -1960,7 +1961,7 @@ __global__ void clip_into_real_kernel(InputType*      real_values_gpu,
 } // end of ClipIntoRealKernel
 
 template <class ComputeBaseType, class InputType, class OutputBaseType, int Rank>
-template <int FFT_TYPE, bool use_thread_method, class PreOpType, class IntraOpType, class PostOpType>
+template <int FFT_ALGO_t, bool use_thread_method, class PreOpType, class IntraOpType, class PostOpType>
 void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetPrecisionAndExectutionMethod(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor) {
     // For kernels with fwd and inv transforms, we want to not set the direction yet.
 
@@ -1970,16 +1971,16 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetPr
 
     if constexpr ( use_thread_method ) {
         using FFT = decltype(Thread( ) + Size<32>( ) + Precision<ComputeBaseType>( ));
-        SetIntraKernelFunctions<FFT_TYPE, FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_functor, intra_op_functor, post_op_functor);
+        SetIntraKernelFunctions<FFT_ALGO_t, FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_functor, intra_op_functor, post_op_functor);
     }
     else {
         using FFT = decltype(Block( ) + Precision<ComputeBaseType>( ) + FFTsPerBlock<1>( ));
-        SetIntraKernelFunctions<FFT_TYPE, FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_functor, intra_op_functor, post_op_functor);
+        SetIntraKernelFunctions<FFT_ALGO_t, FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_functor, intra_op_functor, post_op_functor);
     }
 }
 
 template <class ComputeBaseType, class InputType, class OutputBaseType, int Rank>
-template <int FFT_TYPE, class FFT_base, class PreOpType, class IntraOpType, class PostOpType>
+template <int FFT_ALGO_t, class FFT_base, class PreOpType, class IntraOpType, class PostOpType>
 void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetIntraKernelFunctions(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor) {
 
     if constexpr ( ! detail::has_any_block_operator<FFT_base>::value ) {
@@ -1987,17 +1988,17 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetIn
     }
     else {
         if constexpr ( Rank == 3 ) {
-            SelectSizeAndType<FFT_TYPE, FFT_base, PreOpType, IntraOpType, PostOpType, 16, 4, 32, 8, 64, 8, 128, 8, 256, 8, 512, 8>(kernel_type, do_forward_transform, pre_op_functor, intra_op_functor, post_op_functor);
+            SelectSizeAndType<FFT_ALGO_t, FFT_base, PreOpType, IntraOpType, PostOpType, 16, 4, 32, 8, 64, 8, 128, 8, 256, 8, 512, 8>(kernel_type, do_forward_transform, pre_op_functor, intra_op_functor, post_op_functor);
         }
         else {
             // TODO: 8192 will fail for sm75 if wanted need some extra logic ... , 8192, 16
-            SelectSizeAndType<FFT_TYPE, FFT_base, PreOpType, IntraOpType, PostOpType, 16, 4, 32, 8, 64, 8, 128, 8, 256, 8, 512, 8, 1024, 8, 2048, 8, 4096, 8>(kernel_type, do_forward_transform, pre_op_functor, intra_op_functor, post_op_functor);
+            SelectSizeAndType<FFT_ALGO_t, FFT_base, PreOpType, IntraOpType, PostOpType, 16, 4, 32, 8, 64, 8, 128, 8, 256, 8, 512, 8, 1024, 8, 2048, 8, 4096, 8>(kernel_type, do_forward_transform, pre_op_functor, intra_op_functor, post_op_functor);
         }
     }
 }
 
 template <class ComputeBaseType, class InputType, class OutputBaseType, int Rank>
-template <int FFT_TYPE, class FFT_base, class PreOpType, class IntraOpType, class PostOpType>
+template <int FFT_ALGO_t, class FFT_base, class PreOpType, class IntraOpType, class PostOpType>
 void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor) {
     // This provides both a termination point for the recursive version needed for the block transform case as well as the actual function for thread transform with fixed size 32
     GetTransformSize(kernel_type);
@@ -2006,22 +2007,22 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::Selec
         switch ( device_properties.device_arch ) {
             case 700: {
                 using FFT = decltype(FFT_base( ) + SM<700>( ) + ElementsPerThread<8>( ));
-                SetAndLaunchKernel<FFT_TYPE, FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_functor, intra_op_functor, post_op_functor);
+                SetAndLaunchKernel<FFT_ALGO_t, FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_functor, intra_op_functor, post_op_functor);
                 break;
             }
             case 750: {
                 using FFT = decltype(FFT_base( ) + SM<750>( ) + ElementsPerThread<8>( ));
-                SetAndLaunchKernel<FFT_TYPE, FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_functor, intra_op_functor, post_op_functor);
+                SetAndLaunchKernel<FFT_ALGO_t, FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_functor, intra_op_functor, post_op_functor);
                 break;
             }
             case 800: {
                 using FFT = decltype(FFT_base( ) + SM<800>( ) + ElementsPerThread<8>( ));
-                SetAndLaunchKernel<FFT_TYPE, FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_functor, intra_op_functor, post_op_functor);
+                SetAndLaunchKernel<FFT_ALGO_t, FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_functor, intra_op_functor, post_op_functor);
                 break;
             }
             case 860: {
                 using FFT = decltype(FFT_base( ) + SM<700>( ) + ElementsPerThread<8>( ));
-                SetAndLaunchKernel<FFT_TYPE, FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_functor, intra_op_functor, post_op_functor);
+                SetAndLaunchKernel<FFT_ALGO_t, FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_functor, intra_op_functor, post_op_functor);
                 break;
             }
             default: {
@@ -2033,7 +2034,7 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::Selec
 }
 
 template <class ComputeBaseType, class InputType, class OutputBaseType, int Rank>
-template <int FFT_TYPE, class FFT_base, class PreOpType, class IntraOpType, class PostOpType, unsigned int SizeValue, unsigned int Ept, unsigned int... OtherValues>
+template <int FFT_ALGO_t, class FFT_base, class PreOpType, class IntraOpType, class PostOpType, unsigned int SizeValue, unsigned int Ept, unsigned int... OtherValues>
 void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor) {
     // Use recursion to step through the allowed sizes.
     GetTransformSize(kernel_type);
@@ -2043,24 +2044,24 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::Selec
         switch ( device_properties.device_arch ) {
             case 700: {
                 using FFT = decltype(FFT_base( ) + Size<SizeValue>( ) + SM<700>( ) + ElementsPerThread<8>( ));
-                SetAndLaunchKernel<FFT_TYPE, FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_functor, intra_op_functor, post_op_functor);
+                SetAndLaunchKernel<FFT_ALGO_t, FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_functor, intra_op_functor, post_op_functor);
                 break;
             }
             case 750: {
                 if constexpr ( SizeValue <= 4096 ) {
                     using FFT = decltype(FFT_base( ) + Size<SizeValue>( ) + SM<750>( ) + ElementsPerThread<8>( ));
-                    SetAndLaunchKernel<FFT_TYPE, FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_functor, intra_op_functor, post_op_functor);
+                    SetAndLaunchKernel<FFT_ALGO_t, FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_functor, intra_op_functor, post_op_functor);
                 }
                 break;
             }
             case 800: {
                 using FFT = decltype(FFT_base( ) + Size<SizeValue>( ) + SM<800>( ) + ElementsPerThread<8>( ));
-                SetAndLaunchKernel<FFT_TYPE, FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_functor, intra_op_functor, post_op_functor);
+                SetAndLaunchKernel<FFT_ALGO_t, FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_functor, intra_op_functor, post_op_functor);
                 break;
             }
             case 860: {
                 using FFT = decltype(FFT_base( ) + Size<SizeValue>( ) + SM<700>( ) + ElementsPerThread<8>( ));
-                SetAndLaunchKernel<FFT_TYPE, FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_functor, intra_op_functor, post_op_functor);
+                SetAndLaunchKernel<FFT_ALGO_t, FFT, PreOpType, IntraOpType, PostOpType>(kernel_type, do_forward_transform, pre_op_functor, intra_op_functor, post_op_functor);
                 break;
             }
             default: {
@@ -2070,11 +2071,11 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::Selec
         }
     }
 
-    SelectSizeAndType<FFT_TYPE, FFT_base, PreOpType, IntraOpType, PostOpType, OtherValues...>(kernel_type, do_forward_transform, pre_op_functor, intra_op_functor, post_op_functor);
+    SelectSizeAndType<FFT_ALGO_t, FFT_base, PreOpType, IntraOpType, PostOpType, OtherValues...>(kernel_type, do_forward_transform, pre_op_functor, intra_op_functor, post_op_functor);
 }
 
 template <class ComputeBaseType, class InputType, class OutputBaseType, int Rank>
-template <int FFT_TYPE, class FFT_base_arch, class PreOpType, class IntraOpType, class PostOpType>
+template <int FFT_ALGO_t, class FFT_base_arch, class PreOpType, class IntraOpType, class PostOpType>
 void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAndLaunchKernel(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor) {
 
     using complex_type = typename FFT_base_arch::value_type;
@@ -2119,7 +2120,9 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
 
     // FIXME: this only works if the only intraop functor is conj mul (which it currently is.)
     if constexpr ( IS_IKF_t<IntraOpType> ) {
-        MyFFTDebugAssertTrue(d_ptr.image_to_search != nullptr, "SetExternalImagePointer has not been called.");
+        if constexpr ( FFT_ALGO_t == Generic_Fwd_Image_Inv_FFT ) {
+            MyFFTDebugAssertTrue(d_ptr.image_to_search != nullptr, "SetExternalImagePointer has not been called.");
+        }
     }
     using ExternalImagePtr_t = decltype(d_ptr.image_to_search);
 
@@ -2158,15 +2161,13 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
     if constexpr ( Rank == 1 )
         complex_input = (intra_complex_input);
 
-    is_in_second_buffer_partition = ! is_in_second_buffer_partition;
-
     // if constexpr (detail::is_operator<fft_operator::thread, FFT_base_arch>::value) {
     if constexpr ( ! detail::has_any_block_operator<FFT_base_arch>::value ) {
         MyFFTRunTimeAssertFalse(true, "thread_fft_kernel is currently broken");
         switch ( kernel_type ) {
 
             case r2c_decomposed: {
-                if constexpr ( FFT_TYPE == Generic_Fwd_FFT ) {
+                if constexpr ( FFT_ALGO_t == Generic_Fwd_FFT ) {
                     using FFT = decltype(FFT_base_arch( ) + Direction<fft_direction::forward>( ) + Type<fft_type::c2c>( ));
 
                     LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_decomposed);
@@ -2178,15 +2179,16 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                     precheck;
                     thread_fft_kernel_R2C_decomposed<FFT, complex_type, scalar_type><<<LP.gridDims, LP.threadsPerBlock, shared_mem, cudaStreamPerThread>>>(scalar_input, intra_complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q);
                     postcheck;
-#else
                     is_in_second_buffer_partition = ! is_in_second_buffer_partition;
+
 #endif
                 }
+
                 break;
             }
 
             case r2c_decomposed_transposed: {
-                if constexpr ( FFT_TYPE == Generic_Fwd_FFT ) {
+                if constexpr ( FFT_ALGO_t == Generic_Fwd_FFT ) {
                     using FFT = decltype(FFT_base_arch( ) + Direction<fft_direction::forward>( ) + Type<fft_type::c2c>( ));
 
                     LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_decomposed_transposed);
@@ -2198,7 +2200,6 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                     precheck;
                     thread_fft_kernel_R2C_decomposed_transposed<FFT, complex_type, scalar_type><<<LP.gridDims, LP.threadsPerBlock, shared_mem, cudaStreamPerThread>>>(scalar_input, intra_complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q);
                     postcheck;
-#else
                     is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 #endif
                 }
@@ -2206,7 +2207,7 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
             }
 
             case c2r_decomposed: {
-                if constexpr ( FFT_TYPE == Generic_Inv_FFT ) {
+                if constexpr ( FFT_ALGO_t == Generic_Inv_FFT ) {
                     // Note that unlike the block C2R we require a C2C sub xform.
                     using FFT = decltype(FFT_base_arch( ) + Direction<fft_direction::inverse>( ) + Type<fft_type::c2c>( ));
                     // TODO add completeness check.
@@ -2219,7 +2220,6 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                     precheck;
                     thread_fft_kernel_C2R_decomposed<FFT, complex_type, scalar_type><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(intra_complex_input, scalar_output, LP.mem_offsets, LP.twiddle_in, LP.Q);
                     postcheck;
-#else
                     is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 #endif
                 }
@@ -2227,7 +2227,7 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
             }
 
             case c2r_decomposed_transposed: {
-                if constexpr ( FFT_TYPE == Generic_Inv_FFT ) {
+                if constexpr ( FFT_ALGO_t == Generic_Inv_FFT ) {
                     // Note that unlike the block C2R we require a C2C sub xform.
                     using FFT = decltype(FFT_base_arch( ) + Direction<fft_direction::inverse>( ) + Type<fft_type::c2c>( ));
 
@@ -2239,7 +2239,6 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                     precheck;
                     thread_fft_kernel_C2R_decomposed_transposed<FFT, complex_type, scalar_type><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(intra_complex_input, scalar_output, LP.mem_offsets, LP.twiddle_in, LP.Q);
                     postcheck;
-#else
                     is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 #endif
                 }
@@ -2247,7 +2246,7 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
             }
 
             case xcorr_decomposed: {
-                // TODO: FFT_TYPE
+                // TODO: FFT_ALGO_t
                 using FFT    = decltype(FFT_base_arch( ) + Type<fft_type::c2c>( ) + Direction<fft_direction::forward>( ));
                 using invFFT = decltype(FFT_base_arch( ) + Type<fft_type::c2c>( ) + Direction<fft_direction::inverse>( ));
 
@@ -2276,7 +2275,6 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                     precheck;
                     thread_fft_kernel_C2C_decomposed_ConjMul<FFT, invFFT, complex_type><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>((complex_type*)d_ptr.image_to_search, intra_complex_input, intra_complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q);
                     postcheck;
-#else
                     is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 #endif
                 }
@@ -2284,7 +2282,7 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
             }
 
             case c2c_decomposed: {
-                // TODO: FFT_TYPE
+                // TODO: FFT_ALGO_t
                 using FFT_nodir = decltype(FFT_base_arch( ) + Type<fft_type::c2c>( ));
                 LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_decomposed, do_forward_transform);
 
@@ -2297,7 +2295,6 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                     precheck;
                     thread_fft_kernel_C2C_decomposed<FFT, complex_type><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(intra_complex_input, intra_complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q);
                     postcheck;
-#else
                     is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 #endif
                 }
@@ -2311,7 +2308,6 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                     precheck;
                     thread_fft_kernel_C2C_decomposed<FFT, complex_type><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(intra_complex_input, intra_complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q);
                     postcheck;
-#else
                     is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 #endif
                 }
@@ -2322,7 +2318,7 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
     else {
         switch ( kernel_type ) {
             case r2c_none_XY: {
-                if constexpr ( FFT_TYPE == Generic_Fwd_FFT ) {
+                if constexpr ( FFT_ALGO_t == Generic_Fwd_FFT ) {
                     using FFT               = decltype(FFT_base_arch( ) + Direction<fft_direction::forward>( ) + Type<fft_type::c2c>( ));
                     cudaError_t  error_code = cudaSuccess;
                     auto         workspace  = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
@@ -2347,16 +2343,15 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                         block_fft_kernel_R2C_NONE_XY<FFT, complex_type, scalar_type><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(scalar_input, intra_complex_output, LP.mem_offsets, workspace);
                         postcheck;
                     }
-
-#else
                     is_in_second_buffer_partition = ! is_in_second_buffer_partition;
+
 #endif
                 }
                 break;
             }
 
             case r2c_none_XZ: {
-                if constexpr ( FFT_TYPE == Generic_Fwd_FFT ) {
+                if constexpr ( FFT_ALGO_t == Generic_Fwd_FFT ) {
                     if constexpr ( Rank == 3 ) {
                         using FFT               = decltype(FFT_base_arch( ) + Direction<fft_direction::forward>( ) + Type<fft_type::c2c>( ));
                         cudaError_t  error_code = cudaSuccess;
@@ -2372,7 +2367,6 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                         precheck;
                         block_fft_kernel_R2C_NONE_XZ<FFT, complex_type, scalar_type><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(scalar_input, intra_complex_output, LP.mem_offsets, workspace);
                         postcheck;
-#else
                         is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 #endif
                     }
@@ -2381,7 +2375,7 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
             }
 
             case r2c_decrease_XY: {
-                if constexpr ( FFT_TYPE == Generic_Fwd_FFT ) {
+                if constexpr ( FFT_ALGO_t == Generic_Fwd_FFT ) {
                     using FFT               = decltype(FFT_base_arch( ) + Direction<fft_direction::forward>( ) + Type<fft_type::c2c>( ));
                     cudaError_t  error_code = cudaSuccess;
                     auto         workspace  = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
@@ -2404,7 +2398,6 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                         block_fft_kernel_R2C_DECREASE_XY<FFT, complex_type, scalar_type><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(scalar_input, intra_complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q, workspace);
                         postcheck;
                     }
-#else
                     is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 #endif
                 }
@@ -2412,7 +2405,7 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
             }
 
             case r2c_increase_XY: {
-                if constexpr ( FFT_TYPE == Generic_Fwd_FFT ) {
+                if constexpr ( FFT_ALGO_t == Generic_Fwd_FFT ) {
                     using FFT               = decltype(FFT_base_arch( ) + Direction<fft_direction::forward>( ) + Type<fft_type::c2c>( ));
                     cudaError_t  error_code = cudaSuccess;
                     auto         workspace  = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
@@ -2434,7 +2427,6 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                         block_fft_kernel_R2C_INCREASE_XY<FFT, complex_type, scalar_type><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(scalar_input, intra_complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q, workspace);
                         postcheck;
                     }
-#else
                     is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 #endif
                 }
@@ -2442,7 +2434,7 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
             }
 
             case r2c_increase_XZ: {
-                if constexpr ( FFT_TYPE == Generic_Fwd_FFT ) {
+                if constexpr ( FFT_ALGO_t == Generic_Fwd_FFT ) {
                     if constexpr ( Rank == 3 ) {
                         using FFT               = decltype(FFT_base_arch( ) + Direction<fft_direction::forward>( ) + Type<fft_type::c2c>( ));
                         cudaError_t  error_code = cudaSuccess;
@@ -2461,7 +2453,6 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                         precheck;
                         block_fft_kernel_R2C_INCREASE_XZ<FFT, complex_type, scalar_type><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(scalar_input, intra_complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q, workspace);
                         postcheck;
-#else
                         is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 #endif
                     }
@@ -2470,7 +2461,7 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
             }
 
             case c2c_fwd_none: {
-                if constexpr ( FFT_TYPE == Generic_Fwd_FFT ) {
+                if constexpr ( FFT_ALGO_t == Generic_Fwd_FFT ) {
                     using FFT = decltype(FFT_base_arch( ) + Direction<fft_direction::forward>( ) + Type<fft_type::c2c>( ));
 
                     LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_fwd_none);
@@ -2492,8 +2483,6 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                         block_fft_kernel_C2C_NONE<FFT, complex_type><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(intra_complex_input, complex_output, LP.mem_offsets, workspace);
                         postcheck;
                     }
-#else
-                    // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
                     is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 #endif
                 }
@@ -2501,7 +2490,7 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
             }
 
             case c2c_fwd_none_XYZ: {
-                if constexpr ( FFT_TYPE == Generic_Fwd_FFT ) {
+                if constexpr ( FFT_ALGO_t == Generic_Fwd_FFT ) {
                     if constexpr ( Rank == 3 ) {
                         using FFT = decltype(FFT_base_arch( ) + Direction<fft_direction::forward>( ) + Type<fft_type::c2c>( ));
 
@@ -2518,8 +2507,6 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                         precheck;
                         block_fft_kernel_C2C_NONE_XYZ<FFT, complex_type><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(intra_complex_input, intra_complex_output, LP.mem_offsets, workspace);
                         postcheck;
-#else
-                        // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
                         is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 #endif
                     }
@@ -2528,7 +2515,7 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
             }
 
             case c2c_fwd_decrease: {
-                if constexpr ( FFT_TYPE == Generic_Fwd_FFT ) {
+                if constexpr ( FFT_ALGO_t == Generic_Fwd_FFT ) {
                     using FFT               = decltype(FFT_base_arch( ) + Direction<fft_direction::forward>( ) + Type<fft_type::c2c>( ));
                     cudaError_t  error_code = cudaSuccess;
                     auto         workspace  = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
@@ -2552,8 +2539,6 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                         block_fft_kernel_C2C_DECREASE<FFT, complex_type><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(intra_complex_input, complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q, workspace);
                         postcheck;
                     }
-#else
-                    // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
                     is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 #endif
                 }
@@ -2561,7 +2546,7 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
             }
 
             case c2c_fwd_increase_XYZ: {
-                if constexpr ( FFT_TYPE == Generic_Fwd_FFT ) {
+                if constexpr ( FFT_ALGO_t == Generic_Fwd_FFT ) {
                     if constexpr ( Rank == 3 ) {
                         using FFT = decltype(FFT_base_arch( ) + Direction<fft_direction::forward>( ) + Type<fft_type::c2c>( ));
 
@@ -2582,8 +2567,6 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                         precheck;
                         block_fft_kernel_C2C_INCREASE_XYZ<FFT, complex_type><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(intra_complex_input, intra_complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q, workspace);
                         postcheck;
-#else
-                        // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
                         is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 #endif
                     }
@@ -2592,7 +2575,7 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
             }
 
             case c2c_fwd_increase: {
-                if constexpr ( FFT_TYPE == Generic_Fwd_FFT ) {
+                if constexpr ( FFT_ALGO_t == Generic_Fwd_FFT ) {
                     using FFT = decltype(FFT_base_arch( ) + Direction<fft_direction::forward>( ) + Type<fft_type::c2c>( ));
 
                     LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_fwd_increase);
@@ -2615,8 +2598,6 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                         block_fft_kernel_C2C_INCREASE<FFT, complex_type><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(intra_complex_input, complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q, workspace);
                         postcheck;
                     }
-#else
-                    // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
                     is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 #endif
                 }
@@ -2624,7 +2605,7 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
             }
 
             case c2c_inv_none: {
-                if constexpr ( FFT_TYPE == Generic_Inv_FFT ) {
+                if constexpr ( FFT_ALGO_t == Generic_Inv_FFT ) {
                     using FFT = decltype(FFT_base_arch( ) + Type<fft_type::c2c>( ) + Direction<fft_direction::inverse>( ));
 
                     LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_inv_none);
@@ -2647,8 +2628,6 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                         block_fft_kernel_C2C_NONE<FFT, complex_type><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(intra_complex_input, intra_complex_output, LP.mem_offsets, workspace);
                         postcheck;
                     }
-#else
-                    // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
                     is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 #endif
 
@@ -2658,7 +2637,7 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
             }
 
             case c2c_inv_none_XZ: {
-                if constexpr ( FFT_TYPE == Generic_Inv_FFT ) {
+                if constexpr ( FFT_ALGO_t == Generic_Inv_FFT ) {
                     if constexpr ( Rank == 3 ) {
                         using FFT = decltype(FFT_base_arch( ) + Type<fft_type::c2c>( ) + Direction<fft_direction::inverse>( ));
 
@@ -2675,8 +2654,6 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                         precheck;
                         block_fft_kernel_C2C_NONE_XZ<FFT, complex_type><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(intra_complex_input, intra_complex_output, LP.mem_offsets, workspace);
                         postcheck;
-#else
-                        // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
                         is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 #endif
                     }
@@ -2686,7 +2663,7 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
             }
 
             case c2c_inv_none_XYZ: {
-                if constexpr ( FFT_TYPE == Generic_Inv_FFT ) {
+                if constexpr ( FFT_ALGO_t == Generic_Inv_FFT ) {
                     if constexpr ( Rank == 3 ) {
                         using FFT = decltype(FFT_base_arch( ) + Direction<fft_direction::inverse>( ) + Type<fft_type::c2c>( ));
 
@@ -2702,8 +2679,6 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                         precheck;
                         block_fft_kernel_C2C_NONE_XYZ<FFT, complex_type><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(intra_complex_input, intra_complex_output, LP.mem_offsets, workspace);
                         postcheck;
-#else
-                        // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
                         is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 #endif
                     }
@@ -2712,7 +2687,7 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
             }
 
             case c2c_inv_decrease: {
-                if constexpr ( FFT_TYPE == Generic_Inv_FFT ) {
+                if constexpr ( FFT_ALGO_t == Generic_Inv_FFT ) {
                     using FFT               = decltype(FFT_base_arch( ) + Direction<fft_direction::inverse>( ) + Type<fft_type::c2c>( ));
                     cudaError_t  error_code = cudaSuccess;
                     auto         workspace  = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
@@ -2736,8 +2711,6 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                         block_fft_kernel_C2C_DECREASE<FFT, complex_type><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(intra_complex_input, intra_complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q, workspace);
                         postcheck;
                     }
-#else
-                    // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
                     is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 #endif
                 }
@@ -2745,20 +2718,17 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
             }
 
             case c2c_inv_increase: {
-                if constexpr ( FFT_TYPE == Generic_Inv_FFT ) {
+                if constexpr ( FFT_ALGO_t == Generic_Inv_FFT ) {
                     MyFFTRunTimeAssertTrue(false, "c2c_inv_increase is not yet implemented.");
 
 #if FFT_DEBUG_STAGE > 4
-#else
-                    // Since we skip the memory ops, unlike the other kernels, we need to flip the buffer pinter
-                    is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 #endif
                 }
                 break;
             }
 
             case c2r_none: {
-                if constexpr ( FFT_TYPE == Generic_Inv_FFT ) {
+                if constexpr ( FFT_ALGO_t == Generic_Inv_FFT ) {
                     using FFT = decltype(FFT_base_arch( ) + Direction<fft_direction::inverse>( ) + Type<fft_type::c2r>( ));
 
                     LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2r_none);
@@ -2781,7 +2751,6 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                         block_fft_kernel_C2R_NONE<FFT, complex_type, scalar_type><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(intra_complex_input, scalar_output, LP.mem_offsets, workspace);
                         postcheck;
                     }
-#else
                     is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 #endif
                 }
@@ -2789,7 +2758,7 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
             }
 
             case c2r_none_XY: {
-                if constexpr ( FFT_TYPE == Generic_Inv_FFT ) {
+                if constexpr ( FFT_ALGO_t == Generic_Inv_FFT ) {
                     using FFT = decltype(FFT_base_arch( ) + Direction<fft_direction::inverse>( ) + Type<fft_type::c2r>( ));
 
                     LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2r_none_XY);
@@ -2812,7 +2781,6 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                         block_fft_kernel_C2R_NONE_XY<FFT, complex_type, scalar_type><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(intra_complex_input, scalar_output, LP.mem_offsets, workspace);
                         postcheck;
                     }
-#else
                     is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 #endif
                 }
@@ -2820,7 +2788,7 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
             }
 
             case c2r_decrease_XY: {
-                if constexpr ( FFT_TYPE == Generic_Inv_FFT ) {
+                if constexpr ( FFT_ALGO_t == Generic_Inv_FFT ) {
                     using FFT = decltype(FFT_base_arch( ) + Direction<fft_direction::inverse>( ) + Type<fft_type::c2r>( ));
 
                     LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2r_decrease_XY);
@@ -2844,24 +2812,23 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                         block_fft_kernel_C2R_DECREASE_XY<FFT, complex_type, scalar_type><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(intra_complex_input, scalar_output, LP.mem_offsets, LP.twiddle_in, LP.Q, workspace);
                         postcheck;
                     }
+                    is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 
                     transform_stage_completed = TransformStageCompleted::inv;
-#else
-                    is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 #endif
                 }
                 break;
             }
 
             case c2r_increase: {
-                if constexpr ( FFT_TYPE == Generic_Inv_FFT ) {
+                if constexpr ( FFT_ALGO_t == Generic_Inv_FFT ) {
                     MyFFTRunTimeAssertTrue(false, "c2r_increase is not yet implemented.");
                 }
                 break;
             }
 
             case xcorr_fwd_increase_inv_none: {
-                if constexpr ( FFT_TYPE == Generic_Fwd_Image_Inv_FFT ) {
+                if constexpr ( FFT_ALGO_t == Generic_Fwd_Image_Inv_FFT ) {
                     using FFT    = decltype(FFT_base_arch( ) + Type<fft_type::c2c>( ) + Direction<fft_direction::forward>( ));
                     using invFFT = decltype(FFT_base_arch( ) + Type<fft_type::c2c>( ) + Direction<fft_direction::inverse>( ));
 
@@ -2902,7 +2869,6 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                                 (ExternalImagePtr_t)d_ptr.image_to_search, intra_complex_input, intra_complex_output, LP.mem_offsets, apparent_Q, workspace_fwd, workspace_inv);
                         postcheck;
                     }
-#else
                     is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 #endif
 
@@ -2912,7 +2878,7 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
             }
 
             case xcorr_fwd_none_inv_decrease: {
-                if constexpr ( FFT_TYPE == Generic_Fwd_Image_Inv_FFT ) {
+                if constexpr ( FFT_ALGO_t == Generic_Fwd_Image_Inv_FFT ) {
                     using FFT    = decltype(FFT_base_arch( ) + Type<fft_type::c2c>( ) + Direction<fft_direction::forward>( ));
                     using invFFT = decltype(FFT_base_arch( ) + Type<fft_type::c2c>( ) + Direction<fft_direction::inverse>( ));
 
@@ -2953,10 +2919,8 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                                 (ExternalImagePtr_t)d_ptr.image_to_search, intra_complex_input, intra_complex_output, LP.mem_offsets, LP.twiddle_in, apparent_Q, workspace_fwd, workspace_inv);
                         postcheck;
                     }
-                    transform_stage_completed = TransformStageCompleted::fwd;
-
-#else
                     is_in_second_buffer_partition = ! is_in_second_buffer_partition;
+                    transform_stage_completed     = TransformStageCompleted::fwd;
 #endif
 
                     // do something
@@ -2964,7 +2928,7 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                 break;
             } // end case xcorr_fwd_none_inv_decrease
             case generic_fwd_increase_op_inv_none: {
-                if constexpr ( FFT_TYPE == Generic_Fwd_Image_Inv_FFT ) {
+                if constexpr ( FFT_ALGO_t == Generic_Fwd_Image_Inv_FFT ) {
                     // For convenience, we are explicitly zero-padding. This is lazy. FIXME
                     using FFT    = decltype(FFT_base_arch( ) + Type<fft_type::c2c>( ) + Direction<fft_direction::forward>( ));
                     using invFFT = decltype(FFT_base_arch( ) + Type<fft_type::c2c>( ) + Direction<fft_direction::inverse>( ));
@@ -2998,8 +2962,7 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
                         postcheck;
 
                         // FIXME: this is set in the public method calls for other functions. Since it will be changed to 0-7 to match FFT_DEBUG_STAGE, fix it then.
-                        transform_stage_completed = TransformStageCompleted::fwd;
-#else
+                        transform_stage_completed     = TransformStageCompleted::fwd;
                         is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 #endif
                     }

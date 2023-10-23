@@ -184,7 +184,10 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
 
             cuFFT.CopyHostToDevice(cuFFT_input.real_values);
 
-            targetFT.CopyHostToDevice(target_search_image.real_values);
+            // targetFT.CopyHostToDevice(target_search_image.real_values);
+            // The following function may fail if that memory is not allocated.
+            // FIXME:
+            targetFT.CopyHostToDeviceAndSynchronize(target_search_image.real_values);
 
             FT.SetExternalImagePointer(targetFT.d_ptr.momentum_space);
 
@@ -224,8 +227,6 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
                 cuFFT_input.MakeCufftPlan( );
                 cuFFT_output.MakeCufftPlan( );
             }
-
-            std::cout << "Test lambda" << std::endl;
 
             FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::NOOP>     noop;
             FastFFT::KernelFunction::my_functor<float, 2, FastFFT::KernelFunction::CONJ_MUL> conj_mul;
@@ -445,7 +446,7 @@ int main(int argc, char** argv) {
         SCT size_change_type;
 
         size_change_type = SCT::no_change;
-        compare_libraries<3>(FastFFT::test_size, size_change_type, false);
+        compare_libraries<3>(FastFFT::test_size_3d, size_change_type, false);
 
         // TODO: These are not yet completed.
         // size_change_type = SCT::increase;

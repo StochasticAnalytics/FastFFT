@@ -38,7 +38,7 @@ $(info $$CUFFTDX_INCLUDE_DIR is [${CUFFTDX_INCLUDE_DIR}])
 CUDA_BIN_DIR=$(shell dirname `which $(NVCC)`)
 CUDA_INCLUDE_DIR=$(CUDA_BIN_DIR)/../include
 
-
+# TODO: Changing the debug flags will not force re compilation
 DEBUG_FLAGS :=  
 # Debug level determines various asserts and print macros defined in FastFFT.cuh These should only be set when building tests and developing.
 ifeq (${FFT_DEBUG_LEVEL},)
@@ -89,6 +89,7 @@ EXTERNAL_LIBS= -lfftw3f -lcufft_static -lculibos -lcudart_static -lrt
 TEST_BUILD_DIR=tests
 TEST_SRC_DIR=../src/tests
 # Get all the test source files and remove cu extension
+# TODO: selective targets
 TEST_TARGETS=$(patsubst %.cu,$(TEST_BUILD_DIR)/%,$(notdir $(wildcard $(TEST_SRC_DIR)/*.cu)))
 TEST_DEPS=$(wildcard $(TEST_SRC_DIR)/*.cuh)
 
