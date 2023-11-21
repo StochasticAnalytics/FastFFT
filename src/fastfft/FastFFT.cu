@@ -255,29 +255,40 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetIn
 
 template <class ComputeBaseType, class InputType, class OutputBaseType, int Rank>
 template <typename ExternalImagePtr_t>
-void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetOutputPointer(ExternalImagePtr_t output_pointer) {
+void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetOutputPointer(ExternalImagePtr_t* output_pointer) {
     MyFFTDebugAssertTrue(is_set_input_params && is_set_output_params, "Input and output parameters not set");
 
-    if constexpr ( std::is_same_v<ExternalImagePtr_t, decltype(d_ptr.external_pointer)> ) {
-        d_ptr.external_output         = output_pointer;
+    if ( output_pointer == nullptr ) {
+        d_ptr.external_output         = nullptr;
         d_ptr.external_output_complex = nullptr;
     }
-    else if constexpr ( std::is_same_v<ExternalImagePtr_t, decltype(d_ptr.external_pointer_complex)> ) {
-        d_ptr.external_output_complex = output_pointer;
-        d_ptr.external_output         = nullptr;
-    }
     else {
-        MyFFTDebugAssertTrue(false, "Invalid output pointer type");
-    }
+        if constexpr ( std::is_same_v<ExternalImagePtr_t*, decltype(d_ptr.external_output)> ) {
+            d_ptr.external_output         = output_pointer;
+            d_ptr.external_output_complex = nullptr;
+        }
+        else if constexpr ( std::is_same_v<ExternalImagePtr_t*, decltype(d_ptr.external_output_complex)> ) {
+            d_ptr.external_output_complex = output_pointer;
+            d_ptr.external_output         = nullptr;
+        }
+        else {
+            static_assert_type_name(output_pointer);
+            MyFFTDebugAssertTrue(false, "Invalid output pointer type");
+        }
 
-    // Make sure the user has pinned the memory if it is coming from the host, as this
-    // is required for the memcyp_Async calls.
-    if ( pointer_is_in_device_memory(output_pointer) ) {
-        output_data_is_on_device = true;
-    }
-    else {
-        output_data_is_on_device = false;
-        MyFFTDebugAssertTrue(pointer_is_in_memory_and_registered(output_pointer), "Output pointer is either not allocated or not in pinned memory");
+        // Make sure the user has pinned the memory if it is coming from the host, as this
+        // is required for the memcyp_Async calls.
+        if ( pointer_is_in_device_memory(output_pointer) ) {
+            output_data_is_on_device = true;
+        }
+        else {
+            // FIXME: for this condition, we would want to set the output pointer to the appropraite internal buffer,
+            // and then copy the data to the user supplied pointer. in SetAndLaunchKernel similar to what happends for a
+            // input ptr.
+            MyFFTRunTimeAssertTrue(false, "The external output pointer must be in device memory");
+            output_data_is_on_device = false;
+            // MyFFTDebugAssertTrue(pointer_is_in_memory_and_registered(output_pointer), "Output pointer is either not allocated or not in pinned memory");
+        }
     }
 
     return;
@@ -285,7 +296,7 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetOu
 
 template <class ComputeBaseType, class InputType, class OutputBaseType, int Rank>
 template <typename ExternalImagePtr_t>
-void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetExternalImagePointer(ExternalImagePtr_t ptr) {
+void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetExternalImagePointer(ExternalImagePtr_t* ptr) {
     MyFFTDebugAssertTrue(is_set_input_params && is_set_output_params, "Input and output parameters not set");
 
     d_ptr.image_to_search = ptr;
@@ -1315,8 +1326,8 @@ __global__ void block_fft_kernel_R2C_DECREASE_XY(const ScalarType* __restrict__ 
 
 // decomposed with conj multiplication
 
-template <class FFT, class invFFT, class ComplexType>
-__global__ void thread_fft_kernel_C2C_decomposed_ConjMul(const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q) {
+template <class ExternalImagePtr_t, class FFT, class invFFT, class ComplexType>
+__global__ void thread_fft_kernel_C2C_decomposed_ConjMul(const ExternalImagePtr_t* __restrict__ image_to_search, const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q) {
 
     using complex_type = ComplexType;
     // The data store is non-coalesced, so don't aggregate the data in shared mem.
@@ -1382,9 +1393,9 @@ __launch_bounds__(invFFT::max_threads_per_block) __global__
     io<invFFT>::store(thread_data, &output_values[Return1DFFTAddress(size_of<FFT>::value)]);
 }
 
-template <class FFT, class invFFT, class ComplexType>
+template <class ExternalImagePtr_t, class FFT, class invFFT, class ComplexType>
 __launch_bounds__(invFFT::max_threads_per_block) __global__
-        void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul_SwapRealSpaceQuadrants(const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv) {
+        void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul_SwapRealSpaceQuadrants(const ExternalImagePtr_t* __restrict__ image_to_search, const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv) {
 
     //	// Initialize the shared memory, assuming everyting matches the input data X size in
     using complex_type = ComplexType;
@@ -1915,7 +1926,7 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::ClipI
     float        wanted_padding_value = 0.f;
 
     precheck;
-    clip_into_real_kernel<float, float><<<gridDims, threadsPerBlock, 0, cudaStreamPerThread>>>(d_ptr.position_space, d_ptr.position_space, fwd_dims_in, fwd_dims_out, wanted_center, wanted_padding_value);
+    clip_into_real_kernel<InputType, InputType><<<gridDims, threadsPerBlock, 0, cudaStreamPerThread>>>(d_ptr.position_space, d_ptr.position_space, fwd_dims_in, fwd_dims_out, wanted_center, wanted_padding_value);
     postcheck;
 }
 
@@ -2123,6 +2134,9 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
         if constexpr ( FFT_ALGO_t == Generic_Fwd_Image_Inv_FFT ) {
             MyFFTDebugAssertTrue(d_ptr.image_to_search != nullptr, "SetExternalImagePointer has not been called.");
         }
+        else if constexpr ( FFT_ALGO_t != Generic_Fwd_Image_Inv_FFT ) {
+            MyFFTDebugAssertTrue(d_ptr.image_to_search == nullptr, "SetExternalImagePointer has been called twice.");
+        }
     }
     using ExternalImagePtr_t = decltype(d_ptr.image_to_search);
 
@@ -2148,7 +2162,9 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
             complex_output = (complex_type*)d_ptr.momentum_space_buffer;
     }
 
-    // Make sure we are in the right chunk of the memory pool.
+    // Make sure we are in the right chunk of the memory pool. The intra_ prefix
+    // is to  make clear that all the prior _input and _output pointers are refering to the final
+    // FFT operation as invoked by the caller.
     if ( is_in_second_buffer_partition ) {
         intra_complex_input  = (complex_type*)d_ptr.momentum_space_buffer;
         intra_complex_output = (complex_type*)d_ptr.momentum_space;
@@ -2260,20 +2276,20 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
 
                 if ( swap_real_space_quadrants ) {
                     MyFFTRunTimeAssertTrue(false, "decomposed xcorr with swap real space quadrants is not implemented.");
-                    // cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul_SwapRealSpaceQuadrants<FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));
+                    // cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul_SwapRealSpaceQuadrants<ExternalImagePtr_t, FFT,complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));
 
                     // precheck;
-                    // block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul_SwapRealSpaceQuadrants<FFT,invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
-                    // ( (complex_type*) image_to_search, (complex_type*)  d_ptr.momentum_space_buffer,  (complex_type*) d_ptr.momentum_space, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace_fwd, workspace_inv);
+                    // block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul_SwapRealSpaceQuadrants<ExternalImagePtr_t, FFT,invFFT, complex_type><< <LP.gridDims,  LP.threadsPerBlock, shared_memory, cudaStreamPerThread>> >
+                    // ( (ExternalImagePtr_t*) image_to_search, (complex_type*)  d_ptr.momentum_space_buffer,  (complex_type*) d_ptr.momentum_space, LP.mem_offsets, LP.twiddle_in,LP.Q, workspace_fwd, workspace_inv);
                     // postcheck;
                 }
                 else {
-                    cudaErr(cudaFuncSetAttribute((void*)thread_fft_kernel_C2C_decomposed_ConjMul<FFT, invFFT, complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));
+                    cudaErr(cudaFuncSetAttribute((void*)thread_fft_kernel_C2C_decomposed_ConjMul<ExternalImagePtr_t, FFT, invFFT, complex_type>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));
 
 #if FFT_DEBUG_STAGE > 2
                     // the image_to_search pointer is set during call to CrossCorrelate,
                     precheck;
-                    thread_fft_kernel_C2C_decomposed_ConjMul<FFT, invFFT, complex_type><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>((complex_type*)d_ptr.image_to_search, intra_complex_input, intra_complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q);
+                    thread_fft_kernel_C2C_decomposed_ConjMul<FFT, invFFT, complex_type><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>((ExternalImagePtr_t*)d_ptr.image_to_search, intra_complex_input, intra_complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q);
                     postcheck;
                     is_in_second_buffer_partition = ! is_in_second_buffer_partition;
 #endif
@@ -3356,8 +3372,14 @@ template void FourierTransformer<float, float, float>::CopyDeviceToDevice<float>
 template void FourierTransformer<float, float, float>::CopyDeviceToDevice<float2>(float2*, bool, int);
 template void FourierTransformer<float, float, float>::CopyDeviceToDeviceAndSynchronize<float>(float*, bool, int);
 template void FourierTransformer<float, float, float>::CopyDeviceToDeviceAndSynchronize<float2>(float2*, bool, int);
+template void FourierTransformer<float, float, float>::CopyDeviceToDevice<__half>(__half*, bool, int);
+template void FourierTransformer<float, float, float>::CopyDeviceToDevice<__half2>(__half2*, bool, int);
+template void FourierTransformer<float, float, float>::CopyDeviceToDeviceAndSynchronize<__half>(__half*, bool, int);
+template void FourierTransformer<float, float, float>::CopyDeviceToDeviceAndSynchronize<__half2>(__half2*, bool, int);
 
-template void FourierTransformer<float, float, float>::SetExternalImagePointer<float2*>(float2* output_pointer);
+template void FourierTransformer<float, float, float>::SetExternalImagePointer<float2>(float2* output_pointer);
+template void FourierTransformer<float, float, float>::SetOutputPointer<float>(float* output_pointer);
+template void FourierTransformer<float, float, float>::SetOutputPointer<float2>(float2* output_pointer);
 
 template void FourierTransformer<float, float, float>::Generic_Fwd<my_functor<float, 0, IKF_t::NOOP>,
                                                                    my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,
@@ -3376,10 +3398,44 @@ template void FourierTransformer<float, float, float>::Generic_Fwd_Image_Inv<my_
                                                                                                                 my_functor<float, 2, IKF_t::CONJ_MUL>,
                                                                                                                 my_functor<float, 0, IKF_t::NOOP>);
 
+template class FourierTransformer<float, __half, __half, 2>;
+
+template void FourierTransformer<float, __half, __half>::CopyDeviceToDevice<float>(float*, bool, int);
+template void FourierTransformer<float, __half, __half>::CopyDeviceToDevice<float2>(float2*, bool, int);
+template void FourierTransformer<float, __half, __half>::CopyDeviceToDeviceAndSynchronize<float>(float*, bool, int);
+template void FourierTransformer<float, __half, __half>::CopyDeviceToDeviceAndSynchronize<float2>(float2*, bool, int);
+template void FourierTransformer<float, __half, __half>::CopyDeviceToDevice<__half>(__half*, bool, int);
+template void FourierTransformer<float, __half, __half>::CopyDeviceToDevice<__half2>(__half2*, bool, int);
+template void FourierTransformer<float, __half, __half>::CopyDeviceToDeviceAndSynchronize<__half>(__half*, bool, int);
+template void FourierTransformer<float, __half, __half>::CopyDeviceToDeviceAndSynchronize<__half2>(__half2*, bool, int);
+
+template void FourierTransformer<float, __half, __half>::SetExternalImagePointer<__half2>(__half2* output_pointer);
+template void FourierTransformer<float, __half, __half>::SetOutputPointer<__half>(__half* output_pointer);
+template void FourierTransformer<float, __half, __half>::SetOutputPointer<__half2>(__half2* output_pointer);
+
+template void FourierTransformer<float, __half, __half>::Generic_Fwd<my_functor<float, 0, IKF_t::NOOP>,
+                                                                     my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,
+                                                                                                        my_functor<float, 0, IKF_t::NOOP>);
+
+template void FourierTransformer<float, __half, __half>::Generic_Inv<my_functor<float, 0, IKF_t::NOOP>,
+                                                                     my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,
+                                                                                                        my_functor<float, 0, IKF_t::NOOP>);
+
+template void FourierTransformer<float, __half, __half>::Generic_Fwd<std::nullptr_t, std::nullptr_t>(std::nullptr_t, std::nullptr_t);
+template void FourierTransformer<float, __half, __half>::Generic_Inv<std::nullptr_t, std::nullptr_t>(std::nullptr_t, std::nullptr_t);
+
+template void FourierTransformer<float, __half, __half>::Generic_Fwd_Image_Inv<my_functor<float, 0, IKF_t::NOOP>,
+                                                                               my_functor<float, 2, IKF_t::CONJ_MUL>,
+                                                                               my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,
+                                                                                                                  my_functor<float, 2, IKF_t::CONJ_MUL>,
+                                                                                                                  my_functor<float, 0, IKF_t::NOOP>);
 // 3d explicit instantiations
 
 template class FourierTransformer<float, float, float, 3>;
-template void FourierTransformer<float, float, float, 3>::SetExternalImagePointer<float2*>(float2* output_pointer);
+template void FourierTransformer<float, float, float, 3>::SetExternalImagePointer<float2>(float2* output_pointer);
+
+template void FourierTransformer<float, float, float, 3>::SetOutputPointer<float>(float* output_pointer);
+template void FourierTransformer<float, float, float, 3>::SetOutputPointer<float2>(float2* output_pointer);
 
 template void FourierTransformer<float, float, float, 3>::Generic_Fwd<my_functor<float, 0, IKF_t::NOOP>,
                                                                       my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,
@@ -3398,4 +3454,25 @@ template void FourierTransformer<float, float, float, 3>::Generic_Fwd_Image_Inv<
                                                                                                                    my_functor<float, 2, IKF_t::CONJ_MUL>,
                                                                                                                    my_functor<float, 0, IKF_t::NOOP>);
 
+template class FourierTransformer<float, __half, __half, 3>;
+template void FourierTransformer<float, __half, __half, 3>::SetExternalImagePointer<__half2>(__half2* output_pointer);
+template void FourierTransformer<float, __half, __half, 3>::SetOutputPointer<__half>(__half* output_pointer);
+template void FourierTransformer<float, __half, __half, 3>::SetOutputPointer<__half2>(__half2* output_pointer);
+
+template void FourierTransformer<float, __half, __half, 3>::Generic_Fwd<my_functor<float, 0, IKF_t::NOOP>,
+                                                                        my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,
+                                                                                                           my_functor<float, 0, IKF_t::NOOP>);
+
+template void FourierTransformer<float, __half, __half, 3>::Generic_Inv<my_functor<float, 0, IKF_t::NOOP>,
+                                                                        my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,
+                                                                                                           my_functor<float, 0, IKF_t::NOOP>);
+
+template void FourierTransformer<float, __half, __half, 3>::Generic_Fwd<std::nullptr_t, std::nullptr_t>(std::nullptr_t, std::nullptr_t);
+template void FourierTransformer<float, __half, __half, 3>::Generic_Inv<std::nullptr_t, std::nullptr_t>(std::nullptr_t, std::nullptr_t);
+
+template void FourierTransformer<float, __half, __half, 3>::Generic_Fwd_Image_Inv<my_functor<float, 0, IKF_t::NOOP>,
+                                                                                  my_functor<float, 2, IKF_t::CONJ_MUL>,
+                                                                                  my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,
+                                                                                                                     my_functor<float, 2, IKF_t::CONJ_MUL>,
+                                                                                                                     my_functor<float, 0, IKF_t::NOOP>);
 } // namespace FastFFT

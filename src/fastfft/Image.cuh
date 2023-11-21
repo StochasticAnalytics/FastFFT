@@ -88,10 +88,13 @@ class Image {
     void SetClipIntoMask(short4 input_size, short4 output_size);
     bool is_set_clip_into_mask = false;
     // void SetClipIntoCallback(cufftReal* image_to_insert, int image_to_insert_size_x, int image_to_insert_size_y,int image_to_insert_pitch);
-    void   SetComplexConjMultiplyAndLoadCallBack(cufftComplex* search_image_FT, cufftReal FT_normalization_factor);
-    void   MultiplyConjugateImage(wanted_complex_type* other_image);
-    void   print_values_complex(float* input, std::string msg, int n_to_print);
-    float  ReturnSumOfReal(float* input, short4 size, bool print_val = false);
+    void SetComplexConjMultiplyAndLoadCallBack(cufftComplex* search_image_FT, cufftReal FT_normalization_factor);
+    void MultiplyConjugateImage(wanted_complex_type* other_image);
+    void print_values_complex(float* input, std::string msg, int n_to_print);
+    // float ReturnSumOfReal(float* input, short4 size, bool print_val = false);
+    template <typename T>
+    float ReturnSumOfReal(T* input, short4 size, bool print_val = false);
+
     float2 ReturnSumOfComplex(float2* input, int n_to_print);
     float  ReturnSumOfComplexAmplitudes(float2* input, int n_to_print);
     void   ClipInto(const float* array_to_paste, float* array_to_paste_into, short4 size_from, short4 size_into, short4 wanted_center, float wanted_padding_value);

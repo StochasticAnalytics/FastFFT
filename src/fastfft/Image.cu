@@ -349,9 +349,29 @@ void Image<wanted_real_type, wanted_complex_type>::print_values_complex(float* i
     }
 }
 
-// Return sum of real values
+// // Return sum of real values
+// template <class wanted_real_type, class wanted_complex_type>
+// float Image<wanted_real_type, wanted_complex_type>::ReturnSumOfReal(float* input, short4 size, bool print_val) {
+//     double temp_sum         = 0;
+//     long   address          = 0;
+//     int    padding_jump_val = size.w * 2 - size.x;
+//     for ( int k = 0; k < size.z; k++ ) {
+//         for ( int j = 0; j < size.y; j++ ) {
+//             for ( int i = 0; i < size.x; i++ ) {
+
+//                 temp_sum += double(input[address]);
+//                 address++;
+//             }
+//             address += padding_jump_val;
+//         }
+//     }
+
+//     return float(temp_sum);
+// }
+
 template <class wanted_real_type, class wanted_complex_type>
-float Image<wanted_real_type, wanted_complex_type>::ReturnSumOfReal(float* input, short4 size, bool print_val) {
+template <typename T>
+float Image<wanted_real_type, wanted_complex_type>::ReturnSumOfReal(T* input, short4 size, bool print_val) {
     double temp_sum         = 0;
     long   address          = 0;
     int    padding_jump_val = size.w * 2 - size.x;
@@ -368,6 +388,10 @@ float Image<wanted_real_type, wanted_complex_type>::ReturnSumOfReal(float* input
 
     return float(temp_sum);
 }
+
+template float Image<float, float2>::ReturnSumOfReal<float>(float* input, short4 size, bool print_val);
+template float Image<float, float2>::ReturnSumOfReal<half_float::half>(half_float::half* input, short4 size, bool print_val);
+template float Image<float, float2>::ReturnSumOfReal<__half>(__half* input, short4 size, bool print_val);
 
 // Return the sum of the complex values
 

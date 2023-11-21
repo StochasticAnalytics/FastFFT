@@ -30,6 +30,37 @@ inline constexpr _Tp pi_v = 3.141592653589793238462643383279502884L;
 
 #include "../src/fastfft/types.cuh"
 
+template <typename T>
+__device__ __host__ inline void static_assert_type_name(T v) {
+
+    if constexpr ( std::is_pointer_v<T> ) {
+        static_assert(! std::is_same_v<T, int*>, "int*");
+        static_assert(! std::is_same_v<T, int2*>, "int2*");
+        static_assert(! std::is_same_v<T, int3*>, "int3*");
+        static_assert(! std::is_same_v<T, int4*>, "int4*");
+        static_assert(! std::is_same_v<T, float*>, "float*");
+        static_assert(! std::is_same_v<T, float2*>, "float2*");
+        static_assert(! std::is_same_v<T, float3*>, "float3*");
+        static_assert(! std::is_same_v<T, float4*>, "float4*");
+        static_assert(! std::is_same_v<T, double*>, "double*");
+        static_assert(! std::is_same_v<T, __half*>, "__half*");
+        static_assert(! std::is_same_v<T, __half2*>, "__half2*");
+    }
+    else {
+        static_assert(! std::is_same_v<T, int>, "int");
+        static_assert(! std::is_same_v<T, int2>, "int2");
+        static_assert(! std::is_same_v<T, int3>, "int3");
+        static_assert(! std::is_same_v<T, int4>, "int4");
+        static_assert(! std::is_same_v<T, float>, "float");
+        static_assert(! std::is_same_v<T, float2>, "float2");
+        static_assert(! std::is_same_v<T, float3>, "float3");
+        static_assert(! std::is_same_v<T, float4>, "float4");
+        static_assert(! std::is_same_v<T, double>, "double");
+        static_assert(! std::is_same_v<T, __half>, "__half");
+        static_assert(! std::is_same_v<T, __half2>, "__half2");
+    }
+};
+
 // For testing/debugging it is convenient to execute and have print functions for partial transforms.
 // These will go directly in the kernels and also in the helper Image.cuh definitions for PrintArray.
 // The number refers to the number of 1d FFTs performed,
@@ -129,6 +160,7 @@ typedef struct __align__(64) _LaunchParams {
 
 LaunchParams;
 
+// TODO: Reorder these template params to match the class C, I, O
 template <typename I, typename C, typename O>
 struct DevicePointers {
     // Use this to catch unsupported input/ compute types and throw exception.
@@ -266,10 +298,10 @@ class FourierTransformer {
     void SetInputPointer(InputType* input_pointer);
 
     template <typename ExternalImagePtr_t>
-    void SetOutputPointer(ExternalImagePtr_t output_pointer);
+    void SetOutputPointer(ExternalImagePtr_t* output_pointer);
 
     template <typename ExternalImagePtr_t>
-    void SetExternalImagePointer(ExternalImagePtr_t output_pointer);
+    void SetExternalImagePointer(ExternalImagePtr_t* output_pointer);
     // When passing in a pointer from python (cupy or pytorch) it is a long, and needs to be cast to input type.
     // For now, we are assuming memory ops are all handled in the python code.
     void SetInputPointerFromPython(long input_pointer);

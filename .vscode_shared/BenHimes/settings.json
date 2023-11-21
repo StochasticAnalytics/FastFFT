@@ -76,7 +76,8 @@
         "complex": "cpp",
         "unordered_set": "cpp",
         "__config": "cpp",
-        "target": "cpp"
+        "target": "cpp",
+        "ios": "cpp"
     },
     "C_Cpp.clang_format_path": "/usr/bin/clang-format-14",
     "editor.formatOnSave": true,

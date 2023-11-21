@@ -403,9 +403,9 @@ __launch_bounds__(FFT::max_threads_per_block) __global__
                                                            Offsets mem_offsets, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv,
                                                            PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
 
-template <class FFT, class invFFT, class ComplexType = typename FFT::value_type>
+template <class ExternalImagePtr_t, class FFT, class invFFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-        void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul_SwapRealSpaceQuadrants(const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values,
+        void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul_SwapRealSpaceQuadrants(const ExternalImagePtr_t* __restrict__ image_to_search, const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values,
                                                                                        Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv);
 
 template <class ExternalImagePtr_t, class FFT, class invFFT, class ComplexType = typename FFT::value_type>
@@ -464,8 +464,8 @@ __global__ void thread_fft_kernel_R2C_decomposed_transposed(const ScalarType* __
 template <class FFT, class ComplexType = typename FFT::value_type>
 __global__ void thread_fft_kernel_C2C_decomposed(const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q);
 
-template <class FFT, class invFFT, class ComplexType = typename FFT::value_type>
-__global__ void thread_fft_kernel_C2C_decomposed_ConjMul(const ComplexType* __restrict__ image_to_search, const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q);
+template <class ExternalImagePtr_t, class FFT, class invFFT, class ComplexType = typename FFT::value_type>
+__global__ void thread_fft_kernel_C2C_decomposed_ConjMul(const ExternalImagePtr_t* __restrict__ image_to_search, const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q);
 
 /////////////
 // C2R
@@ -765,8 +765,8 @@ struct io {
     }
 
     template <class ExternalImagePtr_t>
-    static inline __device__ void load_shared_and_conj_multiply(const ExternalImagePtr_t image_to_search,
-                                                                complex_type*            thread_data) {
+    static inline __device__ void load_shared_and_conj_multiply(const ExternalImagePtr_t* image_to_search,
+                                                                complex_type*             thread_data) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         complex_type       c;
@@ -778,13 +778,16 @@ struct io {
                 index += stride;
             }
         }
-        else {
+        else if constexpr ( std::is_same_v<ExternalImagePtr_t, float2*> ) {
             for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
                 c.x            = (thread_data[i].x * image_to_search[index].x + thread_data[i].y * image_to_search[index].y);
                 c.y            = (thread_data[i].y * image_to_search[index].x - thread_data[i].x * image_to_search[index].y);
                 thread_data[i] = c;
                 index += stride;
             }
+        }
+        else {
+            static_assert_type_name(image_to_search);
         }
     }
 
