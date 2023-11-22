@@ -3380,113 +3380,43 @@ using namespace FastFFT::KernelFunction;
 
 // 2d explicit instantiations
 
-template class FourierTransformer<float, float, float, 2>;
+#define INSTANTIATE(COMPUTEBASETYPE, INPUTTYPE, OUTPUTBASETYPE, RANK)                                                                                                                   \
+    template class FourierTransformer<COMPUTEBASETYPE, INPUTTYPE, OUTPUTBASETYPE, RANK>;                                                                                                \
+                                                                                                                                                                                        \
+    template void FourierTransformer<COMPUTEBASETYPE, INPUTTYPE, OUTPUTBASETYPE, RANK>::CopyDeviceToDevice<float>(float*, bool, int);                                                   \
+    template void FourierTransformer<COMPUTEBASETYPE, INPUTTYPE, OUTPUTBASETYPE, RANK>::CopyDeviceToDevice<float2>(float2*, bool, int);                                                 \
+    template void FourierTransformer<COMPUTEBASETYPE, INPUTTYPE, OUTPUTBASETYPE, RANK>::CopyDeviceToDeviceAndSynchronize<float>(float*, bool, int);                                     \
+    template void FourierTransformer<COMPUTEBASETYPE, INPUTTYPE, OUTPUTBASETYPE, RANK>::CopyDeviceToDeviceAndSynchronize<float2>(float2*, bool, int);                                   \
+    template void FourierTransformer<COMPUTEBASETYPE, INPUTTYPE, OUTPUTBASETYPE, RANK>::CopyDeviceToDevice<__half>(__half*, bool, int);                                                 \
+    template void FourierTransformer<COMPUTEBASETYPE, INPUTTYPE, OUTPUTBASETYPE, RANK>::CopyDeviceToDevice<__half2>(__half2*, bool, int);                                               \
+    template void FourierTransformer<COMPUTEBASETYPE, INPUTTYPE, OUTPUTBASETYPE, RANK>::CopyDeviceToDeviceAndSynchronize<__half>(__half*, bool, int);                                   \
+    template void FourierTransformer<COMPUTEBASETYPE, INPUTTYPE, OUTPUTBASETYPE, RANK>::CopyDeviceToDeviceAndSynchronize<__half2>(__half2*, bool, int);                                 \
+                                                                                                                                                                                        \
+    template void FourierTransformer<COMPUTEBASETYPE, INPUTTYPE, OUTPUTBASETYPE, RANK>::SetExternalImagePointer<float2>(float2 * output_pointer);                                       \
+    template void FourierTransformer<COMPUTEBASETYPE, INPUTTYPE, OUTPUTBASETYPE, RANK>::SetOutputPointer<float>(float* output_pointer);                                                 \
+    template void FourierTransformer<COMPUTEBASETYPE, INPUTTYPE, OUTPUTBASETYPE, RANK>::SetOutputPointer<float2>(float2 * output_pointer);                                              \
+                                                                                                                                                                                        \
+    template void FourierTransformer<COMPUTEBASETYPE, INPUTTYPE, OUTPUTBASETYPE, RANK>::Generic_Fwd<my_functor<float, 0, IKF_t::NOOP>,                                                  \
+                                                                                                    my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,               \
+                                                                                                                                       my_functor<float, 0, IKF_t::NOOP>);              \
+                                                                                                                                                                                        \
+    template void FourierTransformer<COMPUTEBASETYPE, INPUTTYPE, OUTPUTBASETYPE, RANK>::Generic_Inv<my_functor<float, 0, IKF_t::NOOP>,                                                  \
+                                                                                                    my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,               \
+                                                                                                                                       my_functor<float, 0, IKF_t::NOOP>);              \
+                                                                                                                                                                                        \
+    template void FourierTransformer<COMPUTEBASETYPE, INPUTTYPE, OUTPUTBASETYPE, RANK>::Generic_Fwd<std::nullptr_t, std::nullptr_t>(std::nullptr_t, std::nullptr_t);                    \
+    template void FourierTransformer<COMPUTEBASETYPE, INPUTTYPE, OUTPUTBASETYPE, RANK>::Generic_Inv<std::nullptr_t, std::nullptr_t>(std::nullptr_t, std::nullptr_t);                    \
+                                                                                                                                                                                        \
+    template void FourierTransformer<COMPUTEBASETYPE, INPUTTYPE, OUTPUTBASETYPE, RANK>::Generic_Fwd_Image_Inv<my_functor<float, 0, IKF_t::NOOP>,                                        \
+                                                                                                              my_functor<float, 2, IKF_t::CONJ_MUL>,                                    \
+                                                                                                              my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,     \
+                                                                                                                                                 my_functor<float, 2, IKF_t::CONJ_MUL>, \
+                                                                                                                                                 my_functor<float, 0, IKF_t::NOOP>);
 
-template void FourierTransformer<float, float, float>::CopyDeviceToDevice<float>(float*, bool, int);
-template void FourierTransformer<float, float, float>::CopyDeviceToDevice<float2>(float2*, bool, int);
-template void FourierTransformer<float, float, float>::CopyDeviceToDeviceAndSynchronize<float>(float*, bool, int);
-template void FourierTransformer<float, float, float>::CopyDeviceToDeviceAndSynchronize<float2>(float2*, bool, int);
-template void FourierTransformer<float, float, float>::CopyDeviceToDevice<__half>(__half*, bool, int);
-template void FourierTransformer<float, float, float>::CopyDeviceToDevice<__half2>(__half2*, bool, int);
-template void FourierTransformer<float, float, float>::CopyDeviceToDeviceAndSynchronize<__half>(__half*, bool, int);
-template void FourierTransformer<float, float, float>::CopyDeviceToDeviceAndSynchronize<__half2>(__half2*, bool, int);
+INSTANTIATE(float, float, float, 2);
+INSTANTIATE(float, __half, __half, 2);
+INSTANTIATE(float, float, float, 3);
+INSTANTIATE(float, __half, __half, 3);
+#undef INSTANTIATE
 
-template void FourierTransformer<float, float, float>::SetExternalImagePointer<float2>(float2* output_pointer);
-template void FourierTransformer<float, float, float>::SetOutputPointer<float>(float* output_pointer);
-template void FourierTransformer<float, float, float>::SetOutputPointer<float2>(float2* output_pointer);
-
-template void FourierTransformer<float, float, float>::Generic_Fwd<my_functor<float, 0, IKF_t::NOOP>,
-                                                                   my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,
-                                                                                                      my_functor<float, 0, IKF_t::NOOP>);
-
-template void FourierTransformer<float, float, float>::Generic_Inv<my_functor<float, 0, IKF_t::NOOP>,
-                                                                   my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,
-                                                                                                      my_functor<float, 0, IKF_t::NOOP>);
-
-template void FourierTransformer<float, float, float>::Generic_Fwd<std::nullptr_t, std::nullptr_t>(std::nullptr_t, std::nullptr_t);
-template void FourierTransformer<float, float, float>::Generic_Inv<std::nullptr_t, std::nullptr_t>(std::nullptr_t, std::nullptr_t);
-
-template void FourierTransformer<float, float, float>::Generic_Fwd_Image_Inv<my_functor<float, 0, IKF_t::NOOP>,
-                                                                             my_functor<float, 2, IKF_t::CONJ_MUL>,
-                                                                             my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,
-                                                                                                                my_functor<float, 2, IKF_t::CONJ_MUL>,
-                                                                                                                my_functor<float, 0, IKF_t::NOOP>);
-
-template class FourierTransformer<float, __half, __half, 2>;
-
-template void FourierTransformer<float, __half, __half>::CopyDeviceToDevice<float>(float*, bool, int);
-template void FourierTransformer<float, __half, __half>::CopyDeviceToDevice<float2>(float2*, bool, int);
-template void FourierTransformer<float, __half, __half>::CopyDeviceToDeviceAndSynchronize<float>(float*, bool, int);
-template void FourierTransformer<float, __half, __half>::CopyDeviceToDeviceAndSynchronize<float2>(float2*, bool, int);
-template void FourierTransformer<float, __half, __half>::CopyDeviceToDevice<__half>(__half*, bool, int);
-template void FourierTransformer<float, __half, __half>::CopyDeviceToDevice<__half2>(__half2*, bool, int);
-template void FourierTransformer<float, __half, __half>::CopyDeviceToDeviceAndSynchronize<__half>(__half*, bool, int);
-template void FourierTransformer<float, __half, __half>::CopyDeviceToDeviceAndSynchronize<__half2>(__half2*, bool, int);
-
-template void FourierTransformer<float, __half, __half>::SetExternalImagePointer<__half2>(__half2* output_pointer);
-template void FourierTransformer<float, __half, __half>::SetOutputPointer<__half>(__half* output_pointer);
-template void FourierTransformer<float, __half, __half>::SetOutputPointer<__half2>(__half2* output_pointer);
-
-template void FourierTransformer<float, __half, __half>::Generic_Fwd<my_functor<float, 0, IKF_t::NOOP>,
-                                                                     my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,
-                                                                                                        my_functor<float, 0, IKF_t::NOOP>);
-
-template void FourierTransformer<float, __half, __half>::Generic_Inv<my_functor<float, 0, IKF_t::NOOP>,
-                                                                     my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,
-                                                                                                        my_functor<float, 0, IKF_t::NOOP>);
-
-template void FourierTransformer<float, __half, __half>::Generic_Fwd<std::nullptr_t, std::nullptr_t>(std::nullptr_t, std::nullptr_t);
-template void FourierTransformer<float, __half, __half>::Generic_Inv<std::nullptr_t, std::nullptr_t>(std::nullptr_t, std::nullptr_t);
-
-template void FourierTransformer<float, __half, __half>::Generic_Fwd_Image_Inv<my_functor<float, 0, IKF_t::NOOP>,
-                                                                               my_functor<float, 2, IKF_t::CONJ_MUL>,
-                                                                               my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,
-                                                                                                                  my_functor<float, 2, IKF_t::CONJ_MUL>,
-                                                                                                                  my_functor<float, 0, IKF_t::NOOP>);
-// 3d explicit instantiations
-
-template class FourierTransformer<float, float, float, 3>;
-template void FourierTransformer<float, float, float, 3>::SetExternalImagePointer<float2>(float2* output_pointer);
-
-template void FourierTransformer<float, float, float, 3>::SetOutputPointer<float>(float* output_pointer);
-template void FourierTransformer<float, float, float, 3>::SetOutputPointer<float2>(float2* output_pointer);
-
-template void FourierTransformer<float, float, float, 3>::Generic_Fwd<my_functor<float, 0, IKF_t::NOOP>,
-                                                                      my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,
-                                                                                                         my_functor<float, 0, IKF_t::NOOP>);
-
-template void FourierTransformer<float, float, float, 3>::Generic_Inv<my_functor<float, 0, IKF_t::NOOP>,
-                                                                      my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,
-                                                                                                         my_functor<float, 0, IKF_t::NOOP>);
-
-template void FourierTransformer<float, float, float, 3>::Generic_Fwd<std::nullptr_t, std::nullptr_t>(std::nullptr_t, std::nullptr_t);
-template void FourierTransformer<float, float, float, 3>::Generic_Inv<std::nullptr_t, std::nullptr_t>(std::nullptr_t, std::nullptr_t);
-
-template void FourierTransformer<float, float, float, 3>::Generic_Fwd_Image_Inv<my_functor<float, 0, IKF_t::NOOP>,
-                                                                                my_functor<float, 2, IKF_t::CONJ_MUL>,
-                                                                                my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,
-                                                                                                                   my_functor<float, 2, IKF_t::CONJ_MUL>,
-                                                                                                                   my_functor<float, 0, IKF_t::NOOP>);
-
-template class FourierTransformer<float, __half, __half, 3>;
-template void FourierTransformer<float, __half, __half, 3>::SetExternalImagePointer<__half2>(__half2* output_pointer);
-template void FourierTransformer<float, __half, __half, 3>::SetOutputPointer<__half>(__half* output_pointer);
-template void FourierTransformer<float, __half, __half, 3>::SetOutputPointer<__half2>(__half2* output_pointer);
-
-template void FourierTransformer<float, __half, __half, 3>::Generic_Fwd<my_functor<float, 0, IKF_t::NOOP>,
-                                                                        my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,
-                                                                                                           my_functor<float, 0, IKF_t::NOOP>);
-
-template void FourierTransformer<float, __half, __half, 3>::Generic_Inv<my_functor<float, 0, IKF_t::NOOP>,
-                                                                        my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,
-                                                                                                           my_functor<float, 0, IKF_t::NOOP>);
-
-template void FourierTransformer<float, __half, __half, 3>::Generic_Fwd<std::nullptr_t, std::nullptr_t>(std::nullptr_t, std::nullptr_t);
-template void FourierTransformer<float, __half, __half, 3>::Generic_Inv<std::nullptr_t, std::nullptr_t>(std::nullptr_t, std::nullptr_t);
-
-template void FourierTransformer<float, __half, __half, 3>::Generic_Fwd_Image_Inv<my_functor<float, 0, IKF_t::NOOP>,
-                                                                                  my_functor<float, 2, IKF_t::CONJ_MUL>,
-                                                                                  my_functor<float, 0, IKF_t::NOOP>>(my_functor<float, 0, IKF_t::NOOP>,
-                                                                                                                     my_functor<float, 2, IKF_t::CONJ_MUL>,
-                                                                                                                     my_functor<float, 0, IKF_t::NOOP>);
 } // namespace FastFFT
