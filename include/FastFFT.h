@@ -30,6 +30,16 @@ inline constexpr _Tp pi_v = 3.141592653589793238462643383279502884L;
 
 #include "../src/fastfft/types.cuh"
 
+template <typename K>
+constexpr inline bool IS_IKF_t( ) {
+    if constexpr ( std::is_final_v<K> ) {
+        return true;
+    }
+    else {
+        return false;
+    }
+};
+
 template <typename T>
 __device__ __host__ inline void static_assert_type_name(T v) {
 
@@ -45,6 +55,7 @@ __device__ __host__ inline void static_assert_type_name(T v) {
         static_assert(! std::is_same_v<T, double*>, "double*");
         static_assert(! std::is_same_v<T, __half*>, "__half*");
         static_assert(! std::is_same_v<T, __half2*>, "__half2*");
+        static_assert(! std::is_same_v<T, nullptr_t>, "nullptr_t");
     }
     else {
         static_assert(! std::is_same_v<T, int>, "int");
@@ -297,11 +308,11 @@ class FourierTransformer {
     // For the time being, the caller is responsible for having the memory allocated for any of these input/output pointers.
     void SetInputPointer(InputType* input_pointer);
 
-    template <typename ExternalImagePtr_t>
-    void SetOutputPointer(ExternalImagePtr_t* output_pointer);
+    template <typename ExternalImage_t>
+    void SetOutputPointer(ExternalImage_t* output_pointer);
 
-    template <typename ExternalImagePtr_t>
-    void SetExternalImagePointer(ExternalImagePtr_t* output_pointer);
+    template <typename ExternalImage_t>
+    void SetExternalImagePointer(ExternalImage_t* output_pointer);
     // When passing in a pointer from python (cupy or pytorch) it is a long, and needs to be cast to input type.
     // For now, we are assuming memory ops are all handled in the python code.
     void SetInputPointerFromPython(long input_pointer);
@@ -562,6 +573,8 @@ class FourierTransformer {
 
  */
 
+    // FIXME: in the execution blocks, we should have some check that the correct direction is implemented.
+    // Or better yet, have this templated and
     enum KernelType { r2c_decomposed, // 1D fwd
                       r2c_decomposed_transposed, // 2d fwd 1st stage
                       r2c_none_XY, // 1d fwd  //  2d fwd 1st stage
@@ -579,7 +592,8 @@ class FourierTransformer {
                       c2c_inv_none_XYZ,
                       c2c_inv_decrease,
                       c2c_inv_increase,
-                      c2c_decomposed,
+                      c2c_fwd_decomposed,
+                      c2c_inv_decomposed,
                       c2r_decomposed,
                       c2r_decomposed_transposed,
                       c2r_none,
@@ -601,7 +615,8 @@ class FourierTransformer {
                        "r2c_decrease_XY", "r2c_increase_XY", "r2c_increase_XZ",
                        "c2c_fwd_none", "c2c_fwd_none_XYZ", "c2c_fwd_increase", "c2c_fwd_increase", "c2c_fwd_increase_XYZ",
                        "c2c_inv_none", "c2c_inv_none_XZ", "c2c_inv_none_XYZ", "c2c_inv_increase", "c2c_inv_increase",
-                       "c2c_decomposed",
+                       "c2c_fwd_decomposed",
+                       "c2c_inv_decomposed",
                        "c2r_decomposed",
                        "c2r_decomposed_transposed",
                        "c2r_none", "c2r_none_XY", "c2r_decrease_XY", "c2r_increase",
@@ -614,7 +629,7 @@ class FourierTransformer {
 
     inline bool IsThreadType(KernelType kernel_type) {
         if ( kernel_type == r2c_decomposed || kernel_type == r2c_decomposed_transposed ||
-             kernel_type == c2c_decomposed ||
+             kernel_type == c2c_fwd_decomposed || c2c_inv_decomposed ||
              kernel_type == c2r_decomposed || kernel_type == c2r_decomposed_transposed || kernel_type == xcorr_decomposed ) {
             return true;
         }
@@ -717,7 +732,7 @@ class FourierTransformer {
 
     void         GetTransformSize(KernelType kernel_type);
     void         GetTransformSize_thread(KernelType kernel_type, int thread_fft_size);
-    LaunchParams SetLaunchParameters(const int& ept, KernelType kernel_type, bool do_forward_transform = true);
+    LaunchParams SetLaunchParameters(const int& ept, KernelType kernel_type);
 
     inline int ReturnPaddedMemorySize(short4& wanted_dims) {
         // Assumes a) SetInputDimensionsAndType has been called and is_fftw_padded is set before this call. (Currently RuntimeAssert to die if false) FIXME
@@ -756,12 +771,13 @@ class FourierTransformer {
     // 1.
     // First call passed from a public transform function, selects block or thread and the transform precision.
     template <int FFT_ALGO_t, bool use_thread_method = false, class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t> // bool is just used as a dummy type
-    void SetPrecisionAndExectutionMethod(KernelType kernel_type, bool do_forward_transform = true, PreOpType pre_op_functor = nullptr, IntraOpType intra_op_functor = nullptr, PostOpType post_op_functor = nullptr);
+    typename std::enable_if_t<FFT_ALGO_t != Generic_Fwd_Image_Inv_FFT || (FFT_ALGO_t == Generic_Fwd_Image_Inv_FFT && IS_IKF_t<IntraOpType>( ))>
+    SetPrecisionAndExectutionMethod(KernelType kernel_type, PreOpType pre_op_functor = nullptr, IntraOpType intra_op_functor = nullptr, PostOpType post_op_functor = nullptr);
 
     // 2. // TODO: remove this now that the functors are working
     // Check to see if any intra kernel functions are wanted, and if so set the appropriate device pointers.
     template <int FFT_ALGO_t, class FFT_base, class PreOpType, class IntraOpType, class PostOpType>
-    void SetIntraKernelFunctions(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
+    void SetIntraKernelFunctions(KernelType kernel_type, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
 
     // 3.
     // Second call, sets size of the transform kernel, selects the appropriate GPU arch
@@ -771,15 +787,15 @@ class FourierTransformer {
     // This allows us to iterate through a set of constexpr sizes passed as a template parameter pack. The value is in providing a means to have different size packs
     // for different fft configurations, eg. 2d vs 3d
     template <int FFT_ALGO_t, class FFT_base, class PreOpType, class IntraOpType, class PostOpType>
-    void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
+    void SelectSizeAndType(KernelType kernel_type, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
 
     template <int FFT_ALGO_t, class FFT_base, class PreOpType, class IntraOpType, class PostOpType, unsigned int SizeValue, unsigned int Ept, unsigned int... OtherValues>
-    void SelectSizeAndType(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
+    void SelectSizeAndType(KernelType kernel_type, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
 
     // 3.
     // Third call, sets the input and output dimensions and type
     template <int FFT_ALGO_t, class FFT_base_arch, class PreOpType, class IntraOpType, class PostOpType>
-    void SetAndLaunchKernel(KernelType kernel_type, bool do_forward_transform, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
+    void SetAndLaunchKernel(KernelType kernel_type, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
 
     void PrintLaunchParameters(LaunchParams LP) {
         std::cerr << "Launch parameters: " << std::endl;
@@ -806,7 +822,8 @@ class FourierTransformer {
     // If the user doesn't specify input/output pointers, assume the are copied into the FastFFT bufferspace.
     // TODO: this will only work for 2d as the output in 3d should be in d_ptr.position_space_buffer
     template <class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t>
-    void Generic_Fwd_Image_Inv(PreOpType pre_op = nullptr, IntraOpType intra_op = nullptr, PostOpType post_op = nullptr);
+    typename std::enable_if_t<IS_IKF_t<IntraOpType>( )>
+    Generic_Fwd_Image_Inv(PreOpType pre_op = nullptr, IntraOpType intra_op = nullptr, PostOpType post_op = nullptr);
 
     template <class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t>
     void Generic_Fwd(PreOpType pre_op = nullptr, IntraOpType intra_op = nullptr);

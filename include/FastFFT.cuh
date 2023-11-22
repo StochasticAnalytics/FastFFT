@@ -23,15 +23,7 @@
 
 
 
-template <typename K>
-constexpr inline bool IS_IKF_t( ) {
-    if constexpr ( std::is_final_v<K> ) {
-        return true;
-    }
-    else {
-        return false;
-    }
-};
+
 
 
 
@@ -392,24 +384,24 @@ template <class FFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
         void block_fft_kernel_C2C_WithPadding_SwapRealSpaceQuadrants(const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 
-template <class ExternalImagePtr_t, class FFT, class invFFT, class ComplexType = typename FFT::value_type>
+template <class ExternalImage_t, class FFT, class invFFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(invFFT::max_threads_per_block) __global__
-        void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul(const ExternalImagePtr_t __restrict__ image_to_search, const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values,
+        void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul(const ExternalImage_t* __restrict__ image_to_search, const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values,
                                                                 Offsets mem_offsets, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv);
 
-template <class ExternalImagePtr_t, class FFT, class invFFT, class ComplexType = typename FFT::value_type, class PreOpType, class IntraOpType, class PostOpType>
+template <class ExternalImage_t, class FFT, class invFFT, class ComplexType = typename FFT::value_type, class PreOpType, class IntraOpType, class PostOpType>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-        void block_fft_kernel_C2C_FWD_INCREASE_OP_INV_NONE(const ExternalImagePtr_t __restrict__ image_to_search, const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values,
+        void block_fft_kernel_C2C_FWD_INCREASE_OP_INV_NONE(const ExternalImage_t* __restrict__ image_to_search, const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values,
                                                            Offsets mem_offsets, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv,
                                                            PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
 
-template <class ExternalImagePtr_t, class FFT, class invFFT, class ComplexType = typename FFT::value_type>
+template <class ExternalImage_t, class FFT, class invFFT, class ComplexType = typename FFT::value_type>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-        void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul_SwapRealSpaceQuadrants(const ExternalImagePtr_t* __restrict__ image_to_search, const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values,
+        void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul_SwapRealSpaceQuadrants(const ExternalImage_t* __restrict__ image_to_search, const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values,
                                                                                        Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv);
 
-template <class ExternalImagePtr_t, class FFT, class invFFT, class ComplexType = typename FFT::value_type>
-__global__ void block_fft_kernel_C2C_FWD_NONE_INV_DECREASE_ConjMul(const ExternalImagePtr_t __restrict__ image_to_search, const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values,
+template <class ExternalImage_t, class FFT, class invFFT, class ComplexType = typename FFT::value_type>
+__global__ void block_fft_kernel_C2C_FWD_NONE_INV_DECREASE_ConjMul(const ExternalImage_t* __restrict__ image_to_search, const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values,
                                                                    Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv);
 
 template <class FFT, class ComplexType = typename FFT::value_type>
@@ -464,8 +456,8 @@ __global__ void thread_fft_kernel_R2C_decomposed_transposed(const ScalarType* __
 template <class FFT, class ComplexType = typename FFT::value_type>
 __global__ void thread_fft_kernel_C2C_decomposed(const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q);
 
-template <class ExternalImagePtr_t, class FFT, class invFFT, class ComplexType = typename FFT::value_type>
-__global__ void thread_fft_kernel_C2C_decomposed_ConjMul(const ExternalImagePtr_t* __restrict__ image_to_search, const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q);
+template <class ExternalImage_t, class FFT, class invFFT, class ComplexType = typename FFT::value_type>
+__global__ void thread_fft_kernel_C2C_decomposed_ConjMul(const ExternalImage_t* __restrict__ image_to_search, const ComplexType* __restrict__ input_values, ComplexType* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q);
 
 /////////////
 // C2R
@@ -493,6 +485,39 @@ __global__ void clip_into_real_kernel(InputType*      real_values_gpu,
                                       int3            wanted_coordinate_of_box_center,
                                       OutputBaseType  wanted_padding_value);
 
+// TODO: this may be expanded, for now it is to be used in the case where we have
+// packed the real values of a c2r into the first half of the complex array.
+// The output type pointer needs to be cast to the correct type AND posibly converted
+template <class FFT, typename WantedType, typename GivenType>
+inline __device__ WantedType convert_if_needed(const GivenType* __restrict__ ptr, const int idx) {
+    using complex_type = typename FFT::value_type;
+    using scalar_type  = typename complex_type::value_type;
+    WantedType ret;
+    if constexpr ( std::is_same_v<GivenType, complex_type> || std::is_same_v<GivenType, const complex_type> ) {
+        if constexpr ( std::is_same_v<complex_type, float2> ) {
+            if constexpr ( std::is_same_v<WantedType, __half> ) {
+                ret = __float2half_rn(reinterpret_cast<const float*>(ptr)[idx]);
+                return std::move(ret);
+            }
+            if constexpr ( std::is_same_v<WantedType, float> ) {
+                ret = reinterpret_cast<const float*>(ptr)[idx];
+                return std::move(ret);
+            }
+            else {
+                static_assert_type_name(ret);
+            }
+        }
+        else {
+            // Currently only setup for the above
+            static_assert_type_name(ptr);
+        }
+    }
+    else {
+        // Currently only setup for the above
+        static_assert_type_name(ptr);
+    }
+}
+
 //////////////////////////////////////////////
 // IO functions adapted from the cufftdx examples
 ///////////////////////////////
@@ -502,7 +527,9 @@ struct io {
     using complex_type = typename FFT::value_type;
     using scalar_type  = typename complex_type::value_type;
 
-    static inline __device__ unsigned int stride_size( ) {
+    static inline __device__ unsigned int
+    stride_size( ) {
+
         return cufftdx::size_of<FFT>::value / FFT::elements_per_thread;
     }
 
@@ -517,9 +544,9 @@ struct io {
         }
     }
 
-    static inline __device__ void store_r2c(const complex_type* thread_data,
-                                            complex_type*       output,
-                                            int                 offset) {
+    static inline __device__ void store_r2c(const complex_type* __restrict__ thread_data,
+                                            complex_type* __restrict__ output,
+                                            int offset) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = offset + threadIdx.x;
         for ( unsigned int i = 0; i < FFT::elements_per_thread / 2; i++ ) {
@@ -539,14 +566,14 @@ struct io {
     // Since we can make repeated use of the same shared memory for each sub-fft
     // we use this method to load into shared mem instead of directly to registers
     // TODO set this up for async mem load
-    static inline __device__ void load_shared(const complex_type* input,
-                                              complex_type*       shared_input,
-                                              complex_type*       thread_data,
-                                              float*              twiddle_factor_args,
-                                              float               twiddle_in,
-                                              int*                input_map,
-                                              int*                output_map,
-                                              int                 Q) {
+    static inline __device__ void load_shared(const complex_type* __restrict__ input,
+                                              complex_type* __restrict__ shared_input,
+                                              complex_type* __restrict__ thread_data,
+                                              float* __restrict__ twiddle_factor_args,
+                                              float twiddle_in,
+                                              int*  input_map,
+                                              int* __restrict__ output_map,
+                                              int Q) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
@@ -562,11 +589,11 @@ struct io {
     // Since we can make repeated use of the same shared memory for each sub-fft
     // we use this method to load into shared mem instead of directly to registers
     // TODO set this up for async mem load
-    static inline __device__ void load_shared(const complex_type* input,
-                                              complex_type*       shared_input,
-                                              complex_type*       thread_data,
-                                              float*              twiddle_factor_args,
-                                              float               twiddle_in) {
+    static inline __device__ void load_shared(const complex_type* __restrict__ input,
+                                              complex_type* __restrict__ shared_input,
+                                              complex_type* __restrict__ thread_data,
+                                              float* __restrict__ twiddle_factor_args,
+                                              float twiddle_in) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
@@ -577,15 +604,15 @@ struct io {
         }
     }
 
-    static inline __device__ void load_shared(const complex_type* input,
-                                              complex_type*       shared_input,
-                                              complex_type*       thread_data,
-                                              float*              twiddle_factor_args,
-                                              float               twiddle_in,
-                                              int*                input_map,
-                                              int*                output_map,
-                                              int                 Q,
-                                              int                 number_of_elements) {
+    static inline __device__ void load_shared(const complex_type* __restrict__ input,
+                                              complex_type* __restrict__ shared_input,
+                                              complex_type* __restrict__ thread_data,
+                                              float* __restrict__ twiddle_factor_args,
+                                              float twiddle_in,
+                                              int* __restrict__ input_map,
+                                              int* __restrict__ output_map,
+                                              int Q,
+                                              int number_of_elements) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
@@ -606,14 +633,14 @@ struct io {
     // Since we can make repeated use of the same shared memory for each sub-fft
     // we use this method to load into shared mem instead of directly to registers
     // TODO set this up for async mem load - alternatively, load to registers then copy but leave in register for firt compute
-    static inline __device__ void load_r2c_shared(const scalar_type* input,
-                                                  scalar_type*       shared_input,
-                                                  complex_type*      thread_data,
-                                                  float*             twiddle_factor_args,
-                                                  float              twiddle_in,
-                                                  int*               input_map,
-                                                  int*               output_map,
-                                                  int                Q) {
+    static inline __device__ void load_r2c_shared(const scalar_type* __restrict__ input,
+                                                  scalar_type* __restrict__ shared_input,
+                                                  complex_type* __restrict__ thread_data,
+                                                  float* __restrict__ twiddle_factor_args,
+                                                  float twiddle_in,
+                                                  int* __restrict__ input_map,
+                                                  int* __restrict__ output_map,
+                                                  int Q) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
@@ -631,11 +658,11 @@ struct io {
     // Since we can make repeated use of the same shared memory for each sub-fft
     // we use this method to load into shared mem instead of directly to registers
     // TODO set this up for async mem load - alternatively, load to registers then copy but leave in register for firt compute
-    static inline __device__ void load_r2c_shared(const scalar_type* input,
-                                                  scalar_type*       shared_input,
-                                                  complex_type*      thread_data,
-                                                  float*             twiddle_factor_args,
-                                                  float              twiddle_in) {
+    static inline __device__ void load_r2c_shared(const scalar_type* __restrict__ input,
+                                                  scalar_type* __restrict__ shared_input,
+                                                  complex_type* __restrict__ thread_data,
+                                                  float* __restrict__ twiddle_factor_args,
+                                                  float twiddle_in) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
@@ -647,8 +674,8 @@ struct io {
         }
     }
 
-    static inline __device__ void load_r2c_shared_and_pad(const scalar_type* input,
-                                                          complex_type*      shared_mem) {
+    static inline __device__ void load_r2c_shared_and_pad(const scalar_type* __restrict__ input,
+                                                          complex_type* __restrict__ shared_mem) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x + (threadIdx.z * size_of<FFT>::value);
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
@@ -658,9 +685,9 @@ struct io {
         __syncthreads( );
     }
 
-    static inline __device__ void copy_from_shared(const complex_type* shared_mem,
-                                                   complex_type*       thread_data,
-                                                   const unsigned int  Q) {
+    static inline __device__ void copy_from_shared(const complex_type* __restrict__ shared_mem,
+                                                   complex_type* __restrict__ thread_data,
+                                                   const unsigned int Q) {
         const unsigned int stride = stride_size( ) * Q; // I think the Q is needed, but double check me TODO
         unsigned int       index  = (threadIdx.x * Q) + threadIdx.z;
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
@@ -673,8 +700,8 @@ struct io {
     // Note that unlike most functions in this file, this one does not have a
     // const decorator on the thread mem, as we want to modify it with the twiddle factors
     // before reducing the full shared mem space.
-    static inline __device__ void reduce_block_fft(complex_type*      thread_data,
-                                                   complex_type*      shared_mem,
+    static inline __device__ void reduce_block_fft(complex_type* __restrict__ thread_data,
+                                                   complex_type* __restrict__ shared_mem,
                                                    const float        twiddle_in,
                                                    const unsigned int Q) {
         const unsigned int stride = stride_size( );
@@ -706,10 +733,10 @@ struct io {
         }
     }
 
-    static inline __device__ void store_r2c_reduced(const complex_type* thread_data,
-                                                    complex_type*       output,
-                                                    const unsigned int  pixel_pitch,
-                                                    const unsigned int  memory_limit) {
+    static inline __device__ void store_r2c_reduced(const complex_type* __restrict__ thread_data,
+                                                    complex_type* __restrict__ output,
+                                                    const unsigned int pixel_pitch,
+                                                    const unsigned int memory_limit) {
         if ( threadIdx.z == 0 ) {
             // Finally we write out the first size_of<FFT>::values to global
             const unsigned int stride = stride_size( );
@@ -726,25 +753,25 @@ struct io {
 
     // when using load_shared || load_r2c_shared, we need then copy from shared mem into the registers.
     // notice we still need the packed complex values for the xform.
-    static inline __device__ void copy_from_shared(const scalar_type* shared_input,
-                                                   complex_type*      thread_data,
-                                                   int*               input_map) {
+    static inline __device__ void copy_from_shared(const scalar_type* __restrict__ shared_input,
+                                                   complex_type* __restrict__ thread_data,
+                                                   int* input_map) {
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
             thread_data[i].x = shared_input[input_map[i]];
             thread_data[i].y = 0.0f;
         }
     }
 
-    static inline __device__ void copy_from_shared(const complex_type* shared_input_complex,
-                                                   complex_type*       thread_data,
-                                                   int*                input_map) {
+    static inline __device__ void copy_from_shared(const complex_type* __restrict__ shared_input_complex,
+                                                   complex_type* __restrict__ thread_data,
+                                                   int* __restrict__ input_map) {
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
             thread_data[i] = shared_input_complex[input_map[i]];
         }
     }
 
-    static inline __device__ void copy_from_shared(const scalar_type* shared_input,
-                                                   complex_type*      thread_data) {
+    static inline __device__ void copy_from_shared(const scalar_type* __restrict__ shared_input,
+                                                   complex_type* __restrict__ thread_data) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
@@ -754,8 +781,8 @@ struct io {
         }
     }
 
-    static inline __device__ void copy_from_shared(const complex_type* shared_input_complex,
-                                                   complex_type*       thread_data) {
+    static inline __device__ void copy_from_shared(const complex_type* __restrict__ shared_input_complex,
+                                                   complex_type* __restrict__ thread_data) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
@@ -764,13 +791,13 @@ struct io {
         }
     }
 
-    template <class ExternalImagePtr_t>
-    static inline __device__ void load_shared_and_conj_multiply(const ExternalImagePtr_t* image_to_search,
-                                                                complex_type*             thread_data) {
+    template <class ExternalImage_t>
+    static inline __device__ void load_shared_and_conj_multiply(ExternalImage_t* __restrict__ image_to_search,
+                                                                complex_type* __restrict__ thread_data) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         complex_type       c;
-        if constexpr ( std::is_same_v<ExternalImagePtr_t, __half2*> ) {
+        if constexpr ( std::is_same_v<ExternalImage_t, __half2> ) {
             for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
                 c.x            = (thread_data[i].x * __low2float(image_to_search[index]) + thread_data[i].y * __high2float(image_to_search[index].y));
                 c.y            = (thread_data[i].y * __low2float(image_to_search[index]) - thread_data[i].x * __high2float(image_to_search[index].y));
@@ -778,7 +805,7 @@ struct io {
                 index += stride;
             }
         }
-        else if constexpr ( std::is_same_v<ExternalImagePtr_t, float2*> ) {
+        else if constexpr ( std::is_same_v<ExternalImage_t, float2> ) {
             for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
                 c.x            = (thread_data[i].x * image_to_search[index].x + thread_data[i].y * image_to_search[index].y);
                 c.y            = (thread_data[i].y * image_to_search[index].x - thread_data[i].x * image_to_search[index].y);
@@ -792,14 +819,14 @@ struct io {
     }
 
     // TODO: set user lambda to default = false, then get rid of other load_shared
-    template <class FunctionType, class ExternalImagePtr_t>
-    static inline __device__ void load_shared(const ExternalImagePtr_t image_to_search,
-                                              complex_type*            thread_data,
-                                              FunctionType             intra_op_functor = nullptr) {
+    template <class FunctionType, class ExternalImage_t>
+    static inline __device__ void load_shared(const ExternalImage_t* __restrict__ image_to_search,
+                                              complex_type* __restrict__ thread_data,
+                                              FunctionType intra_op_functor = nullptr) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         if constexpr ( IS_IKF_t<FunctionType>( ) ) {
-            if constexpr ( std::is_same_v<ExternalImagePtr_t, __half2*> ) {
+            if constexpr ( std::is_same_v<ExternalImage_t, __half2*> ) {
                 for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
                     intra_op_functor(thread_data[i].x, thread_data[i].y, __low2float(image_to_search[index]), __high2float(image_to_search[index])); //ComplexConjMulAndScale<complex_type, scalar_type>(thread_data[i], image_to_search[index], 1.0f);
                     index += stride;
@@ -823,8 +850,8 @@ struct io {
 
     // Now we need send to shared mem and transpose on the way
     // TODO: fix bank conflicts later.
-    static inline __device__ void transpose_r2c_in_shared_XZ(complex_type* shared_mem,
-                                                             complex_type* thread_data) {
+    static inline __device__ void transpose_r2c_in_shared_XZ(complex_type* __restrict__ shared_mem,
+                                                             complex_type* __restrict__ thread_data) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         for ( unsigned int i = 0; i < FFT::elements_per_thread / 2; i++ ) {
@@ -842,8 +869,8 @@ struct io {
 
     // Now we need send to shared mem and transpose on the way
     // TODO: fix bank conflicts later.
-    static inline __device__ void transpose_in_shared_XZ(complex_type* shared_mem,
-                                                         complex_type* thread_data) {
+    static inline __device__ void transpose_in_shared_XZ(complex_type* __restrict__ shared_mem,
+                                                         complex_type* __restrict__ thread_data) {
         const unsigned int stride = io<FFT>::stride_size( );
         unsigned int       index  = threadIdx.x;
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
@@ -855,8 +882,8 @@ struct io {
         __syncthreads( );
     }
 
-    static inline __device__ void store_r2c_transposed_xz(const complex_type* thread_data,
-                                                          complex_type*       output) {
+    static inline __device__ void store_r2c_transposed_xz(const complex_type* __restrict__ thread_data,
+                                                          complex_type* __restrict__ output) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         for ( unsigned int i = 0; i < FFT::elements_per_thread / 2; i++ ) {
@@ -873,8 +900,8 @@ struct io {
     }
 
     // Store a transposed tile, made up of contiguous (full) FFTS
-    static inline __device__ void store_r2c_transposed_xz_strided_Z(const complex_type* shared_mem,
-                                                                    complex_type*       output) {
+    static inline __device__ void store_r2c_transposed_xz_strided_Z(const complex_type* __restrict__ shared_mem,
+                                                                    complex_type* __restrict__ output) {
         const unsigned int     stride                 = stride_size( );
         constexpr unsigned int output_values_to_store = (cufftdx::size_of<FFT>::value / 2) + 1;
         unsigned int           index                  = threadIdx.x + threadIdx.z * output_values_to_store;
@@ -892,10 +919,10 @@ struct io {
 
     // Store a transposed tile, made up of non-contiguous (strided partial) FFTS
     //
-    static inline __device__ void store_r2c_transposed_xz_strided_Z(const complex_type* shared_mem,
-                                                                    complex_type*       output,
-                                                                    const unsigned int  Q,
-                                                                    const unsigned int  sub_fft) {
+    static inline __device__ void store_r2c_transposed_xz_strided_Z(const complex_type* __restrict__ shared_mem,
+                                                                    complex_type* __restrict__ output,
+                                                                    const unsigned int Q,
+                                                                    const unsigned int sub_fft) {
         const unsigned int     stride                 = stride_size( );
         constexpr unsigned int output_values_to_store = (cufftdx::size_of<FFT>::value / 2) + 1;
         unsigned int           index                  = threadIdx.x + threadIdx.z * output_values_to_store;
@@ -911,8 +938,8 @@ struct io {
         __syncthreads( );
     }
 
-    static inline __device__ void store_transposed_xz_strided_Z(const complex_type* shared_mem,
-                                                                complex_type*       output) {
+    static inline __device__ void store_transposed_xz_strided_Z(const complex_type* __restrict__ shared_mem,
+                                                                complex_type* __restrict__ output) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x + threadIdx.z * cufftdx::size_of<FFT>::value;
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
@@ -922,9 +949,9 @@ struct io {
         __syncthreads( );
     }
 
-    static inline __device__ void store_r2c_transposed_xy(const complex_type* thread_data,
-                                                          complex_type*       output,
-                                                          int                 pixel_pitch) {
+    static inline __device__ void store_r2c_transposed_xy(const complex_type* __restrict__ thread_data,
+                                                          complex_type* __restrict__ output,
+                                                          int pixel_pitch) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         for ( unsigned int i = 0; i < FFT::elements_per_thread / 2; i++ ) {
@@ -940,10 +967,10 @@ struct io {
         }
     }
 
-    static inline __device__ void store_r2c_transposed_xy(const complex_type* thread_data,
-                                                          complex_type*       output,
-                                                          int*                output_MAP,
-                                                          int                 pixel_pitch) {
+    static inline __device__ void store_r2c_transposed_xy(const complex_type* __restrict__ thread_data,
+                                                          complex_type* __restrict__ output,
+                                                          int* output_MAP,
+                                                          int  pixel_pitch) {
         const unsigned int stride = stride_size( );
         for ( unsigned int i = 0; i < FFT::elements_per_thread / 2; i++ ) {
             // output map is thread local, so output_MAP[i] gives the x-index in the non-transposed array and blockIdx.y gives the y-index
@@ -958,11 +985,11 @@ struct io {
         }
     }
 
-    static inline __device__ void store_r2c_transposed_xy(const complex_type* thread_data,
-                                                          complex_type*       output,
-                                                          int*                output_MAP,
-                                                          int                 pixel_pitch,
-                                                          int                 memory_limit) {
+    static inline __device__ void store_r2c_transposed_xy(const complex_type* __restrict__ thread_data,
+                                                          complex_type* __restrict__ output,
+                                                          int* __restrict__ output_MAP,
+                                                          int pixel_pitch,
+                                                          int memory_limit) {
         const unsigned int stride = stride_size( );
         for ( unsigned int i = 0; i <= FFT::elements_per_thread / 2; i++ ) {
             // output map is thread local, so output_MAP[i] gives the x-index in the non-transposed array and blockIdx.y gives the y-index
@@ -982,8 +1009,8 @@ struct io {
         // }
     }
 
-    static inline __device__ void load_c2r(const complex_type* input,
-                                           complex_type*       thread_data) {
+    static inline __device__ void load_c2r(const complex_type* __restrict__ input,
+                                           complex_type* __restrict__ thread_data) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         for ( unsigned int i = 0; i < FFT::elements_per_thread / 2; i++ ) {
@@ -999,9 +1026,9 @@ struct io {
         }
     }
 
-    static inline __device__ void load_c2r_transposed(const complex_type* input,
-                                                      complex_type*       thread_data,
-                                                      unsigned int        pixel_pitch) {
+    static inline __device__ void load_c2r_transposed(const complex_type* __restrict__ input,
+                                                      complex_type* __restrict__ thread_data,
+                                                      unsigned int pixel_pitch) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         for ( unsigned int i = 0; i < FFT::elements_per_thread / 2; i++ ) {
@@ -1017,9 +1044,9 @@ struct io {
         }
     }
 
-    static inline __device__ void load_c2r_shared_and_pad(const complex_type* input,
-                                                          complex_type*       shared_mem,
-                                                          const unsigned int  pixel_pitch) {
+    static inline __device__ void load_c2r_shared_and_pad(const complex_type* __restrict__ input,
+                                                          complex_type* __restrict__ shared_mem,
+                                                          const unsigned int pixel_pitch) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x + (threadIdx.z * size_of<FFT>::value);
         for ( unsigned int i = 0; i < FFT::elements_per_thread / 2; i++ ) {
@@ -1037,8 +1064,8 @@ struct io {
     }
 
     // this may benefit from asynchronous execution
-    static inline __device__ void load(const complex_type* input,
-                                       complex_type*       thread_data) {
+    static inline __device__ void load(const complex_type* __restrict__ input,
+                                       complex_type* __restrict__ thread_data) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
@@ -1050,9 +1077,9 @@ struct io {
     }
 
     // this may benefit from asynchronous execution
-    static inline __device__ void load(const complex_type* input,
-                                       complex_type*       thread_data,
-                                       int                 last_index_to_load) {
+    static inline __device__ void load(const complex_type* __restrict__ input,
+                                       complex_type* __restrict__ thread_data,
+                                       int last_index_to_load) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
@@ -1066,10 +1093,10 @@ struct io {
 
     //  TODO: set pre_op_functor to default=false and get rid of other load
     template <class FunctionType>
-    static inline __device__ void load(const complex_type* input,
-                                       complex_type*       thread_data,
-                                       int                 last_index_to_load,
-                                       FunctionType        pre_op_functor = nullptr) {
+    static inline __device__ void load(const complex_type* __restrict__ input,
+                                       complex_type* __restrict__ thread_data,
+                                       int          last_index_to_load,
+                                       FunctionType pre_op_functor = nullptr) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         if constexpr ( IS_IKF_t<FunctionType>( ) ) {
@@ -1092,9 +1119,9 @@ struct io {
         }
     }
 
-    static inline __device__ void store_and_swap_quadrants(const complex_type* thread_data,
-                                                           complex_type*       output,
-                                                           int                 first_negative_index) {
+    static inline __device__ void store_and_swap_quadrants(const complex_type* __restrict__ thread_data,
+                                                           complex_type* __restrict__ output,
+                                                           int first_negative_index) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         complex_type       phase_shift;
@@ -1112,10 +1139,10 @@ struct io {
         }
     }
 
-    static inline __device__ void store_and_swap_quadrants(const complex_type* thread_data,
-                                                           complex_type*       output,
-                                                           int*                source_idx,
-                                                           int                 first_negative_index) {
+    static inline __device__ void store_and_swap_quadrants(const complex_type* __restrict__ thread_data,
+                                                           complex_type* __restrict__ output,
+                                                           int* __restrict__ source_idx,
+                                                           int first_negative_index) {
         const unsigned int stride = stride_size( );
         complex_type       phase_shift;
         int                logical_y;
@@ -1132,9 +1159,9 @@ struct io {
     }
 
     template <class FunctionType = std::nullptr_t>
-    static inline __device__ void store(const complex_type* thread_data,
-                                        complex_type*       output,
-                                        FunctionType        post_op_functor = nullptr) {
+    static inline __device__ void store(const complex_type* __restrict__ thread_data,
+                                        complex_type* __restrict__ output,
+                                        FunctionType post_op_functor = nullptr) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         if constexpr ( IS_IKF_t<FunctionType>( ) ) {
@@ -1151,10 +1178,10 @@ struct io {
         }
     }
 
-    static inline __device__ void store(const complex_type* thread_data,
-                                        complex_type*       output,
-                                        const unsigned int  Q,
-                                        const unsigned int  sub_fft) {
+    static inline __device__ void store(const complex_type* __restrict__ thread_data,
+                                        complex_type* __restrict__ output,
+                                        const unsigned int Q,
+                                        const unsigned int sub_fft) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
@@ -1163,8 +1190,8 @@ struct io {
         }
     }
 
-    static inline __device__ void store_Z(const complex_type* shared_mem,
-                                          complex_type*       output) {
+    static inline __device__ void store_Z(const complex_type* __restrict__ shared_mem,
+                                          complex_type* __restrict__ output) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x + threadIdx.z * size_of<FFT>::value;
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
@@ -1174,10 +1201,10 @@ struct io {
         }
     }
 
-    static inline __device__ void store_Z(const complex_type* shared_mem,
-                                          complex_type*       output,
-                                          const unsigned int  Q,
-                                          const unsigned int  sub_fft) {
+    static inline __device__ void store_Z(const complex_type* __restrict__ shared_mem,
+                                          complex_type* __restrict__ output,
+                                          const unsigned int Q,
+                                          const unsigned int sub_fft) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x + threadIdx.z * size_of<FFT>::value;
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
@@ -1187,9 +1214,9 @@ struct io {
         __syncthreads( );
     }
 
-    static inline __device__ void store(const complex_type* thread_data,
-                                        complex_type*       output,
-                                        unsigned int        memory_limit) {
+    static inline __device__ void store(const complex_type* __restrict__ thread_data,
+                                        complex_type* __restrict__ output,
+                                        unsigned int memory_limit) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
@@ -1199,9 +1226,9 @@ struct io {
         }
     }
 
-    static inline __device__ void store(const complex_type* thread_data,
-                                        complex_type*       output,
-                                        int*                source_idx) {
+    static inline __device__ void store(const complex_type* __restrict__ thread_data,
+                                        complex_type* __restrict__ output,
+                                        int* __restrict__ source_idx) {
         const unsigned int stride = stride_size( );
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
             // If no kernel based changes are made to source_idx, this will be the same as the original index value
@@ -1209,9 +1236,9 @@ struct io {
         }
     }
 
-    static inline __device__ void store_subset(const complex_type* thread_data,
-                                               complex_type*       output,
-                                               int*                source_idx) {
+    static inline __device__ void store_subset(const complex_type* __restrict__ thread_data,
+                                               complex_type* __restrict__ output,
+                                               int* __restrict__ source_idx) {
         const unsigned int stride = stride_size( );
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
             // If no kernel based changes are made to source_idx, this will be the same as the original index value
@@ -1220,9 +1247,9 @@ struct io {
         }
     }
 
-    static inline __device__ void store_coalesced(const complex_type* shared_output,
-                                                  complex_type*       global_output,
-                                                  int                 offset) {
+    static inline __device__ void store_coalesced(const complex_type* __restrict__ shared_output,
+                                                  complex_type* __restrict__ global_output,
+                                                  int offset) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = offset + threadIdx.x;
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
@@ -1231,8 +1258,8 @@ struct io {
         }
     }
 
-    static inline __device__ void load_c2c_shared_and_pad(const complex_type* input,
-                                                          complex_type*       shared_mem) {
+    static inline __device__ void load_c2c_shared_and_pad(const complex_type* __restrict__ input,
+                                                          complex_type* __restrict__ shared_mem) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x + (threadIdx.z * size_of<FFT>::value);
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
@@ -1242,8 +1269,8 @@ struct io {
         __syncthreads( );
     }
 
-    static inline __device__ void store_c2c_reduced(const complex_type* thread_data,
-                                                    complex_type*       output) {
+    static inline __device__ void store_c2c_reduced(const complex_type* __restrict__ thread_data,
+                                                    complex_type* __restrict__ output) {
         if ( threadIdx.z == 0 ) {
             // Finally we write out the first size_of<FFT>::values to global
             const unsigned int stride = stride_size( );
@@ -1258,27 +1285,28 @@ struct io {
         }
     }
 
-    static inline __device__ void store_c2r_reduced(const complex_type* thread_data,
-                                                    scalar_type*        output) {
+    static inline __device__ void store_c2r_reduced(const complex_type* __restrict__ thread_data,
+                                                    scalar_type* __restrict__ output) {
         if ( threadIdx.z == 0 ) {
             // Finally we write out the first size_of<FFT>::values to global
             const unsigned int stride = stride_size( );
             unsigned int       index  = threadIdx.x + (threadIdx.z * size_of<FFT>::value);
+
             for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
                 if ( index < size_of<FFT>::value ) {
                     // transposed index.
-                    output[index] = reinterpret_cast<const scalar_type*>(thread_data)[i];
+                    output[index] = convert_if_needed<FFT, FFT, scalar_type>(thread_data, i);
                 }
                 index += stride;
             }
         }
     }
 
-    static inline __device__ void store_transposed(const complex_type* thread_data,
-                                                   complex_type*       output,
-                                                   int*                output_map,
-                                                   int*                rotated_offset,
-                                                   int                 memory_limit) {
+    static inline __device__ void store_transposed(const complex_type* __restrict__ thread_data,
+                                                   complex_type* __restrict__ output,
+                                                   int* __restrict__ output_map,
+                                                   int* __restrict__ rotated_offset,
+                                                   int memory_limit) {
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
             // If no kernel based changes are made to source_idx, this will be the same as the original index value
             if ( output_map[i] < memory_limit )
@@ -1286,25 +1314,27 @@ struct io {
         }
     }
 
-    static inline __device__ void store_c2r(const complex_type* thread_data,
-                                            scalar_type*        output) {
+    static inline __device__ void store_c2r(const complex_type* __restrict__ thread_data,
+                                            scalar_type* __restrict__ output) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
+
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
-            output[index] = reinterpret_cast<const scalar_type*>(thread_data)[i];
+            output[index] = convert_if_needed<FFT, scalar_type>(thread_data, i);
             index += stride;
         }
     }
 
-    static inline __device__ void store_c2r(const complex_type* thread_data,
-                                            scalar_type*        output,
-                                            unsigned int        memory_limit) {
+    static inline __device__ void store_c2r(const complex_type* __restrict__ thread_data,
+                                            scalar_type* __restrict__ output,
+                                            unsigned int memory_limit) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
+
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
             // TODO: does reinterpret_cast<const scalar_type*>(thread_data)[i] make more sense than just thread_data[i].x??
             if ( index < memory_limit )
-                output[index] = reinterpret_cast<const scalar_type*>(thread_data)[i];
+                output[index] = convert_if_needed<FFT, scalar_type>(thread_data, i);
             index += stride;
         }
     }
@@ -1315,9 +1345,9 @@ struct io_thread {
     using complex_type = typename FFT::value_type;
     using scalar_type  = typename complex_type::value_type;
 
-    static inline __device__ void load_r2c(const scalar_type* input,
-                                           complex_type*      thread_data,
-                                           const int          stride) {
+    static inline __device__ void load_r2c(const scalar_type* __restrict__ input,
+                                           complex_type* __restrict__ thread_data,
+                                           const int stride) {
         unsigned int index = threadIdx.x;
         for ( unsigned int i = 0; i < size_of<FFT>::value; i++ ) {
             thread_data[i].x = input[index];
@@ -1326,10 +1356,10 @@ struct io_thread {
         }
     }
 
-    static inline __device__ void store_r2c(const complex_type* shared_output,
-                                            complex_type*       output,
-                                            const int           stride,
-                                            const int           memory_limit) {
+    static inline __device__ void store_r2c(const complex_type* __restrict__ shared_output,
+                                            complex_type* __restrict__ output,
+                                            const int stride,
+                                            const int memory_limit) {
         // Each thread reads in the input data at stride = mem_offsets.Q
         unsigned int index = threadIdx.x;
         for ( unsigned int i = 0; i < size_of<FFT>::value / 2; i++ ) {
@@ -1341,11 +1371,11 @@ struct io_thread {
         }
     }
 
-    static inline __device__ void store_r2c_transposed_xy(const complex_type* shared_output,
-                                                          complex_type*       output,
-                                                          int                 stride,
-                                                          int                 pixel_pitch,
-                                                          int                 memory_limit) {
+    static inline __device__ void store_r2c_transposed_xy(const complex_type* __restrict__ shared_output,
+                                                          complex_type* __restrict__ output,
+                                                          int stride,
+                                                          int pixel_pitch,
+                                                          int memory_limit) {
         // Each thread reads in the input data at stride = mem_offsets.Q
         unsigned int index = threadIdx.x;
         for ( unsigned int i = 0; i < size_of<FFT>::value / 2; i++ ) {
@@ -1357,11 +1387,11 @@ struct io_thread {
         }
     }
 
-    static inline __device__ void remap_decomposed_segments(const complex_type* thread_data,
-                                                            complex_type*       shared_output,
-                                                            float               twiddle_in,
-                                                            int                 Q,
-                                                            int                 memory_limit) {
+    static inline __device__ void remap_decomposed_segments(const complex_type* __restrict__ thread_data,
+                                                            complex_type* __restrict__ shared_output,
+                                                            float twiddle_in,
+                                                            int   Q,
+                                                            int   memory_limit) {
         // Unroll the first loop and initialize the shared mem.
         complex_type twiddle;
         int          index = threadIdx.x * size_of<FFT>::value;
@@ -1389,9 +1419,9 @@ struct io_thread {
         __syncthreads( );
     }
 
-    static inline __device__ void load_c2c(const complex_type* input,
-                                           complex_type*       thread_data,
-                                           const int           stride) {
+    static inline __device__ void load_c2c(const complex_type* __restrict__ input,
+                                           complex_type* __restrict__ thread_data,
+                                           const int stride) {
         unsigned int index = threadIdx.x;
         for ( unsigned int i = 0; i < size_of<FFT>::value; i++ ) {
             thread_data[i] = input[index];
@@ -1399,9 +1429,9 @@ struct io_thread {
         }
     }
 
-    static inline __device__ void store_c2c(const complex_type* shared_output,
-                                            complex_type*       output,
-                                            const int           stride) {
+    static inline __device__ void store_c2c(const complex_type* __restrict__ shared_output,
+                                            complex_type* __restrict__ output,
+                                            const int stride) {
         // Each thread reads in the input data at stride = mem_offsets.Q
         unsigned int index = threadIdx.x;
         for ( unsigned int i = 0; i < size_of<FFT>::value; i++ ) {
@@ -1410,10 +1440,10 @@ struct io_thread {
         }
     }
 
-    static inline __device__ void remap_decomposed_segments(const complex_type* thread_data,
-                                                            complex_type*       shared_output,
-                                                            float               twiddle_in,
-                                                            int                 Q) {
+    static inline __device__ void remap_decomposed_segments(const complex_type* __restrict__ thread_data,
+                                                            complex_type* __restrict__ shared_output,
+                                                            float twiddle_in,
+                                                            int   Q) {
         // Unroll the first loop and initialize the shared mem.
         complex_type twiddle;
         int          index = threadIdx.x * size_of<FFT>::value;
@@ -1438,10 +1468,10 @@ struct io_thread {
         __syncthreads( );
     }
 
-    static inline __device__ void load_c2r(const complex_type* input,
-                                           complex_type*       thread_data,
-                                           const int           stride,
-                                           const int           memory_limit) {
+    static inline __device__ void load_c2r(const complex_type* __restrict__ input,
+                                           complex_type* __restrict__ thread_data,
+                                           const int stride,
+                                           const int memory_limit) {
         // Each thread reads in the input data at stride = mem_offsets.Q
         unsigned int index  = threadIdx.x;
         unsigned int offset = 2 * memory_limit - 2;
@@ -1460,11 +1490,11 @@ struct io_thread {
     }
 
     // FIXME as above
-    static inline __device__ void load_c2r_transposed(const complex_type* input,
-                                                      complex_type*       thread_data,
-                                                      int                 stride,
-                                                      int                 pixel_pitch,
-                                                      int                 memory_limit) {
+    static inline __device__ void load_c2r_transposed(const complex_type* __restrict__ input,
+                                                      complex_type* __restrict__ thread_data,
+                                                      int stride,
+                                                      int pixel_pitch,
+                                                      int memory_limit) {
         // Each thread reads in the input data at stride = mem_offsets.Q
         unsigned int index = threadIdx.x;
         // unsigned int offset = 2*memory_limit - 2;
@@ -1483,10 +1513,10 @@ struct io_thread {
         }
     }
 
-    static inline __device__ void remap_decomposed_segments_c2r(const complex_type* thread_data,
-                                                                scalar_type*        shared_output,
-                                                                scalar_type         twiddle_in,
-                                                                int                 Q) {
+    static inline __device__ void remap_decomposed_segments_c2r(const complex_type* __restrict__ thread_data,
+                                                                scalar_type* __restrict__ shared_output,
+                                                                scalar_type twiddle_in,
+                                                                int         Q) {
         // Unroll the first loop and initialize the shared mem.
         complex_type twiddle;
         int          index = threadIdx.x * size_of<FFT>::value;
@@ -1510,25 +1540,26 @@ struct io_thread {
         __syncthreads( );
     }
 
-    static inline __device__ void store_c2r(const scalar_type* shared_output,
-                                            scalar_type*       output,
-                                            const int          stride) {
+    static inline __device__ void store_c2r(const scalar_type* __restrict__ shared_output,
+                                            scalar_type* __restrict__ output,
+                                            const int stride) {
         // Each thread reads in the input data at stride = mem_offsets.Q
         unsigned int index = threadIdx.x;
+
         for ( unsigned int i = 0; i < size_of<FFT>::value; i++ ) {
-            output[index] = shared_output[index];
+            output[index] = convert_if_needed(shared_output, index);
             index += stride;
         }
     }
 
-    template <typename ExternalImagePtr_t>
-    static inline __device__ void load_shared_and_conj_multiply(const ExternalImagePtr_t image_to_search,
-                                                                const complex_type*      shared_mem,
-                                                                complex_type*            thread_data,
-                                                                const int                stride) {
+    template <typename ExternalImage_t>
+    static inline __device__ void load_shared_and_conj_multiply(const ExternalImage_t* __restrict__ image_to_search,
+                                                                const complex_type* __restrict__ shared_mem,
+                                                                complex_type* __restrict__ thread_data,
+                                                                const int stride) {
         unsigned int index = threadIdx.x;
         complex_type c;
-        if constexpr ( std::is_same_v<ExternalImagePtr_t, __half2*> ) {
+        if constexpr ( std::is_same_v<ExternalImage_t, __half2*> ) {
 
             for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
                 c.x            = (shared_mem[index].x * __low2float(image_to_search[index]) + shared_mem[index].y * __high2float(image_to_search[index]));

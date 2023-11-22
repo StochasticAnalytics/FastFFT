@@ -167,11 +167,11 @@ bool const_image_test(std::vector<int>& size) {
         FT.SetToConstant(host_input.real_values, host_input.real_memory_allocated, 2.0f);
 
         if constexpr ( use_fp16_io_buffers ) {
-            FT_fp16.SetInputPointer(output_buffer_fp16);
+            FT_fp16.SetInputPointer(output_buffer_fp16); // FIXME: this has no effect for this kernel which is using intra_complex_ptr
             __half* dummy_ptr = nullptr; // FIXME:
-            FT_fp16.SetOutputPointer(dummy_ptr);
+            FT_fp16.SetOutputPointer(output_buffer_fp16);
             FT_fp16.InvFFT( );
-            FT_fp16.CopyDeviceToHostAndSynchronize(reinterpret_cast<__half*>(host_output.real_values), true);
+            cudaErr(cudaMemcpyAsync(host_output.real_values, output_buffer_fp16, sizeof(__half) * host_output.real_memory_allocated, cudaMemcpyDeviceToHost, cudaStreamPerThread));
             host_output.data_is_fp16 = true; // we need to over-ride this as we already convertted but are overwriting.
             host_output.ConvertFP16ToFP32( );
         }
@@ -193,7 +193,7 @@ bool const_image_test(std::vector<int>& size) {
             all_passed                  = false;
             FastFFT_roundTrip_passed[n] = false;
         }
-        std::cerr << "sum" << sum << "full sum " << full_sum << std::endl;
+        std::cerr << "sum" << sum << " full sum " << full_sum << std::endl;
         MyFFTDebugAssertTestTrue(sum == full_sum, "FastFFT constant image round trip for size " + std::to_string(dims_in.x));
     } // loop over sizes
 

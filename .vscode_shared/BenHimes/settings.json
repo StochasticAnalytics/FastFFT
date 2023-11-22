@@ -77,7 +77,9 @@
         "unordered_set": "cpp",
         "__config": "cpp",
         "target": "cpp",
-        "ios": "cpp"
+        "ios": "cpp",
+        "__pragma_push": "cpp",
+        "__locale": "cpp"
     },
     "C_Cpp.clang_format_path": "/usr/bin/clang-format-14",
     "editor.formatOnSave": true,
