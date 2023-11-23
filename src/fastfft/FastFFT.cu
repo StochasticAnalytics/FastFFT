@@ -294,12 +294,43 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetOu
     return;
 }
 
+/**
+ * @brief This will be called by Generic_Fwd_Image_Inv based on the image pointer a user supplies
+ * 
+ * 
+ */
 template <class ComputeBaseType, class InputType, class OutputBaseType, int Rank>
 template <typename ExternalImage_t>
-void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetExternalImagePointer(ExternalImage_t* ptr) {
+EnableIf<IsComplexType<ExternalImage_t>>
+FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetExternalImagePointer(ExternalImage_t* ptr) {
     MyFFTDebugAssertTrue(is_set_input_params && is_set_output_params, "Input and output parameters not set");
 
-    d_ptr.image_to_search = ptr;
+    // Make sure the supplied pointer matches - when an FFT with intraOp functors defined on an external image
+    // is called, we'll check to see which of these two pointers is not null and read from this as well
+    // as decide whether we need to convert to ComputeType prior to use in functor.
+    if constexpr ( std::is_same_v<ComputeBaseType, float> ) {
+        if constexpr ( std::is_same_v<ExternalImage_t, float2> ) {
+            d_ptr.image_to_search             = ptr;
+            d_ptr.image_to_search_and_convert = nullptr;
+        }
+        else if constexpr ( std::is_same_v<ExternalImage_t, __half2> ) {
+            d_ptr.image_to_search             = nullptr;
+            d_ptr.image_to_search_and_convert = ptr;
+        }
+    }
+    else if constexpr ( std::is_same_v<ComputeBaseType, __half> ) {
+        if constexpr ( std::is_same_v<ExternalImage_t, __half2> ) {
+            d_ptr.image_to_search             = ptr;
+            d_ptr.image_to_search_and_convert = nullptr;
+        }
+        else if constexpr ( std::is_same_v<ExternalImage_t, float2> ) {
+            d_ptr.image_to_search             = nullptr;
+            d_ptr.image_to_search_and_convert = ptr;
+        }
+    }
+    else {
+        static_assert(false, "Invalid compute base type");
+    }
 
     // Make sure the user has pinned the memory if it is coming from the host, as this
     // is required for the memcyp_Async calls.
@@ -346,10 +377,11 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetDe
         d_ptr.momentum_space_buffer = (float2*)d_ptr.position_space_buffer;
     }
 
-    d_ptr.external_input          = nullptr;
-    d_ptr.external_output         = nullptr;
-    d_ptr.external_output_complex = nullptr;
-    d_ptr.image_to_search         = nullptr;
+    d_ptr.external_input              = nullptr;
+    d_ptr.external_output             = nullptr;
+    d_ptr.external_output_complex     = nullptr;
+    d_ptr.image_to_search             = nullptr;
+    d_ptr.image_to_search_and_convert = nullptr;
 
     return;
 }
@@ -476,8 +508,14 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::CopyD
 }
 
 template <class ComputeBaseType, class InputType, class OutputBaseType, int Rank>
-template <class PreOpType, class IntraOpType>
-void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::Generic_Fwd(PreOpType pre_op_functor, IntraOpType intra_op_functor) {
+template <class ExternalInputPtr_t,
+          class ExternalOutputPtr_t,
+          class PreOpType,
+          class IntraOpType>
+void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::Generic_Fwd(ExternalInputPtr_t  input_ptr,
+                                                                                       ExternalOutputPtr_t output_ptr,
+                                                                                       PreOpType           pre_op_functor,
+                                                                                       IntraOpType         intra_op_functor) {
 
     SetDimensions(DimensionCheckType::FwdTransform);
 
@@ -601,8 +639,14 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::Gener
 }
 
 template <class ComputeBaseType, class InputType, class OutputBaseType, int Rank>
-template <class IntraOpType, class PostOpType>
-void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::Generic_Inv(IntraOpType intra_op, PostOpType post_op) {
+template <class ExternalInputPtr_t,
+          class ExternalOutputPtr_t,
+          class IntraOpType,
+          class PostOpType>
+void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::Generic_Inv(ExternalInputPtr_t  input_ptr,
+                                                                                       ExternalOutputPtr_t output_ptr,
+                                                                                       IntraOpType         intra_op,
+                                                                                       PostOpType          post_op) {
 
     SetDimensions(DimensionCheckType::InvTransform);
 
@@ -731,9 +775,30 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::Gener
 }
 
 template <class ComputeBaseType, class InputType, class OutputBaseType, int Rank>
-template <class PreOpType, class IntraOpType, class PostOpType>
-typename std::enable_if_t<IS_IKF_t<IntraOpType>( )>
-FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::Generic_Fwd_Image_Inv(PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor) {
+template <class ExternalInputPtr_t,
+          class ExternalOutputPtr_t,
+          class ExternalImagePtr_t,
+          class PreOpType,
+          class IntraOpType,
+          class PostOpType>
+EnableIf<HasIntraOpFunctor<IntraOpType>>
+FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::Generic_Fwd_Image_Inv(ExternalInputPtr_t  input_ptr,
+                                                                                            ExternalOutputPtr_t output_ptr,
+                                                                                            ExternalImagePtr_t  image_to_search_ptr,
+                                                                                            PreOpType           pre_op_functor,
+                                                                                            IntraOpType         intra_op_functor,
+                                                                                            PostOpType          post_op_functor) {
+
+    // We need to check to see if external pointers have been passed in.
+    // If so, we will assume the exist, and check to see if they are on the host or the device and handle accordingly.
+    //      If on input is on the host we'll need to copy to internal buffers on input.
+    //      If on the host we'll need to copy from internal buffers on output. (Possibly also issue a warning.)
+    //      Any copies should be handled in this method, and any type conversions will be handled implicitly by the load/store functors
+    //      If it makes sense, we'll initially retain ComputeType in the internal buffer so conversions will only happen on the final ouptut
+    //      Right now, we control whether the kernel output is intermediate or final based on the kernel name type, which should be okay
+    //      I think it would be hlepful to understand how the FFT type is being constructed by cufftdx and construct something like this.
+    //
+    // If not, we will use our internal buffers as the starting and ending points.
 
     // Set the member pointer to the passed pointer
     SetDimensions(DimensionCheckType::FwdTransform);
@@ -1972,7 +2037,7 @@ __global__ void clip_into_real_kernel(InputType*      real_values_gpu,
 
 template <class ComputeBaseType, class InputType, class OutputBaseType, int Rank>
 template <int FFT_ALGO_t, bool use_thread_method, class PreOpType, class IntraOpType, class PostOpType>
-typename std::enable_if_t<FFT_ALGO_t != Generic_Fwd_Image_Inv_FFT || (FFT_ALGO_t == Generic_Fwd_Image_Inv_FFT && IS_IKF_t<IntraOpType>( ))>
+EnableIf<IfAppliesIntraOpFunctor_HasIntraOpFunctor<IntraOpType, FFT_ALGO_t>>
 FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetPrecisionAndExectutionMethod(KernelType kernel_type, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor) {
     // For kernels with fwd and inv transforms, we want to not set the direction yet.
 
@@ -2133,14 +2198,15 @@ void FourierTransformer<ComputeBaseType, InputType, OutputBaseType, Rank>::SetAn
     }
 
     // FIXME: this only works if the only intraop functor is conj mul (which it currently is.)
+    bool external_image_needs_to_be_converted;
     if constexpr ( IS_IKF_t<IntraOpType>( ) ) {
         if constexpr ( FFT_ALGO_t == Generic_Fwd_Image_Inv_FFT ) {
-            MyFFTDebugAssertTrue(d_ptr.image_to_search != nullptr, "SetExternalImagePointer has not been called.");
-        }
-        else if constexpr ( FFT_ALGO_t != Generic_Fwd_Image_Inv_FFT ) {
-            MyFFTDebugAssertTrue(d_ptr.image_to_search == nullptr, "SetExternalImagePointer has been called twice.");
+            bool one_is_false = d_ptr.image_to_search == nullptr ? d_ptr.image_to_search_and_convert != nullptr : d_ptr.image_to_search_and_convert == nullptr;
+            MyFFTDebugAssertTrue(one_is_false, "SetExternalImagePointer has not been called correctly.");
+            external_image_needs_to_be_converted = d_ptr.image_to_search_and_convert != nullptr;
         }
     }
+
     using ExternalImage_t = std::remove_pointer_t<decltype(d_ptr.image_to_search)>;
 
     if ( d_ptr.external_output ) {
@@ -3392,7 +3458,8 @@ using namespace FastFFT::KernelFunction;
     template void FourierTransformer<COMPUTEBASETYPE, INPUTTYPE, OUTPUTBASETYPE, RANK>::CopyDeviceToDeviceAndSynchronize<__half>(__half*, bool, int);                                   \
     template void FourierTransformer<COMPUTEBASETYPE, INPUTTYPE, OUTPUTBASETYPE, RANK>::CopyDeviceToDeviceAndSynchronize<__half2>(__half2*, bool, int);                                 \
                                                                                                                                                                                         \
-    template void FourierTransformer<COMPUTEBASETYPE, INPUTTYPE, OUTPUTBASETYPE, RANK>::SetExternalImagePointer<float2>(float2 * output_pointer);                                       \
+    template void FourierTransformer<COMPUTEBASETYPE, INPUTTYPE, OUTPUTBASETYPE, RANK>::SetExternalImagePointer<__half2>(__half2 * external_image_ptr);                                 \
+    template void FourierTransformer<COMPUTEBASETYPE, INPUTTYPE, OUTPUTBASETYPE, RANK>::SetExternalImagePointer<float2>(float2 * external_image_ptr);                                   \
     template void FourierTransformer<COMPUTEBASETYPE, INPUTTYPE, OUTPUTBASETYPE, RANK>::SetOutputPointer<float>(float* output_pointer);                                                 \
     template void FourierTransformer<COMPUTEBASETYPE, INPUTTYPE, OUTPUTBASETYPE, RANK>::SetOutputPointer<float2>(float2 * output_pointer);                                              \
                                                                                                                                                                                         \

@@ -1,5 +1,5 @@
-#ifndef _SRC_FASTFFT_TYPES_H_
-#define _SRC_FASTFFT_TYPES_H_
+#ifndef __INCLUDE_DETAIL_FASTFFT_TYPES_H__
+#define __INCLUDE_DETAIL_FASTFFT_TYPES_H__
 
 #include <array>
 #include <string_view>
@@ -41,6 +41,8 @@ constexpr std::array<std::string_view, 3> name = {"natural", "centered", "quadra
 
 } // namespace OriginType
 
+// FIXME: this should work with default value assignment, and I think it is fixed by relying on explicit namespace refs in FastFFT.cu
+// Needs to be tested.
 namespace TransformStageCompleted {
 enum Enum : uint8_t { none = 10,
                       fwd  = 11,
@@ -58,4 +60,4 @@ enum Enum : uint8_t { CopyFromHost,
 
 } // namespace FastFFT
 
-#endif /* _SRC_FASTFFT_TYPES_H_ */
+#endif // __INCLUDE_DETAIL_FASTFFT_TYPES_H__

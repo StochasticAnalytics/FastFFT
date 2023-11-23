@@ -1,77 +1,12 @@
 // Insert some license stuff here
 
-#ifndef _INCLUDE_FASTFFT_H
-#define _INCLUDE_FASTFFT_H
+#ifndef __INCLUDE_FASTFFT_H_
+#define __INCLUDE_FASTFFT_H_
 
-#include <chrono>
-#include <random>
-#include <iostream>
+#include "detail/detail.h"
 
-// Forward declaration so we can leave the inclusion of cuda_fp16.h to FastFFT.cu
-struct __half;
-struct __half2;
-// #include <cuda_fp16.h>
-
-#ifndef ENABLE_FastFFT // ifdef being used in cisTEM that defines these
-#if __cplusplus >= 202002L
-#include <numbers>
-using namespace std::numbers;
-#else
-#if __cplusplus < 201703L
-#message "C++ is " __cplusplus
-#error "C++17 or later required"
-#else
-template <typename _Tp>
-// inline constexpr _Tp pi_v = _Enable_if_floating<_Tp>(3.141592653589793238462643383279502884L);
-inline constexpr _Tp pi_v = 3.141592653589793238462643383279502884L;
-#endif // __cplusplus require > 17
-#endif // __cplusplus 20 support
-#endif // enable FastFFT
-
-#include "../src/fastfft/types.cuh"
-
-template <typename K>
-constexpr inline bool IS_IKF_t( ) {
-    if constexpr ( std::is_final_v<K> ) {
-        return true;
-    }
-    else {
-        return false;
-    }
-};
-
-template <typename T>
-__device__ __host__ inline void static_assert_type_name(T v) {
-
-    if constexpr ( std::is_pointer_v<T> ) {
-        static_assert(! std::is_same_v<T, int*>, "int*");
-        static_assert(! std::is_same_v<T, int2*>, "int2*");
-        static_assert(! std::is_same_v<T, int3*>, "int3*");
-        static_assert(! std::is_same_v<T, int4*>, "int4*");
-        static_assert(! std::is_same_v<T, float*>, "float*");
-        static_assert(! std::is_same_v<T, float2*>, "float2*");
-        static_assert(! std::is_same_v<T, float3*>, "float3*");
-        static_assert(! std::is_same_v<T, float4*>, "float4*");
-        static_assert(! std::is_same_v<T, double*>, "double*");
-        static_assert(! std::is_same_v<T, __half*>, "__half*");
-        static_assert(! std::is_same_v<T, __half2*>, "__half2*");
-        static_assert(! std::is_same_v<T, nullptr_t>, "nullptr_t");
-    }
-    else {
-        static_assert(! std::is_same_v<T, int>, "int");
-        static_assert(! std::is_same_v<T, int2>, "int2");
-        static_assert(! std::is_same_v<T, int3>, "int3");
-        static_assert(! std::is_same_v<T, int4>, "int4");
-        static_assert(! std::is_same_v<T, float>, "float");
-        static_assert(! std::is_same_v<T, float2>, "float2");
-        static_assert(! std::is_same_v<T, float3>, "float3");
-        static_assert(! std::is_same_v<T, float4>, "float4");
-        static_assert(! std::is_same_v<T, double>, "double");
-        static_assert(! std::is_same_v<T, __half>, "__half");
-        static_assert(! std::is_same_v<T, __half2>, "__half2");
-    }
-};
-
+// TODO: When recompiling a changed debug type, make has no knowledge and the -B flag must be passed.
+//       Save the most recent state and have make query that to determine if the -B flag is needed.
 // For testing/debugging it is convenient to execute and have print functions for partial transforms.
 // These will go directly in the kernels and also in the helper Image.cuh definitions for PrintArray.
 // The number refers to the number of 1d FFTs performed,
@@ -80,34 +15,7 @@ __device__ __host__ inline void static_assert_type_name(T v) {
 // Inv 5, 6, 7 ( original y, z, x)
 // Defined in make by setting environmental variable  FFT_DEBUG_STAGE
 
-// #include <iostream>
-/*
-
-Some of the more relevant notes about extended lambdas.
-https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#extended-lambda
-
-The enclosing function for the extended lambda must be named and its address can be taken. If the enclosing function is a class member, then the following conditions must be satisfied:
-
-    All classes enclosing the member function must have a name.
-    The member function must not have private or protected access within its parent class.
-    All enclosing classes must not have private or protected access within their respective parent classes.
-
-
-If the enclosing function is an instantiation of a function template or a member function template, and/or the function is a member of a class template, the template(s) must satisfy the following constraints:
-
-    The template must have at most one variadic parameter, and it must be listed last in the template parameter list.
-    The template parameters must be named.
-    The template instantiation argument types cannot involve types that are either local to a function (except for closure types for extended lambdas), or are private or protected class members.
-#define IS_EXT_LAMBDA( type )  __nv_is_extended_device_lambda_closure_type( type ) 
-
-
-*/
 namespace FastFFT {
-
-// To limit which kernels are instantiated, define a set of constants for the FFT method to be used at compile time.
-constexpr int Generic_Fwd_FFT           = 1;
-constexpr int Generic_Inv_FFT           = 2;
-constexpr int Generic_Fwd_Image_Inv_FFT = 3;
 
 // For debugging
 
@@ -175,27 +83,29 @@ LaunchParams;
 template <typename I, typename C, typename O>
 struct DevicePointers {
     // Use this to catch unsupported input/ compute types and throw exception.
-    int* position_space          = nullptr;
-    int* position_space_buffer   = nullptr;
-    int* momentum_space          = nullptr;
-    int* momentum_space_buffer   = nullptr;
-    int* image_to_search         = nullptr;
-    int* external_input          = nullptr;
-    int* external_output         = nullptr;
-    int* external_output_complex = nullptr;
+    int* position_space              = nullptr;
+    int* position_space_buffer       = nullptr;
+    int* momentum_space              = nullptr;
+    int* momentum_space_buffer       = nullptr;
+    int* image_to_search             = nullptr;
+    int* image_to_search_and_convert = nullptr;
+    int* external_input              = nullptr;
+    int* external_output             = nullptr;
+    int* external_output_complex     = nullptr;
 };
 
 // Input real-fp32, compute fp32, output real/complex fp32
 template <>
 struct DevicePointers<float*, float*, float*> {
-    float*  position_space;
-    float*  position_space_buffer;
-    float2* momentum_space;
-    float2* momentum_space_buffer;
-    float2* image_to_search;
-    float*  external_input;
-    float*  external_output;
-    float2* external_output_complex;
+    float*   position_space;
+    float*   position_space_buffer;
+    float2*  momentum_space;
+    float2*  momentum_space_buffer;
+    float2*  image_to_search;
+    __half2* image_to_search_and_convert;
+    float*   external_input;
+    float*   external_output;
+    float2*  external_output_complex;
 };
 
 // Input real fp16, compute fp32, output real/complex fp16
@@ -208,6 +118,7 @@ struct DevicePointers<__half*, float*, __half*> {
     float2*  momentum_space;
     float2*  momentum_space_buffer;
     __half2* image_to_search;
+    float2*  image_to_search_and_convert;
     __half*  external_input;
     __half*  external_output;
     __half2* external_output_complex;
@@ -312,10 +223,16 @@ class FourierTransformer {
     void SetOutputPointer(ExternalImage_t* output_pointer);
 
     template <typename ExternalImage_t>
-    void SetExternalImagePointer(ExternalImage_t* output_pointer);
+    EnableIf<IsComplexType<ExternalImage_t>>
+    SetExternalImagePointer(ExternalImage_t* output_pointer);
     // When passing in a pointer from python (cupy or pytorch) it is a long, and needs to be cast to input type.
     // For now, we are assuming memory ops are all handled in the python code.
     void SetInputPointerFromPython(long input_pointer);
+
+    // template <class InputDataPtr_t,
+    //           class OutputDataPtr_t,
+    //           class ImageToSearchPtr_t>
+    // void SetDataPointers(InputDataPtr_t input_ptr, OutputDataPtr_t output_ptr, ImageToSearchPtr_t image_to_search_ptr);
 
     ///////////////////////////////////////////////
     // Public actions:
@@ -351,19 +268,45 @@ class FourierTransformer {
     // FFT calls
 
     // Alias for FwdFFT, is there any overhead?
-    template <class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t>
-    void FwdFFT(PreOpType pre_op = nullptr, IntraOpType intra_op = nullptr) {
-        Generic_Fwd<PreOpType, IntraOpType>(pre_op, intra_op);
+    template <class ExternalInputPtr_t  = nullptr_t,
+              class ExternalOutputPtr_t = nullptr_t,
+              class PreOpType           = nullptr_t,
+              class IntraOpType         = nullptr_t>
+    EnableIf<IsPointerOrNullPtrType<ExternalInputPtr_t, ExternalOutputPtr_t, PreOpType, IntraOpType>>
+    FwdFFT(ExternalInputPtr_t  input_ptr  = nullptr,
+           ExternalOutputPtr_t output_ptr = nullptr,
+           PreOpType           pre_op     = nullptr,
+           IntraOpType         intra_op   = nullptr) {
+
+        Generic_Fwd<ExternalInputPtr_t, External_OutputPtr_t, PreOpType, IntraOpType>(input_ptr, output_ptr, pre_op, intra_op);
     }
 
-    template <class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t>
-    void InvFFT(IntraOpType intra_op = nullptr, PostOpType post_op = nullptr) {
-        Generic_Inv<IntraOpType, PostOpType>(intra_op, post_op);
+    template <class ExternalInputPtr_t  = nullptr_t,
+              class ExternalOutputPtr_t = nullptr_t,
+              class IntraOpType         = nullptr_t,
+              class PostOpType          = nullptr_t>
+    EnableIf<IsPointerOrNullPtrType<ExternalInputPtr_t, ExternalOutputPtr_t, IntraOpType, PostOpType>>
+    InvFFT(ExternalInputPtr_t  input_ptr  = nullptr,
+           ExternalOutputPtr_t output_ptr = nullptr,
+           IntraOpType         intra_op   = nullptr,
+           PostOpType          post_op    = nullptr) {
+        Generic_Inv<ExternalInputPtr_t, External_OutputPtr_t, IntraOpType, PostOpType>(input_ptr, output_ptr, intra_op, post_op);
     }
 
-    template <class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t>
-    void FwdImageInvFFT(PreOpType pre_op = nullptr, IntraOpType intra_op = nullptr, PostOpType post_op = nullptr) {
-        Generic_Fwd_Image_Inv<PreOpType, IntraOpType, PostOpType>(pre_op, intra_op, post_op);
+    template <class ExternalInputPtr_t  = nullptr_t,
+              class ExternalOutputPtr_t = nullptr_t,
+              class ExternalImagePtr_t  = nullptr_t,
+              class PreOpType           = nullptr_t,
+              class IntraOpType         = nullptr_t,
+              class PostOpType          = nullptr_t>
+    EnableIf<IsPointerOrNullPtrType<ExternalInputPtr_t, ExternalOutputPtr_t, ExternalImagePtr_t, PreOpType, IntraOpType, PostOpType>>
+    FwdImageInvFFT(ExternalInputPtr_t  input_ptr       = nullptr,
+                   ExternalOutputPtr_t output_ptr      = nullptr,
+                   ExternalImagePtr_t  image_to_search = nullptr,
+                   PreOpType           pre_op          = nullptr,
+                   IntraOpType         intra_op        = nullptr,
+                   PostOpType          post_op         = nullptr) {
+        Generic_Fwd_Image_Inv<ExternalInputPtr_t, External_OutputPtr_t, ExternalImagePtr_t, PreOpType, IntraOpType, PostOpType>(input_ptr, output_ptr, image_to_search, pre_op, intra_op, post_op);
     }
 
     void ClipIntoTopLeft( );
@@ -771,7 +714,7 @@ class FourierTransformer {
     // 1.
     // First call passed from a public transform function, selects block or thread and the transform precision.
     template <int FFT_ALGO_t, bool use_thread_method = false, class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t> // bool is just used as a dummy type
-    typename std::enable_if_t<FFT_ALGO_t != Generic_Fwd_Image_Inv_FFT || (FFT_ALGO_t == Generic_Fwd_Image_Inv_FFT && IS_IKF_t<IntraOpType>( ))>
+    EnableIf<IfAppliesIntraOpFunctor_HasIntraOpFunctor<IntraOpType, FFT_ALGO_t>>
     SetPrecisionAndExectutionMethod(KernelType kernel_type, PreOpType pre_op_functor = nullptr, IntraOpType intra_op_functor = nullptr, PostOpType post_op_functor = nullptr);
 
     // 2. // TODO: remove this now that the functors are working
@@ -819,17 +762,37 @@ class FourierTransformer {
     bool external_image_is_on_device;
     void AllocateBufferMemory( );
 
-    // If the user doesn't specify input/output pointers, assume the are copied into the FastFFT bufferspace.
-    // TODO: this will only work for 2d as the output in 3d should be in d_ptr.position_space_buffer
-    template <class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t>
-    typename std::enable_if_t<IS_IKF_t<IntraOpType>( )>
-    Generic_Fwd_Image_Inv(PreOpType pre_op = nullptr, IntraOpType intra_op = nullptr, PostOpType post_op = nullptr);
+    template <class ExternalInputPtr_t,
+              class ExternalOutputPtr_t,
+              class ExternalImagePtr_t,
+              class PreOpType,
+              class IntraOpType,
+              class PostOpType>
+    EnableIf<HasIntraOpFunctor<IntraOpType>>
+    Generic_Fwd_Image_Inv(ExternalInputPtr_t  input_ptr,
+                          ExternalOutputPtr_t output_ptr,
+                          ExternalImagePtr_t  image_to_search,
+                          PreOpType           pre_op,
+                          IntraOpType         intra_op,
+                          PostOpType          post_op);
 
-    template <class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t>
-    void Generic_Fwd(PreOpType pre_op = nullptr, IntraOpType intra_op = nullptr);
+    template <class ExternalInputPtr_t,
+              class ExternalOutputPtr_t,
+              class PreOpType,
+              class IntraOpType>
+    void Generic_Fwd(ExternalInputPtr_t  input_ptr,
+                     ExternalOutputPtr_t output_ptr,
+                     PreOpType           pre_op,
+                     IntraOpType         intra_op);
 
-    template <class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t>
-    void Generic_Inv(IntraOpType intra_op = nullptr, PostOpType post_op = nullptr);
+    template <class ExternalInputPtr_t,
+              class ExternalOutputPtr_t,
+              class IntraOpType,
+              class PostOpType>
+    void Generic_Inv(ExternalInputPtr_t  input_ptr,
+                     ExternalOutputPtr_t output_ptr,
+                     IntraOpType         intra_op,
+                     PostOpType          post_op);
 }; // class Fourier Transformer
 
 } // namespace FastFFT

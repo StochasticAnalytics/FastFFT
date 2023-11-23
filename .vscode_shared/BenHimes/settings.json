@@ -79,7 +79,12 @@
         "target": "cpp",
         "ios": "cpp",
         "__pragma_push": "cpp",
-        "__locale": "cpp"
+        "__locale": "cpp",
+        "__bit_reference": "cpp",
+        "__functional_base": "cpp",
+        "__node_handle": "cpp",
+        "__memory": "cpp",
+        "locale": "cpp"
     },
     "C_Cpp.clang_format_path": "/usr/bin/clang-format-14",
     "editor.formatOnSave": true,
