@@ -9,8 +9,8 @@ bool const_image_test(std::vector<int>& size) {
     std::vector<bool> FFTW_passed(size.size( ), true);
     std::vector<bool> FastFFT_forward_passed(size.size( ), true);
     std::vector<bool> FastFFT_roundTrip_passed(size.size( ), true);
-    __half*           output_buffer_fp16         = nullptr;
-    __half2*          output_buffer_fp16_complex = nullptr;
+    float*            output_buffer_fp32 = nullptr;
+    __half*           output_buffer_fp16 = nullptr;
 
     for ( int n = 0; n < size.size( ); n++ ) {
 
@@ -103,22 +103,22 @@ bool const_image_test(std::vector<int>& size) {
         if constexpr ( use_fp16_io_buffers ) {
             // We need to allocate memory for the output buffer.
             cudaErr(cudaMalloc((void**)&output_buffer_fp16, sizeof(__half) * host_output.real_memory_allocated));
-            output_buffer_fp16_complex = (__half2*)output_buffer_fp16;
             // This is an in-place operation so when copying to device, just use half the memory.
             host_output.ConvertFP32ToFP16( );
             // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
             // ensures faster transfer. If false, it will be pinned for you.
             sum = host_output.ReturnSumOfReal(reinterpret_cast<__half*>(host_output.real_values), dims_out);
-            // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
-            // Note, it we could also copy the whole buffer for fp32
-            FT_fp16.CopyHostToDeviceAndSynchronize(reinterpret_cast<__half*>(host_output.real_values), host_output.real_memory_allocated);
+
+            cudaErr(cudaMemcpyAsync(output_buffer_fp16, host_output.real_values, sizeof(__half) * host_output.real_memory_allocated, cudaMemcpyHostToDevice, cudaStreamPerThread));
         }
         else {
+            cudaErr(cudaMalloc((void**)&output_buffer_fp32, sizeof(float) * host_output.real_memory_allocated));
+
             // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
             // ensures faster transfer. If false, it will be pinned for you.
             sum = host_output.ReturnSumOfReal(host_output.real_values, dims_out);
             // This copies the host memory into the device global memory. If needed, it will also allocate the device memory first.
-            FT.CopyHostToDeviceAndSynchronize(host_output.real_values);
+            cudaErr(cudaMemcpy(output_buffer_fp32, host_output.real_values, sizeof(float) * host_output.real_memory_allocated, cudaMemcpyHostToDevice));
         }
 
         // Just to make sure we don't get a false positive, set the host memory to some undesired value.
@@ -129,16 +129,17 @@ bool const_image_test(std::vector<int>& size) {
         if constexpr ( use_fp16_io_buffers ) {
             // Recast the position space buffer and pass it in as if it were an external, device, __half* pointer.
 
-            FT_fp16.SetInputPointer(reinterpret_cast<__half*>(FT_fp16.d_ptr.position_space));
-            FT_fp16.SetOutputPointer(output_buffer_fp16_complex);
-            FT_fp16.FwdFFT( );
+            FT_fp16.FwdFFT(output_buffer_fp16);
             cudaErr(cudaMemcpy(host_output.real_values, output_buffer_fp16, sizeof(__half) * host_output.real_memory_allocated, cudaMemcpyDeviceToHost));
             host_output.ConvertFP16ToFP32( );
         }
         else {
-            FT.FwdFFT( );
+            FT.FwdFFT(output_buffer_fp32);
             // in buffer, do not deallocate, do not unpin memory
-            FT.CopyDeviceToHostAndSynchronize(host_output.real_values, false);
+            if ( FT.is_in_buffer_memory )
+                cudaErr(cudaMemcpy(host_output.real_values, FT.GetDeviceBufferPointer( ), sizeof(float) * host_output.real_memory_allocated, cudaMemcpyDeviceToHost));
+            else
+                cudaErr(cudaMemcpy(host_output.real_values, output_buffer_fp32, sizeof(float) * host_output.real_memory_allocated, cudaMemcpyDeviceToHost));
         }
 
         test_passed = true;
@@ -167,17 +168,18 @@ bool const_image_test(std::vector<int>& size) {
         FT.SetToConstant(host_input.real_values, host_input.real_memory_allocated, 2.0f);
 
         if constexpr ( use_fp16_io_buffers ) {
-            FT_fp16.SetInputPointer(output_buffer_fp16); // FIXME: this has no effect for this kernel which is using intra_complex_ptr
-            __half* dummy_ptr = nullptr; // FIXME:
-            FT_fp16.SetOutputPointer(output_buffer_fp16);
-            FT_fp16.InvFFT( );
-            cudaErr(cudaMemcpyAsync(host_output.real_values, output_buffer_fp16, sizeof(__half) * host_output.real_memory_allocated, cudaMemcpyDeviceToHost, cudaStreamPerThread));
+
+            FT_fp16.InvFFT(output_buffer_fp16);
+            cudaErr(cudaMemcpy(host_output.real_values, output_buffer_fp16, sizeof(__half) * host_output.real_memory_allocated, cudaMemcpyDeviceToHost));
             host_output.data_is_fp16 = true; // we need to over-ride this as we already convertted but are overwriting.
             host_output.ConvertFP16ToFP32( );
         }
         else {
-            FT.InvFFT( );
-            FT.CopyDeviceToHostAndSynchronize(host_output.real_values, true);
+            FT.InvFFT(output_buffer_fp32);
+            if ( FT.is_in_buffer_memory )
+                cudaErr(cudaMemcpy(host_output.real_values, FT.GetDeviceBufferPointer( ), sizeof(float) * host_output.real_memory_allocated, cudaMemcpyDeviceToHost));
+            else
+                cudaErr(cudaMemcpy(host_output.real_values, output_buffer_fp32, sizeof(float) * host_output.real_memory_allocated, cudaMemcpyDeviceToHost));
         }
 
         if constexpr ( FFT_DEBUG_STAGE > 4 ) {

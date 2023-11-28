@@ -101,11 +101,11 @@ FastFFT::PrintState()
     std::cout << std::endl;
 
     std::cout << "State Variables:\n" << std::endl;
-    std::cout << "is_in_memory_device_pointer " << is_in_memory_device_pointer << std::endl;
-    std::cout << "is_in_second_buffer_partition " << is_in_second_buffer_partition << std::endl;
+        // std::cerr << "is_in_memory_device_pointer " << is_in_memory_device_pointer << std::endl; // FIXME: switched to is_pointer_in_device_memory(d_ptr.buffer_1) defined in FastFFT.cuh
+    std::cout << "is_in_buffer_memory " << is_in_buffer_memory << std::endl;
     std::cout << "is_fftw_padded_input " << is_fftw_padded_input << std::endl;
     std::cout << "is_fftw_padded_output " << is_fftw_padded_output << std::endl;
-    std::cout << "is_real_valued_input " << is_real_valued_input << std::endl;
+    std::cout << "is_real_valued_input " << IsAllowedRealType<InputType>  << std::endl;
     std::cout << "is_set_input_params " << is_set_input_params << std::endl;
     std::cout << "is_set_output_params " << is_set_output_params << std::endl;
     std::cout << "is_size_validated " << is_size_validated << std::endl;

@@ -34,4 +34,10 @@ constexpr bool IsComplexType = (std::is_same_v<T, float2> || std::is_same_v<T, _
 template <typename... Args>
 constexpr bool IsPointerOrNullPtrType = (... && (std::is_same<Args, nullptr_t>::value || std::is_pointer_v<std::decay_t<Args>>));
 
+template <typename T>
+constexpr bool IsAllowedRealType = std::is_same_v<T, __half> || std::is_same_v<T, float>;
+
+template <typename T>
+constexpr bool IsAllowedComplexType = std::is_same_v<T, __half2> || std::is_same_v<T, float2>;
+
 #endif // __INCLUDE_DETAIL_CONCEPTS_H__

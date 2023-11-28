@@ -72,7 +72,8 @@ bool unit_impulse_test(std::vector<int> size, bool do_increase_size) {
 
             // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
             // ensures faster transfer. If false, it will be pinned for you.
-            FT.SetInputPointer(host_input.real_values);
+            // FIXME:
+            // FT.SetInputPointer(host_input.real_values);
 
             // Set a unit impulse at the center of the input array.
             FT.SetToConstant(host_input.real_values, host_input.real_memory_allocated, 0.0f);

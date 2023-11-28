@@ -18,10 +18,10 @@
 
 namespace py = pybind11;
 
-template <class ComputeType, class InputType, class OutputBaseType>
+template <class ComputeType, class InputType, class OtherImageType>
 void declare_array(py::module& m, const std::string& typestr) {
 
-    using FT_t = FastFFT::FourierTransformer<ComputeType, InputType, OutputBaseType>;
+    using FT_t = FastFFT::FourierTransformer<ComputeType, InputType, OtherImageType>;
 
     std::string pyclass_name = std::string("FourierTransformer") + typestr;
     py::class_<FT_t>(m, pyclass_name.c_str( ))

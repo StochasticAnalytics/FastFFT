@@ -2,6 +2,7 @@
 #define __INCLUDE_DETAILS_CHECKS_AND_DEBUG_H__
 
 #include "types.h"
+#include <iostream>
 
 namespace FastFFT {
 // hacky and non-conclusive way to trouble shoot mismatched types in function calls
@@ -115,6 +116,28 @@ inline void checkCudaErr(cudaError_t err) {
 };
 
 // clang-format on
+
+// For debugging
+
+inline void PrintVectorType(int3 input) {
+    std::cerr << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
+}
+
+inline void PrintVectorType(int4 input) {
+    std::cerr << "(x,y,z,w) " << input.x << " " << input.y << " " << input.z << " " << input.w << std::endl;
+}
+
+inline void PrintVectorType(dim3 input) {
+    std::cerr << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
+}
+
+inline void PrintVectorType(short3 input) {
+    std::cerr << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
+}
+
+inline void PrintVectorType(short4 input) {
+    std::cerr << "(x,y,z,w) " << input.x << " " << input.y << " " << input.z << " " << input.w << std::endl;
+}
 
 } // namespace FastFFT
 

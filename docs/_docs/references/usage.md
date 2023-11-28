@@ -20,20 +20,19 @@ In cufft, the first step to library access is to create a "handle" to a plan, *i
     cufftSetStream(cuda_plan_inverse, cudaStreamPerThread);
 
     // The parallel in Fast FFT would be to create an empty FourierTransformer object, e.g.
-    // The template arguments are: ComputeBaseType, InputType, OutputBaseType, Rank
+    // The template arguments are: ComputeBaseType, InputType, OtherImageType, Rank
     FastFFT::FourierTransformer<float, float, float, 2> FT;
 ```
 
 ```{note}
+
 The current implementation only supports float for all three stages and dimensions (rank) of 2,3. This is under active development.
 
-Also note that the compute and output are **base** types, while the input is the **full** type.
+    * support for input  __half and __nv_bfloat16 are next to improve bandwidth
+    * support for input __half2 and __nv_bfloat162 and float2 follow this to enable c2c transforms.
+    * support for half-precision ComputeType **may** be explored, but prioritizing non-power of 2 support for ComputeType = float is a higher priority.
 
-* The input may be a real (__half or float) or complex (__half2 or float2) image and this depends only on the input data.
-* The output may be a real or complex image or a complex FFT, which depends on the FFT algorithm(s) actually called by the user.
-* The compute type is always a complex image, and this is a limitation of the cuFFT library.
-    * This is the reason for full/base type distinction.
-* Any algorithms that couple a second image to one of the intra process functors assumes the image type to have the same base type as the input, and the full type depends on the stage it is used.
+Any algorithms that couple a second image to one of the intra process functors assumes the OtherImageType matched the data on the stage it is used.
     * For example, the correlation functor assumes the input is a real image, and the second image is a complex image, and the output is a real image.
 ```
 
@@ -66,8 +65,5 @@ Both SetForwardFFTPlan and SetInverseFFTPlan must be called prior to using any F
 * Optionally Set input and/or output pointers
   * This will instruct FastFFT to read/write on relevant transforms to and from these external memory buffers
   * Otherwise, data must be manually copied to/from the FastFFT buffers using the relevant methods
-    * FastFFT::CopyDeviceToDevice
-    * FastFFT::CopyDeviceToHost
     * FastFFT::CopyHostToDevice
-    * FastFFT::CopyDeviceToDeviceFromNonOwningAddress
       * If the input/output pointers are not set and the FastFFT buffers are not allocated, the will be allocated on the first call to either of the latter two functions

@@ -189,7 +189,8 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
             // FIXME:
             targetFT.CopyHostToDeviceAndSynchronize(target_search_image.real_values);
 
-            FT.SetExternalImagePointer(targetFT.d_ptr.momentum_space);
+            // FIXME:
+            // FT.SetExternalImagePointer(targetFT.d_ptr.momentum_space);
 
             // Wait on the transfers to finish.
             cudaErr(cudaStreamSynchronize(cudaStreamPerThread));

@@ -52,7 +52,6 @@ enum Enum : uint8_t { none = 10,
 namespace DimensionCheckType {
 enum Enum : uint8_t { CopyFromHost,
                       CopyToHost,
-                      CopyDeviceToDevice,
                       FwdTransform,
                       InvTransform };
 

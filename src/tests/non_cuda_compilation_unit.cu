@@ -9,6 +9,9 @@ int main(int argc, char** argv) {
     const int input_size = 64;
 
     FastFFT::FourierTransformer<float, float, float, 2> FT;
+
+    float* d_input = nullptr;
+
     // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
     FT.SetForwardFFTPlan(input_size, input_size, 1, input_size, input_size, 1, true);
     FT.SetInverseFFTPlan(input_size, input_size, 1, input_size, input_size, 1, false);
@@ -22,6 +25,8 @@ int main(int argc, char** argv) {
 
     int host_input_real_memory_allocated  = FT.ReturnInputMemorySize( );
     int host_output_real_memory_allocated = FT.ReturnInvOutputMemorySize( );
+
+    cudaErr(cudaMallocAsync(&d_input, sizeof(decltype(d_input)) * host_input_real_memory_allocated, cudaStreamPerThread));
 
     if ( host_input_real_memory_allocated != host_output_real_memory_allocated ) {
         std::cout << "Error: input and output memory sizes do not match" << std::endl;
@@ -39,10 +44,6 @@ int main(int argc, char** argv) {
     host_input.fill(-1.0f);
     host_output.fill(-1.0f);
 
-    // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
-    // ensures faster transfer. If false, it will be pinned for you.
-    FT.SetInputPointer(host_input.data( ));
-
     // Check basic initialization function
     FT.SetToConstant(host_input.data( ), host_output_real_memory_allocated, 3.14f);
     for ( auto& val : host_input ) {
@@ -57,14 +58,14 @@ int main(int argc, char** argv) {
     host_input.at(0) = 1.0f;
 
     // Copy to the device
-    FT.CopyHostToDevice(host_input.data( ));
-
+    cudaErr(cudaMemcpyAsync(d_input, host_input.data( ), sizeof(decltype(d_input)) * host_input_real_memory_allocated, cudaMemcpyHostToDevice, cudaStreamPerThread));
+    cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
     // Do a round trip FFT
-    FT.FwdFFT( );
-    FT.InvFFT( );
+    FT.FwdFFT(d_input);
+    FT.InvFFT(d_input);
 
     // Now copy back to the output array (still set to -1)
-    FT.CopyDeviceToHost(host_output.data( ), true, host_input_real_memory_allocated);
+    cudaErr(cudaMemcpyAsync(host_output.data( ), d_input, sizeof(decltype(d_input)) * host_output_real_memory_allocated, cudaMemcpyDeviceToHost, cudaStreamPerThread));
     if ( host_output.at(0) == input_size * input_size ) {
         std::cout << "Success: output memory copied back correctly after fft/ifft pair" << std::endl;
     }

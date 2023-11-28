@@ -29,7 +29,7 @@ inline bool pointer_is_in_memory_and_registered(T ptr) {
 }
 
 template <typename T>
-inline bool pointer_is_in_device_memory(T ptr) {
+inline bool is_pointer_in_device_memory(T ptr) {
     // FIXME: I don't think this is thread safe, add a mutex as in cistem::GpuImage
     cudaPointerAttributes attr;
     cudaErr(cudaPointerGetAttributes(&attr, ptr));
