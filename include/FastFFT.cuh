@@ -5,6 +5,7 @@
 #define __INCLUDE_FAST_FFT_CUH__
 
 #include "detail/detail.cuh"
+#include <cuda_fp16.h>
 
 // “This software contains source code provided by NVIDIA Corporation.”
 // This is located in include/cufftdx*
@@ -188,41 +189,111 @@ __global__ void clip_into_real_kernel(InputType*      real_values_gpu,
                                       int3            wanted_coordinate_of_box_center,
                                       OutputBaseType  wanted_padding_value);
 
-// TODO: this may be expanded, for now it is to be used in the case where we have
-// packed the real values of a c2r into the first half of the complex array.
-// The output type pointer needs to be cast to the correct type AND posibly converted
+// TODO: This would be much cleaner if we could first go from complex_compute_t -> float 2 then do conversions
+// I think since this would be a compile time decision, it would be fine, but it would be good to confirm.
 template <class FFT, typename WantedType, typename GivenType>
 inline __device__ WantedType convert_if_needed(const GivenType* __restrict__ ptr, const int idx) {
     using complex_compute_t = typename FFT::value_type;
     using scalar_compute_t  = typename complex_compute_t::value_type;
-    WantedType ret;
 
-    if constexpr ( std::is_same_v<GivenType, complex_compute_t> || std::is_same_v<GivenType, const complex_compute_t> ) {
-        if constexpr ( std::is_same_v<complex_compute_t, float2> ) {
-            if constexpr ( std::is_same_v<WantedType, __half> ) {
-                ret = __float2half_rn(reinterpret_cast<const float*>(ptr)[idx]);
-                return std::move(ret);
-            }
-            if constexpr ( std::is_same_v<WantedType, float> ) {
-                ret = reinterpret_cast<const float*>(ptr)[idx];
-                return std::move(ret);
-            }
-            if constexpr ( std::is_same_v<WantedType, float2> ) {
-                ret = reinterpret_cast<const float2*>(ptr)[idx];
-                return std::move(ret);
+    // For now, we are assuming (as everywhere else) that compute precision is never double
+    // and may in the future be _half. But is currently only float.
+    // FIXME: THis should be caught earlier I think.
+    if constexpr ( std::is_same_v<complex_compute_t, double> ) {
+        static_no_doubles( );
+    }
+    if constexpr ( std::is_same_v<complex_compute_t, __half> ) {
+        static_no_half_support_yet( );
+    }
+
+    if constexpr ( std::is_same_v<std::decay_t<GivenType>, complex_compute_t> || std::is_same_v<std::decay_t<GivenType>, float2> ) {
+        if constexpr ( std::is_same_v<WantedType, scalar_compute_t> || std::is_same_v<WantedType, float> ) {
+            // In this case we assume we have a real valued result, packed into the first half of the complex array
+            // TODO: think about cases where we may hit this block unintentionally and how to catch this
+            return std::move(static_cast<const WantedType*>(ptr)[idx]);
+        }
+        else if constexpr ( std::is_same_v<WantedType, __half> ) {
+            // In this case we assume we have a real valued result, packed into the first half of the complex array
+            // TODO: think about cases where we may hit this block unintentionally and how to catch this
+            return std::move(__float2half_rn(static_cast<const float*>(ptr)[idx]));
+        }
+        else if constexpr ( std::is_same_v<WantedType, __half2> ) {
+            // Note: we will eventually need a similar hase for __nv_bfloat16
+            // I think I may need to strip the const news for this to work
+            if constexpr ( std::is_same_v<GivenType, complex_compute_t> ) {
+                return std::move(__floats2half2_rn(ptr[idx].real( ), 0.f));
             }
             else {
-                static_assert_type_name(ret);
+                return std::move(__floats2half2_rn(static_cast<const float*>(ptr)[idx], 0.f));
             }
         }
+        else if constexpr ( std::is_same_v<std::decay_t<GivenType>, complex_compute_t> && std::is_same_v<std::decay_t<WantedType>, complex_compute_t> ) {
+            // return std::move(static_cast<const WantedType*>(ptr)[idx]);
+            return std::move(ptr[idx]);
+        }
+        else if constexpr ( std::is_same_v<std::decay_t<GivenType>, complex_compute_t> && std::is_same_v<std::decay_t<WantedType>, float2> ) {
+            // return std::move(static_cast<const WantedType*>(ptr)[idx]);
+            return std::move(WantedType{ptr[idx].real( ), ptr[idx].imag( )});
+        }
+        else if constexpr ( std::is_same_v<std::decay_t<GivenType>, float2> && std::is_same_v<std::decay_t<WantedType>, float2> ) {
+            // return std::move(static_cast<const WantedType*>(ptr)[idx]);
+            return std::move(ptr[idx]);
+        }
         else {
-            // Currently only setup for the above
             static_assert_type_name(ptr);
+            static_no_match( );
+        }
+    }
+    else if constexpr ( std::is_same_v<std::decay_t<GivenType>, scalar_compute_t> || std::is_same_v<std::decay_t<GivenType>, float> ) {
+        if constexpr ( std::is_same_v<WantedType, scalar_compute_t> || std::is_same_v<WantedType, float> ) {
+            // In this case we assume we have a real valued result, packed into the first half of the complex array
+            // TODO: think about cases where we may hit this block unintentionally and how to catch this
+            return std::move(static_cast<const WantedType*>(ptr)[idx]);
+        }
+        else if constexpr ( std::is_same_v<WantedType, __half> ) {
+            // In this case we assume we have a real valued result, packed into the first half of the complex array
+            // TODO: think about cases where we may hit this block unintentionally and how to catch this
+            return std::move(__float2half_rn(static_cast<const float*>(ptr)[idx]));
+        }
+        else if constexpr ( std::is_same_v<WantedType, __half2> ) {
+            // Here we assume we are reading a real value and placeing it in a complex array. Could this go sideways?
+            return std::move(__floats2half2_rn(static_cast<const float*>(ptr)[idx], 0.f));
+        }
+        else if ( std::is_same_v<std::decay_t<WantedType>, complex_compute_t> || std::is_same_v<std::decay_t<WantedType>, float2> ) {
+            // Here we assume we are reading a real value and placeing it in a complex array. Could this go sideways?
+            return std::move(WantedType{static_cast<const float*>(ptr)[idx], 0.f});
+        }
+        else {
+            static_assert_type_name(ptr);
+            static_no_match( );
+        }
+    }
+    else if constexpr ( std::is_same_v<std::decay_t<GivenType>, __half> ) {
+        if constexpr ( std::is_same_v<WantedType, scalar_compute_t> || std::is_same_v<WantedType, float> ) {
+            return std::move(__half2float(ptr[idx]));
+        }
+        else if constexpr ( std::is_same_v<WantedType, __half> ) {
+            // In this case we assume we have a real valued result, packed into the first half of the complex array
+            // TODO: think about cases where we may hit this block unintentionally and how to catch this
+            return std::move(static_cast<const WantedType*>(ptr)[idx]);
+        }
+        else if constexpr ( std::is_same_v<WantedType, __half2> ) {
+            // Here we assume we are reading a real value and placeing it in a complex array. Could this go sideways?
+            // FIXME: For some reason CUDART_ZERO_FP16 is not defined even with cuda_fp16.h included
+            return std::move(__halves2half2(static_cast<const __half*>(ptr)[idx], __ushort_as_half((unsigned short)0x0000U)));
+        }
+        else if ( std::is_same_v<std::decay_t<WantedType>, complex_compute_t> || std::is_same_v<std::decay_t<WantedType>, float2> ) {
+            // Here we assume we are reading a real value and placeing it in a complex array. Could this go sideways?
+            return std::move(WantedType{__half2float(static_cast<const __half*>(ptr)[idx]), 0.f});
+        }
+        else {
+            static_assert_type_name(ptr);
+            static_no_match( );
         }
     }
     else {
-        // Currently only setup for the above
         static_assert_type_name(ptr);
+        static_no_match( );
     }
 }
 
@@ -541,13 +612,13 @@ struct io {
         if constexpr ( IS_IKF_t<FunctionType>( ) ) {
             if constexpr ( std::is_same_v<ExternalImage_t, __half2*> ) {
                 for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
-                    intra_op_functor(thread_data[i].x, thread_data[i].y, __low2float(image_to_search[index]), __high2float(image_to_search[index])); //ComplexConjMulAndScale<complex_compute_t, scalar_compute_t>(thread_data[i], image_to_search[index], 1.0f);
+                    intra_op_functor(thread_data[i].x, thread_data[i].y, __low2float(image_to_search[index]), __high2float(image_to_search[index]));
                     index += stride;
                 }
             }
             else {
                 for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
-                    intra_op_functor(thread_data[i].x, thread_data[i].y, image_to_search[index].x, image_to_search[index].y); //ComplexConjMulAndScale<complex_compute_t, scalar_compute_t>(thread_data[i], image_to_search[index], 1.0f);
+                    intra_op_functor(thread_data[i].x, thread_data[i].y, image_to_search[index].x, image_to_search[index].y);
                     index += stride;
                 }
             }
@@ -555,7 +626,7 @@ struct io {
         else {
             for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
                 // a * conj b
-                thread_data[i] = thread_data[i], image_to_search[index]; //ComplexConjMulAndScale<complex_compute_t, scalar_compute_t>(thread_data[i], image_to_search[index], 1.0f);
+                thread_data[i] = thread_data[i], image_to_search[index];
                 index += stride;
             }
         }
@@ -674,7 +745,6 @@ struct io {
         for ( unsigned int i = 0; i < FFT::elements_per_thread / 2; i++ ) {
             // output map is thread local, so output_MAP[i] gives the x-index in the non-transposed array and blockIdx.y gives the y-index
             output[index * pixel_pitch + blockIdx.y] = convert_if_needed<FFT, data_io_t>(thread_data, i);
-
             index += stride;
         }
         constexpr unsigned int threads_per_fft        = cufftdx::size_of<FFT>::value / FFT::elements_per_thread;
@@ -921,7 +991,7 @@ struct io {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x + threadIdx.z * size_of<FFT>::value;
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
-            output[Return1DFFTAddress_YZ_transpose_strided_Z(index)] = convert_if_needed<FFT, data_io_t>(shared_mem, i);
+            output[Return1DFFTAddress_YZ_transpose_strided_Z(index)] = convert_if_needed<FFT, data_io_t>(shared_mem, index);
 
             index += stride;
         }
@@ -935,7 +1005,7 @@ struct io {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x + threadIdx.z * size_of<FFT>::value;
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
-            output[Return1DFFTAddress_YZ_transpose_strided_Z(index, Q, sub_fft)] = convert_if_needed<FFT, data_io_t>(shared_mem, i);
+            output[Return1DFFTAddress_YZ_transpose_strided_Z(index, Q, sub_fft)] = convert_if_needed<FFT, data_io_t>(shared_mem, index);
             index += stride;
         }
         __syncthreads( );
@@ -984,7 +1054,7 @@ struct io {
         const unsigned int stride = stride_size( );
         unsigned int       index  = offset + threadIdx.x;
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
-            global_output[index] = convert_if_needed<FFT, data_io_t>(shared_output, i);
+            global_output[index] = convert_if_needed<FFT, data_io_t>(shared_output, index);
             index += stride;
         }
     }
@@ -1075,7 +1145,7 @@ struct io {
             index += stride;
         }
     }
-}; // struct io}
+};
 
 template <class FFT>
 struct io_thread {

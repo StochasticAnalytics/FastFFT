@@ -1,11 +1,10 @@
 #ifndef _SRC_TESTS_TESTS_H
 #define _SRC_TESTS_TESTS_H
 
+#include <iostream>
 #include "../fastfft/Image.cuh"
 #include "../../include/FastFFT.cuh"
 #include "helper_functions.cuh"
-
-#include <iostream>
 
 namespace FastFFT {
 // Input size vectors to be tested.

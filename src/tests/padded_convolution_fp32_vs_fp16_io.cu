@@ -103,6 +103,10 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
             FastFFT::FourierTransformer<float, float, float, Rank> cuFFT;
             FastFFT::FourierTransformer<float, float, float, Rank> targetFT;
 
+            float* FT_buffer;
+            float* cuFFT_buffer;
+            float* targetFT_buffer;
+
             if ( is_size_change_decrease ) {
                 FT.SetForwardFFTPlan(input_size.x, input_size.y, input_size.z, input_size.x, input_size.y, input_size.z);
                 FT.SetInverseFFTPlan(input_size.x, input_size.y, input_size.z, output_size.x, output_size.y, output_size.z);
@@ -136,6 +140,10 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
             cuFFT_input.real_memory_allocated  = cuFFT.ReturnInputMemorySize( );
             cuFFT_output.real_memory_allocated = cuFFT.ReturnInvOutputMemorySize( );
 
+            cudaErr(cudaMallocAsync((void**)&FT_buffer, FT_input.real_memory_allocated, cudaStreamPerThread));
+            cudaErr(cudaMallocAsync((void**)&cuFFT_buffer, cuFFT_input.real_memory_allocated, cudaStreamPerThread));
+            cudaErr(cudaMallocAsync((void**)&targetFT_buffer, target_search_image.real_memory_allocated, cudaStreamPerThread));
+
             if ( is_size_change_decrease )
                 target_search_image.real_memory_allocated = targetFT.ReturnInputMemorySize( );
             else
@@ -152,12 +160,6 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
 
             target_search_image.Allocate(true);
             positive_control.Allocate(true);
-
-            // Now we want to associate the host memory with the device memory. The method here asks if the host pointer is pinned (in page locked memory) which
-            // ensures faster transfer. If false, it will be pinned for you.
-            FT.SetInputPointer(FT_input.real_values);
-            cuFFT.SetInputPointer(cuFFT_input.real_values);
-            targetFT.SetInputPointer(target_search_image.real_values);
 
             // Set a unit impulse at the center of the input array.
             // For now just considering the real space image to have been implicitly quadrant swapped so the center is at the origin.
@@ -189,10 +191,9 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
             // FIXME:
             targetFT.CopyHostToDeviceAndSynchronize(target_search_image.real_values);
 
-            // FIXME:
-            // FT.SetExternalImagePointer(targetFT.d_ptr.momentum_space);
-
-            // Wait on the transfers to finish.
+            cudaErr(cudaMemcpyAsync(FT_buffer, FT_input.real_values, FT_input.real_memory_allocated, cudaMemcpyHostToDevice, cudaStreamPerThread));
+            cudaErr(cudaMemcpyAsync(cuFFT_buffer, cuFFT_input.real_values, cuFFT_input.real_memory_allocated, cudaMemcpyHostToDevice, cudaStreamPerThread));
+            cudaErr(cudaMemcpyAsync(targetFT_buffer, target_search_image.real_values, target_search_image.real_memory_allocated, cudaMemcpyHostToDevice, cudaStreamPerThread));
             cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
 
             // Positive control on the host.
@@ -212,8 +213,7 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
                 }
             }
             else {
-                std::cout << "Test failed for FFTW positive control. Value at zero is  " << positive_control.real_values[0] << std::endl;
-                MyTestPrintAndExit(" ");
+                MyTestPrintAndExit(false, "Test failed for FFTW positive control. Value at zero is " + std::to_string(positive_control.real_values[0]));
             }
 
             cuFFT_output.create_timing_events( );
@@ -240,30 +240,27 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
                 // FT.CrossCorrelate(targetFT.d_ptr.momentum_space, false);
                 // Will type deduction work here?
                 MyFFTDebugPrintWithDetails("Calling FwdImageInvFFT");
-                FT.FwdImageInvFFT(noop, conj_mul, noop);
+                FT.FwdImageInvFFT(FT_buffer, targetFT_buffer, noop, conj_mul, noop);
             }
             else {
                 MyFFTDebugPrintWithDetails("Calling Fwd then Inv");
-                FT.FwdFFT( );
-                FT.InvFFT( );
+                FT.FwdFFT(FT_buffer);
+                FT.InvFFT(FT_buffer);
             }
 
             bool continue_debugging;
             if ( is_size_change_decrease ) {
                 // Because the output is smaller than the input, we just copy to FT input.
                 // FIXME: In reality, we didn't need to allocate FT_output at all in this case
-                FT.CopyDeviceToHostAndSynchronize(FT_input.real_values, false);
+                FT.CopyDeviceToHostAndSynchronize(FT_input.real_values);
                 continue_debugging = debug_partial_fft<FFT_DEBUG_STAGE, Rank>(FT_input, fwd_dims_in, fwd_dims_out, inv_dims_in, inv_dims_out, __LINE__);
             }
             else {
                 // the output is equal or > the input, so we can always copy there.
-                FT.CopyDeviceToHostAndSynchronize(FT_output.real_values, false, false);
+                FT.CopyDeviceToHostAndSynchronize(FT_output.real_values);
                 continue_debugging = debug_partial_fft<FFT_DEBUG_STAGE, Rank>(FT_output, fwd_dims_in, fwd_dims_out, inv_dims_in, inv_dims_out, __LINE__);
             }
-
-            if ( ! continue_debugging ) {
-                MyTestPrintAndExit(" ");
-            }
+            MyTestPrintAndExit(continue_debugging, "Partial FFT debug stage " + std::to_string(FFT_DEBUG_STAGE));
 
             if ( is_size_change_decrease ) {
                 CheckUnitImpulseRealImage(FT_input, __LINE__);
@@ -309,11 +306,11 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
                 if ( set_conjMult_callback || is_size_change_decrease ) {
                     //   FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
                     // Will type deduction work here?
-                    FT.FwdImageInvFFT(noop, conj_mul, noop);
+                    FT.FwdImageInvFFT(FT_buffer, targetFT_buffer, noop, conj_mul, noop);
                 }
                 else {
-                    FT.FwdFFT( );
-                    FT.InvFFT( );
+                    FT.FwdFFT(FT_buffer);
+                    FT.InvFFT(FT_buffer);
                 }
             }
             cuFFT_output.record_stop( );
@@ -325,7 +322,7 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
             // {
             //   precheck;
             //   cufftReal* overlap_pointer;
-            //   overlap_pointer = cuFFT.d_ptr.position_space;
+            //   overlap_pointer = cuFFT_buffer;
             //   cuFFT_output.SetClipIntoCallback(overlap_pointer, cuFFT_input.size.x, cuFFT_input.size.y, cuFFT_input.size.w*2);
             //   postcheck;
             // }
@@ -333,7 +330,7 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
             if ( set_conjMult_callback ) {
                 precheck;
                 // FIXME scaling factor
-                cuFFT_output.SetComplexConjMultiplyAndLoadCallBack((cufftComplex*)targetFT.d_ptr.momentum_space_buffer, 1.0f);
+                cuFFT_output.SetComplexConjMultiplyAndLoadCallBack((cufftComplex*)cuFFT_buffer, 1.0f);
                 postcheck;
             }
 
@@ -344,11 +341,11 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
                 if ( is_size_change_decrease ) {
 
                     precheck;
-                    cudaErr(cufftExecR2C(cuFFT_input.cuda_plan_forward, (cufftReal*)cuFFT.d_ptr.position_space, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer));
+                    cudaErr(cufftExecR2C(cuFFT_input.cuda_plan_forward, (cufftReal*)cuFFT_buffer, (cufftComplex*)cuFFT_buffer));
                     postcheck;
 
                     precheck;
-                    cudaErr(cufftExecC2R(cuFFT_input.cuda_plan_inverse, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer, (cufftReal*)cuFFT.d_ptr.position_space));
+                    cudaErr(cufftExecC2R(cuFFT_input.cuda_plan_inverse, (cufftComplex*)cuFFT_buffer, (cufftReal*)cuFFT_buffer));
                     postcheck;
                 }
                 else {
@@ -357,11 +354,11 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
                     // cuFFT.CopyDeviceToHostAndSynchronize(cuFFT_output.real_values,false);
 
                     precheck;
-                    cudaErr(cufftExecR2C(cuFFT_output.cuda_plan_forward, (cufftReal*)cuFFT.d_ptr.position_space, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer));
+                    cudaErr(cufftExecR2C(cuFFT_output.cuda_plan_forward, (cufftReal*)cuFFT_buffer, (cufftComplex*)cuFFT_buffer));
                     postcheck;
 
                     precheck;
-                    cudaErr(cufftExecC2R(cuFFT_output.cuda_plan_inverse, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer, (cufftReal*)cuFFT.d_ptr.position_space));
+                    cudaErr(cufftExecC2R(cuFFT_output.cuda_plan_inverse, (cufftComplex*)cuFFT_buffer, (cufftReal*)cuFFT_buffer));
                     postcheck;
                 }
 
@@ -369,25 +366,25 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
                 for ( int i = 0; i < n_loops; ++i ) {
                     // std::cout << i << "i / " << n_loops << "n_loops" << std::endl;
                     if ( set_conjMult_callback )
-                        cuFFT.ClipIntoTopLeft( );
+                        cuFFT.ClipIntoTopLeft(cuFFT_buffer);
                     // cuFFT.ClipIntoReal(input_size.x/2, input_size.y/2, input_size.z/2);
 
                     if ( is_size_change_decrease ) {
                         precheck;
-                        cudaErr(cufftExecR2C(cuFFT_input.cuda_plan_forward, (cufftReal*)cuFFT.d_ptr.position_space, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer));
+                        cudaErr(cufftExecR2C(cuFFT_input.cuda_plan_forward, (cufftReal*)cuFFT_buffer, (cufftComplex*)cuFFT_buffer));
                         postcheck;
 
                         precheck;
-                        cudaErr(cufftExecC2R(cuFFT_input.cuda_plan_inverse, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer, (cufftReal*)cuFFT.d_ptr.position_space));
+                        cudaErr(cufftExecC2R(cuFFT_input.cuda_plan_inverse, (cufftComplex*)cuFFT_buffer, (cufftReal*)cuFFT_buffer));
                         postcheck;
                     }
                     else {
                         precheck;
-                        cudaErr(cufftExecR2C(cuFFT_output.cuda_plan_forward, (cufftReal*)cuFFT.d_ptr.position_space, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer));
+                        cudaErr(cufftExecR2C(cuFFT_output.cuda_plan_forward, (cufftReal*)cuFFT_buffer, (cufftComplex*)cuFFT_buffer));
                         postcheck;
 
                         precheck;
-                        cudaErr(cufftExecC2R(cuFFT_output.cuda_plan_inverse, (cufftComplex*)cuFFT.d_ptr.momentum_space_buffer, (cufftReal*)cuFFT.d_ptr.position_space));
+                        cudaErr(cufftExecC2R(cuFFT_output.cuda_plan_inverse, (cufftComplex*)cuFFT_buffer, (cufftReal*)cuFFT_buffer));
                         postcheck;
                     }
                 }
@@ -401,6 +398,10 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
 
             oSize++;
             // We don't want to loop if the size is not actually changing.
+            cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
+            cudaErr(cudaFree(FT_buffer));
+            cudaErr(cudaFree(cuFFT_buffer));
+            cudaErr(cudaFree(targetFT_buffer));
         } // while loop over pad to size
     } // for loop over pad from size
 }

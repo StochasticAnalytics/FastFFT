@@ -203,8 +203,7 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
                 }
             }
             else {
-                std::cout << "Test failed for FFTW positive control. Value at zero is  " << positive_control.real_values[0] << std::endl;
-                MyTestPrintAndExit(" ");
+                MyTestPrintAndExit(false, "Test failed for FFTW positive control. Value at zero is  " + std::to_string(positive_control.real_values[0]));
             }
 
             cuFFT_output.create_timing_events( );
@@ -242,7 +241,7 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
             bool continue_debugging;
             if ( is_size_change_decrease ) {
                 // Because the output is smaller than the input, we just copy to FT input.
-                // FIXME: In reality, we didn't need to allocate FT_output at all in this case
+                // TODO: In reality, we didn't need to allocate FT_output at all in this case
                 FT.CopyDeviceToHostAndSynchronize(FT_input.real_values);
                 continue_debugging = debug_partial_fft<FFT_DEBUG_STAGE, Rank>(FT_input, fwd_dims_in, fwd_dims_out, inv_dims_in, inv_dims_out, __LINE__);
             }
@@ -251,10 +250,7 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
                 FT.CopyDeviceToHostAndSynchronize(FT_output.real_values);
                 continue_debugging = debug_partial_fft<FFT_DEBUG_STAGE, Rank>(FT_output, fwd_dims_in, fwd_dims_out, inv_dims_in, inv_dims_out, __LINE__);
             }
-
-            if ( ! continue_debugging ) {
-                MyTestPrintAndExit(" ");
-            }
+            MyTestPrintAndExit(continue_debugging, "Partial FFT debug stage " + std::to_string(FFT_DEBUG_STAGE));
 
             if ( is_size_change_decrease ) {
                 CheckUnitImpulseRealImage(FT_input, __LINE__);
@@ -323,7 +319,6 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
 
             if ( set_conjMult_callback ) {
                 precheck;
-                // FIXME scaling factor
                 cuFFT_output.SetComplexConjMultiplyAndLoadCallBack((cufftComplex*)cuFFT_buffer, 1.0f);
                 postcheck;
             }

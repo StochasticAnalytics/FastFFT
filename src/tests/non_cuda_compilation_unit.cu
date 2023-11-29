@@ -13,8 +13,8 @@ int main(int argc, char** argv) {
     float* d_input = nullptr;
 
     // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
-    FT.SetForwardFFTPlan(input_size, input_size, 1, input_size, input_size, 1, true);
-    FT.SetInverseFFTPlan(input_size, input_size, 1, input_size, input_size, 1, false);
+    FT.SetForwardFFTPlan(input_size, input_size, 1, input_size, input_size, 1);
+    FT.SetInverseFFTPlan(input_size, input_size, 1, input_size, input_size, 1);
 
     // The padding (dims.w) is calculated based on the setup
     short4 dims_in  = FT.ReturnFwdInputDimensions( );

@@ -78,8 +78,6 @@ bool const_image_test(std::vector<int>& size) {
             init_passed[n] = false;
         }
 
-        // MyFFTDebugAssertTestTrue( sum == dims_out.x*dims_out.y*dims_out.z,"Unit impulse Init ");
-
         host_output.FwdFFT( );
 
         bool test_passed = true;
@@ -96,7 +94,6 @@ bool const_image_test(std::vector<int>& size) {
             all_passed     = false;
             FFTW_passed[n] = false;
         }
-        // MyFFTDebugAssertTestTrue( test_passed, "FFTW unit impulse forward FFT");
 
         FT.SetToConstant(host_output.real_values, host_output.real_memory_allocated, 1.0f);
 
@@ -130,16 +127,16 @@ bool const_image_test(std::vector<int>& size) {
             // Recast the position space buffer and pass it in as if it were an external, device, __half* pointer.
 
             FT_fp16.FwdFFT(output_buffer_fp16);
-            cudaErr(cudaMemcpy(host_output.real_values, output_buffer_fp16, sizeof(__half) * host_output.real_memory_allocated, cudaMemcpyDeviceToHost));
+            std::cerr << "output buffer fp16 " << output_buffer_fp16 << std::endl;
+            FT.SetToConstant(host_output.real_values, host_output.real_memory_allocated, -1.0f);
+            FT.CopyDeviceToHostAndSynchronize(host_output.real_values);
             host_output.ConvertFP16ToFP32( );
         }
         else {
+            std::cerr << "output buffer fp32 " << output_buffer_fp32 << std::endl;
             FT.FwdFFT(output_buffer_fp32);
-            // in buffer, do not deallocate, do not unpin memory
-            if ( FT.is_in_buffer_memory )
-                cudaErr(cudaMemcpy(host_output.real_values, FT.GetDeviceBufferPointer( ), sizeof(float) * host_output.real_memory_allocated, cudaMemcpyDeviceToHost));
-            else
-                cudaErr(cudaMemcpy(host_output.real_values, output_buffer_fp32, sizeof(float) * host_output.real_memory_allocated, cudaMemcpyDeviceToHost));
+            FT.SetToConstant(host_output.real_values, host_output.real_memory_allocated, -1.0f);
+            FT.CopyDeviceToHostAndSynchronize(host_output.real_values);
         }
 
         test_passed = true;
@@ -157,8 +154,7 @@ bool const_image_test(std::vector<int>& size) {
         if constexpr ( FFT_DEBUG_STAGE < 5 ) {
             continue_debugging = debug_partial_fft<FFT_DEBUG_STAGE, Rank>(host_output, dims_in, dims_out, dims_in, dims_out, __LINE__);
         }
-        if ( ! continue_debugging )
-            std::abort( );
+        MyTestPrintAndExit(continue_debugging, "Partial FFT debug stage " + std::to_string(FFT_DEBUG_STAGE));
 
         if ( test_passed == false ) {
             all_passed                = false;
@@ -176,10 +172,11 @@ bool const_image_test(std::vector<int>& size) {
         }
         else {
             FT.InvFFT(output_buffer_fp32);
-            if ( FT.is_in_buffer_memory )
-                cudaErr(cudaMemcpy(host_output.real_values, FT.GetDeviceBufferPointer( ), sizeof(float) * host_output.real_memory_allocated, cudaMemcpyDeviceToHost));
-            else
-                cudaErr(cudaMemcpy(host_output.real_values, output_buffer_fp32, sizeof(float) * host_output.real_memory_allocated, cudaMemcpyDeviceToHost));
+            // FIXME
+            // if ( FT.is_in_buffer_memory )
+            //     cudaErr(cudaMemcpy(host_output.real_values, FT.GetDeviceBufferPointer( ), sizeof(float) * host_output.real_memory_allocated, cudaMemcpyDeviceToHost));
+            // else
+            cudaErr(cudaMemcpy(host_output.real_values, output_buffer_fp32, sizeof(float) * host_output.real_memory_allocated, cudaMemcpyDeviceToHost));
         }
 
         if constexpr ( FFT_DEBUG_STAGE > 4 ) {
@@ -197,6 +194,13 @@ bool const_image_test(std::vector<int>& size) {
         }
         std::cerr << "sum" << sum << " full sum " << full_sum << std::endl;
         MyFFTDebugAssertTestTrue(sum == full_sum, "FastFFT constant image round trip for size " + std::to_string(dims_in.x));
+
+        if constexpr ( use_fp16_io_buffers ) {
+            cudaErr(cudaFree(output_buffer_fp16));
+        }
+        else {
+            cudaErr(cudaFree(output_buffer_fp32));
+        }
     } // loop over sizes
 
     if ( all_passed ) {
@@ -231,11 +235,14 @@ int main(int argc, char** argv) {
     FastFFT::CheckInputArgs(argc, argv, text_line, run_2d_unit_tests, run_3d_unit_tests);
 
     if ( run_2d_unit_tests ) {
+        constexpr bool start_with_fp16 = true;
+        constexpr bool start_with_fp32 = ! start_with_fp16;
         std::cerr << "line 1" << std::endl;
-        if ( ! const_image_test<2, false>(FastFFT::test_size) )
+        if ( ! const_image_test<2, start_with_fp16>(FastFFT::test_size) )
             return 1;
+
         std::cerr << "line 2" << std::endl;
-        if ( ! const_image_test<2, true>(FastFFT::test_size) )
+        if ( ! const_image_test<2, start_with_fp32>(FastFFT::test_size) )
             return 1;
     }
 

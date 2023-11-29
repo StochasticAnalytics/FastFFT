@@ -17,13 +17,25 @@
 
 namespace FastFFT {
 
+// TODO: this may be expanded, for now it is to be used in the case where we have
+// packed the real values of a c2r into the first half of the complex array.
+// The output type pointer needs to be cast to the correct type AND posibly converted
+template <bool flag = false>
+inline void static_no_match( ) { static_assert(flag, "no match"); }
+
+template <bool flag = false>
+inline void static_no_doubles( ) { static_assert(flag, "no doubles are allowed"); }
+
+template <bool flag = false>
+inline void static_no_half_support_yet( ) { static_assert(flag, "no __half support yet"); }
+
 // TODO: Device pointers are probably no longer needed, and only depend on InputType
 // TODO: Add a method to set the cuda stream
-template <typename ComputeBaseType, typename InputType, class OtherImageType>
+template <class C, class I, class OI>
 struct DevicePointers {
     // Use this to catch unsupported input/ compute types and throw exception.
-    int* buffer_1{ };
-    int* buffer_2{ };
+    void* buffer_1;
+    void* buffer_2;
 };
 
 template <>
@@ -38,20 +50,10 @@ struct DevicePointers<float*, __half*, float*> {
     __half2* buffer_2{ };
 };
 
-// Input real fp16, compute fp32, output real/complex fp16
-// Assuming the image to search has the same base type as the input and wil
-// be promoted for search if needed
 template <>
-struct DevicePointers<__half*, float*, __half*> {
-    __half*  position_space;
-    __half*  position_space_buffer;
-    float2*  momentum_space;
-    float2*  momentum_space_buffer;
-    __half2* image_to_search;
-    float2*  image_to_search_and_convert;
-    __half*  external_input;
-    __half*  external_output;
-    __half2* external_output_complex;
+struct DevicePointers<float*, __half*, __half*> {
+    __half2* buffer_1{ };
+    __half2* buffer_2{ };
 };
 
 /**
@@ -115,11 +117,24 @@ class FourierTransformer {
     void CopyHostToDevice(InputType* input_pointer, int n_elements_to_copy = 0);
 
     void CopyDeviceToHostAndSynchronize(InputType* input_pointer, int n_elements_to_copy = 0) {
+        SetDimensions(DimensionCheckType::CopyToHost);
+        int n_to_actually_copy = (n_elements_to_copy > 0) ? n_elements_to_copy : memory_size_to_copy_;
         if ( is_in_buffer_memory ) {
-            cudaErr(cudaMemcpyAsync(input_pointer, d_ptr.buffer_1, n_elements_to_copy * sizeof(InputType), cudaMemcpyDeviceToHost, cudaStreamPerThread));
+            std::cerr << " in buffer memory " << std::endl;
+            std::cerr << "  buffer_1 " << d_ptr.buffer_1 << std::endl;
+            std::cerr << "  buffer_2 " << d_ptr.buffer_2 << std::endl;
+            std::cerr << " input_ptr " << input_pointer << std::endl;
+            std::cerr << "copying " << n_to_actually_copy << " elements" << std::endl;
+            cudaErr(cudaMemcpyAsync(input_pointer, d_ptr.buffer_1, n_to_actually_copy * sizeof(InputType), cudaMemcpyDeviceToHost, cudaStreamPerThread));
         }
         else {
-            cudaErr(cudaMemcpyAsync(input_pointer, d_ptr.buffer_2, n_elements_to_copy * sizeof(InputType), cudaMemcpyDeviceToHost, cudaStreamPerThread));
+            std::cerr << " not in buffer memory " << std::endl;
+            std::cerr << "  buffer_1 " << d_ptr.buffer_1 << std::endl;
+            std::cerr << "  buffer_2 " << d_ptr.buffer_2 << std::endl;
+            std::cerr << " input_ptr " << input_pointer << std::endl;
+            std::cerr << "copying " << n_to_actually_copy << " elements" << std::endl;
+
+            cudaErr(cudaMemcpyAsync(input_pointer, d_ptr.buffer_2, n_to_actually_copy * sizeof(InputType), cudaMemcpyDeviceToHost, cudaStreamPerThread));
         }
         cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
     };
@@ -150,34 +165,28 @@ class FourierTransformer {
     // FFT calls
 
     // TODO: when picking up tomorrow, remove default values for input pointers and move EnableIf to the declarations for the generic functions and instantiate these from fastFFT.cus
+    // Following this
     // Alias for FwdFFT, is there any overhead?
     template <class PreOpType   = nullptr_t,
               class IntraOpType = nullptr_t>
-    EnableIf<IsPointerOrNullPtrType<PreOpType, IntraOpType>>
-    FwdFFT(InputType*  input_ptr = nullptr,
-           PreOpType   pre_op    = nullptr,
-           IntraOpType intra_op  = nullptr) {
-        Generic_Fwd<PreOpType, IntraOpType>(input_ptr, pre_op, intra_op);
-    }
+    void FwdFFT(InputType*  input_ptr,
+                PreOpType   pre_op   = nullptr,
+                IntraOpType intra_op = nullptr);
 
     template <class IntraOpType = nullptr_t,
               class PostOpType  = nullptr_t>
-    EnableIf<IsPointerOrNullPtrType<IntraOpType, PostOpType>>
-    InvFFT(InputType*  input_ptr = nullptr,
-           IntraOpType intra_op  = nullptr,
-           PostOpType  post_op   = nullptr) {
-
-        Generic_Inv<IntraOpType, PostOpType>(input_ptr, intra_op, post_op);
-    }
+    void InvFFT(InputType*  input_ptr,
+                IntraOpType intra_op = nullptr,
+                PostOpType  post_op  = nullptr);
 
     template <class PreOpType   = nullptr_t,
               class IntraOpType = nullptr_t,
               class PostOpType  = nullptr_t>
-    void FwdImageInvFFT(InputType*      input_ptr       = nullptr,
-                        OtherImageType* image_to_search = nullptr,
-                        PreOpType       pre_op          = nullptr,
-                        IntraOpType     intra_op        = nullptr,
-                        PostOpType      post_op         = nullptr) {
+    void FwdImageInvFFT(InputType*      input_ptr,
+                        OtherImageType* image_to_search,
+                        PreOpType       pre_op   = nullptr,
+                        IntraOpType     intra_op = nullptr,
+                        PostOpType      post_op  = nullptr) {
         Generic_Fwd_Image_Inv<PreOpType, IntraOpType, PostOpType>(input_ptr, image_to_search, pre_op, intra_op, post_op);
     }
 
@@ -483,15 +492,29 @@ class FourierTransformer {
     std::vector<std::string>
             KernelName{"r2c_decomposed",
                        "r2c_decomposed_transposed",
-                       "r2c_none_XY", "r2c_none_XZ",
-                       "r2c_decrease_XY", "r2c_increase_XY", "r2c_increase_XZ",
-                       "c2c_fwd_none", "c2c_fwd_none_XYZ", "c2c_fwd_increase", "c2c_fwd_increase", "c2c_fwd_increase_XYZ",
-                       "c2c_inv_none", "c2c_inv_none_XZ", "c2c_inv_none_XYZ", "c2c_inv_increase", "c2c_inv_increase",
+                       "r2c_none_XY",
+                       "r2c_none_XZ",
+                       "r2c_decrease_XY",
+                       "r2c_increase_XY",
+                       "r2c_increase_XZ",
+                       "c2c_fwd_none",
+                       "c2c_fwd_none_XYZ",
+                       "c2c_fwd_decrease",
+                       "c2c_fwd_increase",
+                       "c2c_fwd_increase_XYZ",
+                       "c2c_inv_none",
+                       "c2c_inv_none_XZ",
+                       "c2c_inv_none_XYZ",
+                       "c2c_inv_decrease",
+                       "c2c_inv_increase",
                        "c2c_fwd_decomposed",
                        "c2c_inv_decomposed",
                        "c2r_decomposed",
                        "c2r_decomposed_transposed",
-                       "c2r_none", "c2r_none_XY", "c2r_decrease_XY", "c2r_increase",
+                       "c2r_none",
+                       "c2r_none_XY",
+                       "c2r_decrease_XY",
+                       "c2r_increase",
                        "xcorr_fwd_increase_inv_none",
                        "xcorr_fwd_decrease_inv_none",
                        "xcorr_fwd_none_inv_decrease",
@@ -499,28 +522,49 @@ class FourierTransformer {
                        "xcorr_decomposed",
                        "generic_fwd_increase_op_inv_none"};
 
+    // All in a column so it is obvious if a "==" is missing which will of course break the or co nditions and
+    // always evaluate true.
     inline bool IsThreadType(KernelType kernel_type) {
-        if ( kernel_type == r2c_decomposed || kernel_type == r2c_decomposed_transposed ||
-             kernel_type == c2c_fwd_decomposed || c2c_inv_decomposed ||
-             kernel_type == c2r_decomposed || kernel_type == c2r_decomposed_transposed || kernel_type == xcorr_decomposed ) {
+        if ( kernel_type == r2c_decomposed ||
+             kernel_type == r2c_decomposed_transposed ||
+             kernel_type == c2c_fwd_decomposed ||
+             kernel_type == c2c_inv_decomposed ||
+             kernel_type == c2r_decomposed ||
+             kernel_type == c2r_decomposed_transposed ||
+             kernel_type == xcorr_decomposed ) {
             return true;
         }
-
-        else if ( kernel_type == r2c_none_XY || kernel_type == r2c_none_XZ ||
-                  kernel_type == r2c_decrease_XY || kernel_type == r2c_increase_XY || kernel_type == r2c_increase_XZ ||
-                  kernel_type == c2c_fwd_none || c2c_fwd_none_XYZ ||
-                  kernel_type == c2c_fwd_decrease ||
-                  kernel_type == c2c_fwd_increase || kernel_type == c2c_fwd_increase_XYZ ||
-                  kernel_type == c2c_inv_none || kernel_type == c2c_inv_none_XZ || kernel_type == c2c_inv_none_XYZ ||
-                  kernel_type == c2c_inv_decrease || kernel_type == c2c_inv_increase ||
-                  kernel_type == c2r_none || kernel_type == c2r_none_XY || kernel_type == c2r_decrease_XY || kernel_type == c2r_increase ||
-                  kernel_type == xcorr_fwd_increase_inv_none || kernel_type == xcorr_fwd_decrease_inv_none || kernel_type == xcorr_fwd_none_inv_decrease || kernel_type == xcorr_fwd_decrease_inv_decrease ||
-                  kernel_type == generic_fwd_increase_op_inv_none ) {
-            return false;
-        }
         else {
-            std::cerr << "Function IsThreadType does not recognize the kernel type ( " << KernelName[kernel_type] << " )" << std::endl;
-            exit(-1);
+            if ( kernel_type == r2c_none_XY ||
+                 kernel_type == r2c_none_XZ ||
+                 kernel_type == r2c_decrease_XY ||
+                 kernel_type == r2c_increase_XY ||
+                 kernel_type == r2c_increase_XZ ||
+                 kernel_type == c2c_fwd_none ||
+                 kernel_type == c2c_fwd_none_XYZ ||
+                 kernel_type == c2c_fwd_decrease ||
+                 kernel_type == c2c_fwd_increase ||
+                 kernel_type == c2c_fwd_increase_XYZ ||
+                 kernel_type == c2c_inv_none ||
+                 kernel_type == c2c_inv_none_XZ ||
+                 kernel_type == c2c_inv_none_XYZ ||
+                 kernel_type == c2c_inv_decrease ||
+                 kernel_type == c2c_inv_increase ||
+                 kernel_type == c2r_none ||
+                 kernel_type == c2r_none_XY ||
+                 kernel_type == c2r_decrease_XY ||
+                 kernel_type == c2r_increase ||
+                 kernel_type == xcorr_fwd_increase_inv_none ||
+                 kernel_type == xcorr_fwd_decrease_inv_none ||
+                 kernel_type == xcorr_fwd_none_inv_decrease ||
+                 kernel_type == xcorr_fwd_decrease_inv_decrease ||
+                 kernel_type == generic_fwd_increase_op_inv_none ) {
+                return false;
+            }
+            else {
+                std::cerr << "Function IsThreadType does not recognize the kernel type ( " << KernelName[kernel_type] << " )" << std::endl;
+                exit(-1);
+            }
         }
     };
 
@@ -613,7 +657,7 @@ class FourierTransformer {
     template <class PreOpType,
               class IntraOpType,
               class PostOpType>
-    EnableIf<HasIntraOpFunctor<IntraOpType>>
+    EnableIf<HasIntraOpFunctor<IntraOpType> && IsAllowedInputType<InputType, OtherImageType>>
     Generic_Fwd_Image_Inv(InputType*      input_ptr,
                           OtherImageType* image_to_search,
                           PreOpType       pre_op,
@@ -622,15 +666,17 @@ class FourierTransformer {
 
     template <class PreOpType,
               class IntraOpType>
-    void Generic_Fwd(InputType*  input_ptr,
-                     PreOpType   pre_op,
-                     IntraOpType intra_op);
+    EnableIf<IsAllowedInputType<InputType>>
+    Generic_Fwd(InputType*  input_ptr,
+                PreOpType   pre_op,
+                IntraOpType intra_op);
 
     template <class IntraOpType,
               class PostOpType>
-    void Generic_Inv(InputType*  input_ptr,
-                     IntraOpType intra_op,
-                     PostOpType  post_op);
+    EnableIf<IsAllowedInputType<InputType>>
+    Generic_Inv(InputType*  input_ptr,
+                IntraOpType intra_op,
+                PostOpType  post_op);
 
     inline bool IsTransormAlongZ(KernelType kernel_type) {
         if ( kernel_type == c2c_fwd_none_XYZ || kernel_type == c2c_fwd_increase_XYZ ||
@@ -674,6 +720,7 @@ class FourierTransformer {
 
     // Input is real or complex inferred from InputType
     DevicePointers<ComputeBaseType*, InputType*, OtherImageType*> d_ptr;
+    // Check to make sure we haven't fouled up the explicit instantiation of DevicePointers
 
 }; // class Fourier Transformer
 
