@@ -8,7 +8,7 @@ int main(int argc, char** argv) {
 
     const int input_size = 64;
 
-    FastFFT::FourierTransformer<float, float, float, 2> FT;
+    FastFFT::FourierTransformer<float, float, float2, 2> FT;
 
     float* d_input = nullptr;
 

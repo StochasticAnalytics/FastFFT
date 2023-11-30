@@ -46,7 +46,7 @@ bool unit_impulse_test(std::vector<int> size, bool do_increase_size) {
 
             // We just make one instance of the FourierTransformer class, with calc type float.
             // For the time being input and output are also float. TODO calc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
-            FastFFT::FourierTransformer<float, float, float, Rank> FT;
+            FastFFT::FourierTransformer<float, float, float2, Rank> FT;
 
             float* FT_buffer;
             // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU

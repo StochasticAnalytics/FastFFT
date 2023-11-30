@@ -61,6 +61,9 @@ FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::FourierTra
     // exit(0);
     // This assumption precludes the use of a packed _half2 that is really RRII layout for two arrays of __half.
     static_assert(IsAllowedRealType<InputType> || IsAllowedComplexType<InputType>, "Input type must be either float or __half");
+
+    // Make sure an explicit specializtion for the device pointers is available
+    static_assert(! std::is_same_v<decltype(d_ptr.buffer_1), std::nullptr_t>, "Device pointer type not specialized");
 }
 
 template <class ComputeBaseType, class InputType, class OtherImageType, int Rank>
@@ -3207,10 +3210,10 @@ using namespace FastFFT::KernelFunction;
                                                                                                                                           my_functor<float, 2, IKF_t::CONJ_MUL>, \
                                                                                                                                           my_functor<float, 0, IKF_t::NOOP>);
 
-INSTANTIATE(float, float, float, 2);
-INSTANTIATE(float, __half, __half, 2);
-INSTANTIATE(float, float, float, 3);
-INSTANTIATE(float, __half, __half, 3);
+INSTANTIATE(float, float, float2, 2);
+INSTANTIATE(float, __half, __half2, 2);
+INSTANTIATE(float, float, float2, 3);
+INSTANTIATE(float, __half, __half2, 3);
 #undef INSTANTIATE
 
 } // namespace FastFFT

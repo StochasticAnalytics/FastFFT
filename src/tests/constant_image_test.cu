@@ -37,8 +37,8 @@ bool const_image_test(std::vector<int>& size) {
 
         // We just make one instance of the FourierTransformer class, with calc type float.
         // For the time being input and output are also float. TODO calc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
-        FastFFT::FourierTransformer<float, float, float, Rank>   FT;
-        FastFFT::FourierTransformer<float, __half, __half, Rank> FT_fp16;
+        FastFFT::FourierTransformer<float, float, float2, Rank>   FT;
+        FastFFT::FourierTransformer<float, __half, __half2, Rank> FT_fp16;
 
         // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
         FT.SetForwardFFTPlan(input_size.x, input_size.y, input_size.z, output_size.x, output_size.y, output_size.z);
@@ -125,14 +125,11 @@ bool const_image_test(std::vector<int>& size) {
         // bool swap_real_space_quadrants = false;
         if constexpr ( use_fp16_io_buffers ) {
             // Recast the position space buffer and pass it in as if it were an external, device, __half* pointer.
-
             FT_fp16.FwdFFT(output_buffer_fp16);
-            std::cerr << "output buffer fp16 " << output_buffer_fp16 << std::endl;
             FT_fp16.CopyDeviceToHostAndSynchronize(reinterpret_cast<__half*>(host_output.real_values));
             host_output.ConvertFP16ToFP32( );
         }
         else {
-            std::cerr << "output buffer fp32 " << output_buffer_fp32 << std::endl;
             FT.FwdFFT(output_buffer_fp32);
             FT.CopyDeviceToHostAndSynchronize(host_output.real_values);
         }
@@ -164,17 +161,13 @@ bool const_image_test(std::vector<int>& size) {
         if constexpr ( use_fp16_io_buffers ) {
 
             FT_fp16.InvFFT(output_buffer_fp16);
-            cudaErr(cudaMemcpy(host_output.real_values, output_buffer_fp16, sizeof(__half) * host_output.real_memory_allocated, cudaMemcpyDeviceToHost));
+            FT_fp16.CopyDeviceToHostAndSynchronize(reinterpret_cast<__half*>(host_output.real_values));
             host_output.data_is_fp16 = true; // we need to over-ride this as we already convertted but are overwriting.
             host_output.ConvertFP16ToFP32( );
         }
         else {
             FT.InvFFT(output_buffer_fp32);
-            // FIXME
-            // if ( FT.is_in_buffer_memory )
-            //     cudaErr(cudaMemcpy(host_output.real_values, FT.GetDeviceBufferPointer( ), sizeof(float) * host_output.real_memory_allocated, cudaMemcpyDeviceToHost));
-            // else
-            cudaErr(cudaMemcpy(host_output.real_values, output_buffer_fp32, sizeof(float) * host_output.real_memory_allocated, cudaMemcpyDeviceToHost));
+            FT.CopyDeviceToHostAndSynchronize(host_output.real_values);
         }
 
         if constexpr ( FFT_DEBUG_STAGE > 4 ) {
@@ -233,7 +226,7 @@ int main(int argc, char** argv) {
     FastFFT::CheckInputArgs(argc, argv, text_line, run_2d_unit_tests, run_3d_unit_tests);
 
     if ( run_2d_unit_tests ) {
-        constexpr bool start_with_fp16 = true;
+        constexpr bool start_with_fp16 = false;
         constexpr bool start_with_fp32 = ! start_with_fp16;
         std::cerr << "line 1" << std::endl;
         if ( ! const_image_test<2, start_with_fp16>(FastFFT::test_size) )

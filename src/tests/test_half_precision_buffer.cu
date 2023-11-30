@@ -13,7 +13,7 @@ bool half_precision_buffer_test(int size) {
     Image<float, float2> host_input_fp32(input_size);
     Image<float, float2> host_output_fp16(input_size);
 
-    FastFFT::FourierTransformer<float, float, float> FT;
+    FastFFT::FourierTransformer<float, float, float2> FT;
 
     host_input_fp32.Allocate(false);
     host_output_fp16.Allocate(false);

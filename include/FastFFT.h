@@ -34,24 +34,24 @@ inline void static_no_half_support_yet( ) { static_assert(flag, "no __half suppo
 template <class C, class I, class OI>
 struct DevicePointers {
     // Use this to catch unsupported input/ compute types and throw exception.
-    void* buffer_1;
-    void* buffer_2;
+    std::nullptr_t buffer_1;
+    std::nullptr_t buffer_2;
 };
 
 template <>
-struct DevicePointers<float*, float*, float*> {
+struct DevicePointers<float*, float*, float2*> {
     float2* buffer_1{ };
     float2* buffer_2{ };
 };
 
 template <>
-struct DevicePointers<float*, __half*, float*> {
+struct DevicePointers<float*, __half*, float2*> {
     __half2* buffer_1{ };
     __half2* buffer_2{ };
 };
 
 template <>
-struct DevicePointers<float*, __half*, __half*> {
+struct DevicePointers<float*, __half*, __half2*> {
     __half2* buffer_1{ };
     __half2* buffer_2{ };
 };
@@ -65,7 +65,7 @@ struct DevicePointers<float*, __half*, __half*> {
  * @tparam OtherImageType - __half or float. Actual type depends on position/momentum space representation.
  * @tparam Rank - only 2,3 supported. Support for 3d is partial
  */
-template <class ComputeBaseType = float, class InputType = float, class OtherImageType = float, int Rank = 2>
+template <class ComputeBaseType = float, class InputType = float, class OtherImageType = float2, int Rank = 2>
 class FourierTransformer {
 
   public:

@@ -98,10 +98,10 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
 
             // We just make one instance of the FourierTransformer class, with calc type float.
             // For the time being input and output are also float. TODO caFlc optionally either fp16 or nv_bloat16, TODO inputs at lower precision for bandwidth improvement.
-            FastFFT::FourierTransformer<float, float, float, Rank> FT;
+            FastFFT::FourierTransformer<float, float, float2, Rank> FT;
             // Create an instance to copy memory also for the cufft tests.
-            FastFFT::FourierTransformer<float, float, float, Rank> cuFFT;
-            FastFFT::FourierTransformer<float, float, float, Rank> targetFT;
+            FastFFT::FourierTransformer<float, float, float2, Rank> cuFFT;
+            FastFFT::FourierTransformer<float, float, float2, Rank> targetFT;
 
             float* FT_buffer;
             float* cuFFT_buffer;
@@ -240,7 +240,7 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
                 // FT.CrossCorrelate(targetFT.d_ptr.momentum_space, false);
                 // Will type deduction work here?
                 MyFFTDebugPrintWithDetails("Calling FwdImageInvFFT");
-                FT.FwdImageInvFFT(FT_buffer, targetFT_buffer, noop, conj_mul, noop);
+                FT.FwdImageInvFFT(FT_buffer, reinterpret_cast<float2*>(targetFT_buffer), noop, conj_mul, noop);
             }
             else {
                 MyFFTDebugPrintWithDetails("Calling Fwd then Inv");
@@ -306,7 +306,7 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
                 if ( set_conjMult_callback || is_size_change_decrease ) {
                     //   FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
                     // Will type deduction work here?
-                    FT.FwdImageInvFFT(FT_buffer, targetFT_buffer, noop, conj_mul, noop);
+                    FT.FwdImageInvFFT(FT_buffer, reinterpret_cast<float2*>(targetFT_buffer), noop, conj_mul, noop);
                 }
                 else {
                     FT.FwdFFT(FT_buffer);
