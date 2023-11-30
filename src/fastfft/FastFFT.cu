@@ -2564,16 +2564,16 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
 
                     CheckSharedMemory(shared_memory, device_properties);
 #if FFT_DEBUG_STAGE > 6
-                    cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2R_NONE<FFT, data_io_t, data_buffer_t>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));
+                    cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2R_NONE<FFT, data_buffer_t, data_io_t>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));
 
                     if constexpr ( Rank == 1 ) {
                         precheck;
-                        block_fft_kernel_C2R_NONE<FFT, data_io_t, data_buffer_t><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(complex_input, external_data_ptr, LP.mem_offsets, workspace);
+                        block_fft_kernel_C2R_NONE<FFT, data_buffer_t, data_io_t><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(complex_input, external_data_ptr, LP.mem_offsets, workspace);
                         postcheck;
                     }
                     else {
                         precheck;
-                        block_fft_kernel_C2R_NONE<FFT, data_io_t, data_buffer_t><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(intra_complex_input, external_data_ptr, LP.mem_offsets, workspace);
+                        block_fft_kernel_C2R_NONE<FFT, data_buffer_t, data_io_t><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(intra_complex_input, external_data_ptr, LP.mem_offsets, workspace);
                         postcheck;
                     }
                     is_in_buffer_memory = ! is_in_buffer_memory;
@@ -2595,16 +2595,16 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
 
                     CheckSharedMemory(shared_memory, device_properties);
 #if FFT_DEBUG_STAGE > 6
-                    cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2R_NONE_XY<FFT, data_io_t, data_buffer_t>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));
+                    cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2R_NONE_XY<FFT, data_buffer_t, data_io_t>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));
 
                     if constexpr ( Rank == 1 ) {
                         precheck;
-                        block_fft_kernel_C2R_NONE_XY<FFT, data_io_t, data_buffer_t><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(complex_input, external_data_ptr, LP.mem_offsets, workspace);
+                        block_fft_kernel_C2R_NONE_XY<FFT, data_buffer_t, data_io_t><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(complex_input, external_data_ptr, LP.mem_offsets, workspace);
                         postcheck;
                     }
                     else {
                         precheck;
-                        block_fft_kernel_C2R_NONE_XY<FFT, data_io_t, data_buffer_t><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(intra_complex_input, external_data_ptr, LP.mem_offsets, workspace);
+                        block_fft_kernel_C2R_NONE_XY<FFT, data_buffer_t, data_io_t><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(intra_complex_input, external_data_ptr, LP.mem_offsets, workspace);
                         postcheck;
                     }
                     is_in_buffer_memory = ! is_in_buffer_memory;
@@ -2627,15 +2627,15 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
                     CheckSharedMemory(shared_memory, device_properties);
 
 #if FFT_DEBUG_STAGE > 6
-                    cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2R_DECREASE_XY<FFT, data_io_t, data_buffer_t>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));
+                    cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_C2R_DECREASE_XY<FFT, data_buffer_t, data_io_t>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));
                     if constexpr ( Rank == 1 ) {
                         precheck;
-                        block_fft_kernel_C2R_DECREASE_XY<FFT, data_io_t, data_buffer_t><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(complex_input, external_data_ptr, LP.mem_offsets, LP.twiddle_in, LP.Q, workspace);
+                        block_fft_kernel_C2R_DECREASE_XY<FFT, data_buffer_t, data_io_t><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(complex_input, external_data_ptr, LP.mem_offsets, LP.twiddle_in, LP.Q, workspace);
                         postcheck;
                     }
                     else {
                         precheck;
-                        block_fft_kernel_C2R_DECREASE_XY<FFT, data_io_t, data_buffer_t><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(intra_complex_input, external_data_ptr, LP.mem_offsets, LP.twiddle_in, LP.Q, workspace);
+                        block_fft_kernel_C2R_DECREASE_XY<FFT, data_buffer_t, data_io_t><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(intra_complex_input, external_data_ptr, LP.mem_offsets, LP.twiddle_in, LP.Q, workspace);
                         postcheck;
                     }
                     is_in_buffer_memory = ! is_in_buffer_memory;

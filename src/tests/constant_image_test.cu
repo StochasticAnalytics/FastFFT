@@ -183,7 +183,7 @@ bool const_image_test(std::vector<int>& size) {
             all_passed                  = false;
             FastFFT_roundTrip_passed[n] = false;
         }
-        std::cerr << "sum" << sum << " full sum " << full_sum << std::endl;
+        std::cerr << "sum " << sum << " full sum " << full_sum << std::endl;
         MyFFTDebugAssertTestTrue(sum == full_sum, "FastFFT constant image round trip for size " + std::to_string(dims_in.x));
 
         if constexpr ( use_fp16_io_buffers ) {

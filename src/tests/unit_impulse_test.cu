@@ -114,7 +114,7 @@ bool unit_impulse_test(std::vector<int> size, bool do_increase_size) {
 
             FT.FwdFFT(FT_buffer);
 
-            bool continue_debugging;
+            bool continue_debugging = true;
             // We don't want this to break compilation of other tests, so only check at runtime.
             std::cerr << " address of hout output " << host_output.real_values << std::endl;
             std::cerr << " address of FT_buffer " << FT_buffer << std::endl;
@@ -199,7 +199,7 @@ int main(int argc, char** argv) {
     const std::string_view text_line = "unit impulse";
     FastFFT::CheckInputArgs(argc, argv, text_line, run_2d_unit_tests, run_3d_unit_tests);
 
-    constexpr bool do_increase_size = true;
+    constexpr bool do_increase_size = false;
     // TODO: size decrease
     if ( run_2d_unit_tests ) {
         if ( ! unit_impulse_test<2>(FastFFT::test_size, do_increase_size) )
