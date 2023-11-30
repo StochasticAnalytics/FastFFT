@@ -2213,7 +2213,12 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
 
                     CheckSharedMemory(shared_memory, device_properties);
 #if FFT_DEBUG_STAGE > 0
+
                     cudaErr(cudaFuncSetAttribute((void*)block_fft_kernel_R2C_DECREASE_XY<FFT, data_io_t, data_buffer_t>, cudaFuncAttributeMaxDynamicSharedMemorySize, shared_memory));
+                    // PrintState( );
+                    // PrintLaunchParameters(LP);
+                    // std::cerr << "shared mem req " << shared_memory << std::endl;
+                    // std::cerr << "FFT max tbp " << FFT::max_threads_per_block << std::endl;
                     if constexpr ( Rank == 1 ) {
                         precheck;
                         block_fft_kernel_R2C_DECREASE_XY<FFT, data_io_t, data_buffer_t><<<LP.gridDims, LP.threadsPerBlock, shared_memory, cudaStreamPerThread>>>(external_data_ptr, complex_output, LP.mem_offsets, LP.twiddle_in, LP.Q, workspace);

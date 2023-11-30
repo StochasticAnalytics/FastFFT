@@ -79,6 +79,10 @@ endif
 ifeq (${FastFFT_sync_checking},1)
 # If HEAVYERRORCHECKING_FFT is not already asked for, then add it anytime debug_stage < 8 (partial FFTs)
 	DEBUG_FLAGS+=-DHEAVYERRORCHECKING_FFT
+else
+	ifeq (${debug_level}, 4)
+		DEBUG_FLAGS+=-DHEAVYERRORCHECKING_FFT
+	endif
 endif
 
 

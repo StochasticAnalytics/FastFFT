@@ -68,7 +68,7 @@ bool unit_impulse_test(std::vector<int> size, bool do_increase_size) {
             // Minmize the number of calls to malloc which are slow and can lead to fragmentation.
             device_output.real_memory_allocated = std::max(host_input.real_memory_allocated, host_output.real_memory_allocated);
             cudaErr(cudaMallocAsync((void**)&FT_buffer, device_output.real_memory_allocated * sizeof(float), cudaStreamPerThread));
-
+            cudaErr(cudaMemsetAsync(FT_buffer, 0, device_output.real_memory_allocated * sizeof(float), cudaStreamPerThread));
             // In your own programs, you will be handling this memory allocation yourself. We'll just make something here.
             // I think fftwf_malloc may potentially create a different alignment than new/delete, but kinda doubt it. For cisTEM consistency...
             bool set_fftw_plan = true;
@@ -90,8 +90,11 @@ bool unit_impulse_test(std::vector<int> size, bool do_increase_size) {
             // This will exit if fail, so the following bools are not really needed any more.
             CheckUnitImpulseRealImage(host_output, __LINE__);
 
+            // It doesn't really matter which one we copy here, it would make sense to do the smaller one though.
             cudaErr(cudaMemcpyAsync(FT_buffer, host_output.real_values, host_output.real_memory_allocated * sizeof(float), cudaMemcpyHostToDevice, cudaStreamPerThread));
 
+            // We need to wait for the copy to finish before we can do the FFT on the host.
+            cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
             host_output.FwdFFT( );
 
             host_output.fftw_epsilon = host_output.ReturnSumOfComplexAmplitudes(host_output.complex_values, host_output.real_memory_allocated / 2);
@@ -113,20 +116,17 @@ bool unit_impulse_test(std::vector<int> size, bool do_increase_size) {
             // bool swap_real_space_quadrants = true;
 
             FT.FwdFFT(FT_buffer);
-
             bool continue_debugging = true;
             // We don't want this to break compilation of other tests, so only check at runtime.
-            std::cerr << " address of hout output " << host_output.real_values << std::endl;
-            std::cerr << " address of FT_buffer " << FT_buffer << std::endl;
             if constexpr ( FFT_DEBUG_STAGE < 5 ) {
                 if ( do_increase_size ) {
+
                     FT.CopyDeviceToHostAndSynchronize(host_output.real_values);
                     // Right now, only testing a size change on the forward transform,
                     continue_debugging = debug_partial_fft<FFT_DEBUG_STAGE, Rank>(host_output, dims_fwd_in, dims_fwd_out, dims_inv_in, dims_inv_out, __LINE__);
                     sum                = host_output.ReturnSumOfComplexAmplitudes(host_output.complex_values, host_output.real_memory_allocated / 2);
                 }
                 else {
-                    std::cerr << "Copying in constant with n_elem " << FT.ReturnInputMemorySize( ) << std::endl;
                     FT.CopyDeviceToHostAndSynchronize(host_input.real_values, FT.ReturnInputMemorySize( ));
                     continue_debugging = debug_partial_fft<FFT_DEBUG_STAGE, Rank>(host_input, dims_fwd_in, dims_fwd_out, dims_inv_in, dims_inv_out, __LINE__);
                     sum                = host_input.ReturnSumOfComplexAmplitudes(host_input.complex_values, host_input.real_memory_allocated / 2);
@@ -140,8 +140,8 @@ bool unit_impulse_test(std::vector<int> size, bool do_increase_size) {
                     FastFFT_forward_passed[iSize] = false;
                 }
             }
-            MyTestPrintAndExit(continue_debugging, "Partial FFT debug stage " + std::to_string(FFT_DEBUG_STAGE));
 
+            MyTestPrintAndExit(continue_debugging, "Partial FFT debug stage " + std::to_string(FFT_DEBUG_STAGE));
             // MyFFTDebugAssertTestTrue( abs(sum - host_output.fftw_epsilon) < 1e-8, "FastFFT unit impulse forward FFT");
             FT.SetToConstant(host_output.real_values, host_output.real_memory_allocated, 2.0f);
 
@@ -150,7 +150,7 @@ bool unit_impulse_test(std::vector<int> size, bool do_increase_size) {
 
             if constexpr ( FFT_DEBUG_STAGE > 4 ) {
                 // Right now, only testing a size change on the forward transform,
-                continue_debugging = debug_partial_fft<FFT_DEBUG_STAGE, Rank>(host_output, dims_fwd_in, dims_fwd_out, dims_inv_in, dims_inv_out, __LINE__);
+                // continue_debugging = debug_partial_fft<FFT_DEBUG_STAGE, Rank>(host_output, dims_fwd_in, dims_fwd_out, dims_inv_in, dims_inv_out, __LINE__);
 
                 sum = host_output.ReturnSumOfReal(host_output.real_values, dims_fwd_out);
                 if ( sum != dims_fwd_out.x * dims_fwd_out.y * dims_fwd_out.z ) {
@@ -158,7 +158,7 @@ bool unit_impulse_test(std::vector<int> size, bool do_increase_size) {
                     FastFFT_roundTrip_passed[iSize] = false;
                 }
             }
-            MyTestPrintAndExit(continue_debugging, "Partial FFT debug stage " + std::to_string(FFT_DEBUG_STAGE));
+            // MyTestPrintAndExit(continue_debugging, "Partial FFT debug stage " + std::to_string(FFT_DEBUG_STAGE));
 
             // std::cout << "size in/out " << dims_fwd_in.x << ", " << dims_fwd_out.x << std::endl;
             // MyFFTDebugAssertTestTrue( sum == dims_fwd_out.x*dims_fwd_out.y*dims_fwd_out.z,"FastFFT unit impulse round trip FFT");
@@ -181,9 +181,9 @@ bool unit_impulse_test(std::vector<int> size, bool do_increase_size) {
             if ( ! FFTW_passed[n] )
                 std::cout << "    FFTW failed for size " << size[n] << " rank " << Rank << std::endl;
             if ( ! FastFFT_forward_passed[n] )
-                std::cout << "    FastFFT failed for forward transform size " << size[n] << " rank " << Rank << std::endl;
+                std::cout << "    FastFFT failed for forward transform size " << size[n] << " rank " << Rank << " increase " << do_increase_size << std::endl;
             if ( ! FastFFT_roundTrip_passed[n] )
-                std::cout << "    FastFFT failed for roundtrip transform size " << size[n] << " rank " << Rank << std::endl;
+                std::cout << "    FastFFT failed for roundtrip transform size " << size[n] << " rank " << Rank << " increase " << do_increase_size << std::endl;
         }
     }
     return all_passed;
@@ -199,16 +199,21 @@ int main(int argc, char** argv) {
     const std::string_view text_line = "unit impulse";
     FastFFT::CheckInputArgs(argc, argv, text_line, run_2d_unit_tests, run_3d_unit_tests);
 
-    constexpr bool do_increase_size = false;
     // TODO: size decrease
     if ( run_2d_unit_tests ) {
-        if ( ! unit_impulse_test<2>(FastFFT::test_size, do_increase_size) )
+        constexpr bool do_increase_size_first = true;
+        constexpr bool second_round           = ! do_increase_size_first;
+        if ( ! unit_impulse_test<2>(FastFFT::test_size, do_increase_size_first) )
+            return 1;
+        if ( ! unit_impulse_test<2>(FastFFT::test_size, second_round) )
             return 1;
     }
 
     if ( run_3d_unit_tests ) {
         // FIXME: tests are failing for 3d
-        if ( ! unit_impulse_test<3>(FastFFT::test_size_3d, do_increase_size) )
+        constexpr bool do_increase_size_first = true;
+        constexpr bool second_round           = ! do_increase_size_first;
+        if ( ! unit_impulse_test<3>(FastFFT::test_size_3d, do_increase_size_first) )
             return 1;
         // if (! unit_impulse_test(test_size_3d, true, true)) return 1;
     }

@@ -70,17 +70,14 @@ __device__ __host__ inline void static_assert_type_name(T v) {
 #define MyFFTDebugPrintWithDetails(...)
 #endif
 
-#if FFT_DEBUG_LEVEL == 3
+#if FFT_DEBUG_LEVEL >= 3
 // More verbose debug info
 #define MyFFTDebugPrint(...) { std::cerr << __VA_ARGS__ << std::endl; }
 #define MyFFTDebugPrintWithDetails(...) { std::cerr << __VA_ARGS__ << " From: " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; }
 #endif
 
 #if FFT_DEBUG_LEVEL == 4
-// More verbose debug info + state info
-#define MyFFTDebugPrint(...) { FastFFT::FourierTransformer::PrintState( );  std::cerr << __VA_ARGS__ << std::endl; }
-#define MyFFTDebugPrintWithDetails(...)  { FastFFT::FourierTransformer::PrintState( ); std::cerr << __VA_ARGS__ << " From: " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; }
-
+// Activates HEAVY error checking and sets an std::abort() in cudaErr9) macro below (if not defined already by external like cisTEM.)
 #endif
 
 // Always in use
@@ -96,7 +93,16 @@ __device__ __host__ inline void static_assert_type_name(T v) {
 // Note we are using std::cerr b/c the wxWidgets apps running in cisTEM are capturing std::cout
 // If I leave cudaErr blank when HEAVYERRORCHECKING_FFT is not defined, I get some reports/warnings about unused or unreferenced variables. I suspect the performance hit is very small so just leave this on.
 // The real cost is in the synchronization of in pre/postcheck.
+#if FFT_DEBUG_LEVEL == 4
+#define cudaErr(error) { auto status = static_cast<cudaError_t>(error); if ( status != cudaSuccess ) { std::cerr << cudaGetErrorString(status) << " :-> "; MyFFTPrintWithDetails(""); std::abort(); } };
+#else
+#if FFT_DEBUG_LEVEL == 3
 #define cudaErr(error) { auto status = static_cast<cudaError_t>(error); if ( status != cudaSuccess ) { std::cerr << cudaGetErrorString(status) << " :-> "; MyFFTPrintWithDetails(""); } };
+#else
+#define cudaErr(...)
+#endif
+#endif
+
 #endif
 
 #ifndef postcheck
