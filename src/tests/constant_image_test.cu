@@ -128,14 +128,12 @@ bool const_image_test(std::vector<int>& size) {
 
             FT_fp16.FwdFFT(output_buffer_fp16);
             std::cerr << "output buffer fp16 " << output_buffer_fp16 << std::endl;
-            FT.SetToConstant(host_output.real_values, host_output.real_memory_allocated, -1.0f);
-            FT.CopyDeviceToHostAndSynchronize(host_output.real_values);
+            FT_fp16.CopyDeviceToHostAndSynchronize(reinterpret_cast<__half*>(host_output.real_values));
             host_output.ConvertFP16ToFP32( );
         }
         else {
             std::cerr << "output buffer fp32 " << output_buffer_fp32 << std::endl;
             FT.FwdFFT(output_buffer_fp32);
-            FT.SetToConstant(host_output.real_values, host_output.real_memory_allocated, -1.0f);
             FT.CopyDeviceToHostAndSynchronize(host_output.real_values);
         }
 

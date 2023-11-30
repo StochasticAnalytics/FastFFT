@@ -50,94 +50,95 @@ C2C additionally specify direction and may specify an operation.
   For these kernels the XY transpose is intended for 2d transforms, while the XZ is for 3d transforms.
 */
 
-template <class FFT, class ComplexDataType, class ScalarDataType>
+template <class FFT, class InputData_t, class OutputData_t>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-        void block_fft_kernel_R2C_NONE_XY(const ScalarDataType* __restrict__ input_values, ComplexDataType* __restrict__ output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+        void block_fft_kernel_R2C_NONE_XY(const InputData_t* __restrict__ input_values, OutputData_t* __restrict__ output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
 
 // XZ_STRIDE ffts/block via threadIdx.x, notice launch bounds. Creates partial coalescing.
-template <class FFT, class ComplexDataType, class ScalarDataType>
+template <class FFT, class InputData_t, class OutputData_t>
 __launch_bounds__(XZ_STRIDE* FFT::max_threads_per_block) __global__
-        void block_fft_kernel_R2C_NONE_XZ(const ScalarDataType* __restrict__ input_values, ComplexDataType* __restrict__ output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+        void block_fft_kernel_R2C_NONE_XZ(const InputData_t* __restrict__ input_values, OutputData_t* __restrict__ output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
 
-template <class FFT, class ComplexDataType, class ScalarDataType>
+template <class FFT, class InputData_t, class OutputData_t>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-        void block_fft_kernel_R2C_INCREASE_XY(const ScalarDataType* __restrict__ input_values, ComplexDataType* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
+        void block_fft_kernel_R2C_INCREASE_XY(const InputData_t* __restrict__ input_values, OutputData_t* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 
 // XZ_STRIDE ffts/block via threadIdx.x, notice launch bounds. Creates partial coalescing.
-template <class FFT, class ComplexDataType, class ScalarDataType>
+template <class FFT, class InputData_t, class OutputData_t>
 __launch_bounds__(XZ_STRIDE* FFT::max_threads_per_block) __global__
-        void block_fft_kernel_R2C_INCREASE_XZ(const ScalarDataType* __restrict__ input_values, ComplexDataType* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
+        void block_fft_kernel_R2C_INCREASE_XZ(const InputData_t* __restrict__ input_values, OutputData_t* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 
 // __launch_bounds__(FFT::max_threads_per_block)  we don't know this because it is threadDim.x * threadDim.z - this could be templated if it affects performance significantly
-template <class FFT, class ComplexDataType, class ScalarDataType>
-__global__ void block_fft_kernel_R2C_DECREASE_XY(const ScalarDataType* __restrict__ input_values, ComplexDataType* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
+template <class FFT, class InputData_t, class OutputData_t>
+__global__ void block_fft_kernel_R2C_DECREASE_XY(const InputData_t* __restrict__ input_values, OutputData_t* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 
 /////////////
 // C2C
 /////////////
 
-template <class FFT, class ComplexDataType>
+template <class FFT, class ComplexData_t>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-        void block_fft_kernel_C2C_INCREASE(const ComplexDataType* __restrict__ input_values, ComplexDataType* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
+        void block_fft_kernel_C2C_INCREASE(const ComplexData_t* __restrict__ input_values, ComplexData_t* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 
 // __launch_bounds__(FFT::max_threads_per_block)  we don't know this because it is threadDim.x * threadDim.z - this could be templated if it affects performance significantly
-template <class FFT, class ComplexDataType>
-__global__ void block_fft_kernel_C2C_DECREASE(const ComplexDataType* __restrict__ input_values, ComplexDataType* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
+template <class FFT, class ComplexData_t>
+__global__ void block_fft_kernel_C2C_DECREASE(const ComplexData_t* __restrict__ input_values, ComplexData_t* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 
-template <class FFT, class ComplexDataType>
+template <class FFT, class ComplexData_t>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-        void block_fft_kernel_C2C_WithPadding_SwapRealSpaceQuadrants(const ComplexDataType* __restrict__ input_values, ComplexDataType* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
+        void block_fft_kernel_C2C_WithPadding_SwapRealSpaceQuadrants(const ComplexData_t* __restrict__ input_values, ComplexData_t* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
 
-template <class ExternalImage_t, class FFT, class invFFT, class ComplexDataType>
+template <class ExternalImage_t, class FFT, class invFFT, class ComplexData_t>
 __launch_bounds__(invFFT::max_threads_per_block) __global__
-        void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul(const ExternalImage_t* __restrict__ image_to_search, const ComplexDataType* __restrict__ input_values, ComplexDataType* __restrict__ output_values,
+        void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul(const ExternalImage_t* __restrict__ image_to_search, const ComplexData_t* __restrict__ input_values, ComplexData_t* __restrict__ output_values,
                                                                 Offsets mem_offsets, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv);
 
-template <class ExternalImage_t, class FFT, class invFFT, class ComplexDataType, class PreOpType, class IntraOpType, class PostOpType>
+template <class ExternalImage_t, class FFT, class invFFT, class ComplexData_t, class PreOpType, class IntraOpType, class PostOpType>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-        void block_fft_kernel_C2C_FWD_INCREASE_OP_INV_NONE(const ExternalImage_t* __restrict__ image_to_search, const ComplexDataType* __restrict__ input_values, ComplexDataType* __restrict__ output_values,
+        void block_fft_kernel_C2C_FWD_INCREASE_OP_INV_NONE(const ExternalImage_t* __restrict__ image_to_search, const ComplexData_t* __restrict__ input_values, ComplexData_t* __restrict__ output_values,
                                                            Offsets mem_offsets, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv,
                                                            PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
 
-template <class ExternalImage_t, class FFT, class invFFT, class ComplexDataType>
+template <class ExternalImage_t, class FFT, class invFFT, class ComplexData_t>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-        void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul_SwapRealSpaceQuadrants(const ExternalImage_t* __restrict__ image_to_search, const ComplexDataType* __restrict__ input_values, ComplexDataType* __restrict__ output_values,
+        void block_fft_kernel_C2C_FWD_INCREASE_INV_NONE_ConjMul_SwapRealSpaceQuadrants(const ExternalImage_t* __restrict__ image_to_search, const ComplexData_t* __restrict__ input_values, ComplexData_t* __restrict__ output_values,
                                                                                        Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv);
 
-template <class ExternalImage_t, class FFT, class invFFT, class ComplexDataType>
-__global__ void block_fft_kernel_C2C_FWD_NONE_INV_DECREASE_ConjMul(const ExternalImage_t* __restrict__ image_to_search, const ComplexDataType* __restrict__ input_values, ComplexDataType* __restrict__ output_values,
+template <class ExternalImage_t, class FFT, class invFFT, class ComplexData_t>
+__global__ void block_fft_kernel_C2C_FWD_NONE_INV_DECREASE_ConjMul(const ExternalImage_t* __restrict__ image_to_search, const ComplexData_t* __restrict__ input_values, ComplexData_t* __restrict__ output_values,
                                                                    Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace_fwd, typename invFFT::workspace_type workspace_inv);
 
-template <class FFT, class ComplexDataType>
+template <class FFT, class ComplexData_t>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-        void block_fft_kernel_C2C_NONE(const ComplexDataType* __restrict__ input_values, ComplexDataType* __restrict__ output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+        void block_fft_kernel_C2C_NONE(const ComplexData_t* __restrict__ input_values, ComplexData_t* __restrict__ output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
 
-template <class FFT, class ComplexDataType>
+template <class FFT, class ComplexData_t>
 __launch_bounds__(XZ_STRIDE* FFT::max_threads_per_block) __global__
-        void block_fft_kernel_C2C_NONE_XZ(const ComplexDataType* __restrict__ input_values, ComplexDataType* __restrict__ output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+        void block_fft_kernel_C2C_NONE_XZ(const ComplexData_t* __restrict__ input_values, ComplexData_t* __restrict__ output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
 
-template <class FFT, class ComplexDataType>
+template <class FFT, class ComplexData_t>
 __launch_bounds__(XZ_STRIDE* FFT::max_threads_per_block) __global__
-        void block_fft_kernel_C2C_NONE_XYZ(const ComplexDataType* __restrict__ input_values, ComplexDataType* __restrict__ output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+        void block_fft_kernel_C2C_NONE_XYZ(const ComplexData_t* __restrict__ input_values, ComplexData_t* __restrict__ output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
 
-template <class FFT, class ComplexDataType>
+template <class FFT, class ComplexData_t>
 __launch_bounds__(XZ_STRIDE* FFT::max_threads_per_block) __global__
-        void block_fft_kernel_C2C_INCREASE_XYZ(const ComplexDataType* __restrict__ input_values, ComplexDataType* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
+        void block_fft_kernel_C2C_INCREASE_XYZ(const ComplexData_t* __restrict__ input_values, ComplexData_t* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q, typename FFT::workspace_type workspace);
+
 /////////////
 // C2R
 /////////////
 
-template <class FFT, class ComplexDataType, class ScalarDataType>
+template <class FFT, class InputData_t, class OutputData_t>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-        void block_fft_kernel_C2R_NONE(const ComplexDataType* __restrict__ input_values, ScalarDataType* __restrict__ output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+        void block_fft_kernel_C2R_NONE(const InputData_t* __restrict__ input_values, OutputData_t* __restrict__ output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
 
-template <class FFT, class ComplexDataType, class ScalarDataType>
+template <class FFT, class InputData_t, class OutputData_t>
 __launch_bounds__(FFT::max_threads_per_block) __global__
-        void block_fft_kernel_C2R_NONE_XY(const ComplexDataType* __restrict__ input_values, ScalarDataType* __restrict__ output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
+        void block_fft_kernel_C2R_NONE_XY(const InputData_t* __restrict__ input_values, OutputData_t* __restrict__ output_values, Offsets mem_offsets, typename FFT::workspace_type workspace);
 
 // __launch_bounds__(FFT::max_threads_per_block)  we don't know this because it is threadDim.x * threadDim.z - this could be templated if it affects performance significantly
-template <class FFT, class ComplexDataType, class ScalarDataType>
-__global__ void block_fft_kernel_C2R_DECREASE_XY(const ComplexDataType* __restrict__ input_values, ScalarDataType* __restrict__ output_values, Offsets mem_offsets, const float twiddle_in, const unsigned int Q, typename FFT::workspace_type workspace);
+template <class FFT, class InputData_t, class OutputData_t>
+__global__ void block_fft_kernel_C2R_DECREASE_XY(const InputData_t* __restrict__ input_values, OutputData_t* __restrict__ output_values, Offsets mem_offsets, const float twiddle_in, const unsigned int Q, typename FFT::workspace_type workspace);
 
 //////////////////////////////
 // Thread FFT based Kernel definitions
@@ -147,31 +148,31 @@ __global__ void block_fft_kernel_C2R_DECREASE_XY(const ComplexDataType* __restri
 // R2C
 /////////////
 
-template <class FFT, class ComplexDataType, class ScalarDataType>
-__global__ void thread_fft_kernel_R2C_decomposed(const ScalarDataType* __restrict__ input_values, ComplexDataType* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q);
+template <class FFT, class InputData_t, class OutputData_t>
+__global__ void thread_fft_kernel_R2C_decomposed(const InputData_t* __restrict__ input_values, OutputData_t* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q);
 
-template <class FFT, class ComplexDataType, class ScalarDataType>
-__global__ void thread_fft_kernel_R2C_decomposed_transposed(const ScalarDataType* __restrict__ input_values, ComplexDataType* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q);
+template <class FFT, class InputData_t, class OutputData_t>
+__global__ void thread_fft_kernel_R2C_decomposed_transposed(const InputData_t* __restrict__ input_values, OutputData_t* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q);
 
 /////////////
 // C2C
 /////////////
 
-template <class FFT, class ComplexDataType>
-__global__ void thread_fft_kernel_C2C_decomposed(const ComplexDataType* __restrict__ input_values, ComplexDataType* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q);
+template <class FFT, class ComplexData_t>
+__global__ void thread_fft_kernel_C2C_decomposed(const ComplexData_t* __restrict__ input_values, ComplexData_t* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q);
 
-template <class ExternalImage_t, class FFT, class invFFT, class ComplexDataType>
-__global__ void thread_fft_kernel_C2C_decomposed_ConjMul(const ExternalImage_t* __restrict__ image_to_search, const ComplexDataType* __restrict__ input_values, ComplexDataType* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q);
+template <class ExternalImage_t, class FFT, class invFFT, class ComplexData_t>
+__global__ void thread_fft_kernel_C2C_decomposed_ConjMul(const ExternalImage_t* __restrict__ image_to_search, const ComplexData_t* __restrict__ input_values, ComplexData_t* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q);
 
 /////////////
 // C2R
 /////////////
 
-template <class FFT, class ComplexDataType, class ScalarDataType>
-__global__ void thread_fft_kernel_C2R_decomposed(const ComplexDataType* __restrict__ input_values, ScalarDataType* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q);
+template <class FFT, class InputData_t, class OutputData_t>
+__global__ void thread_fft_kernel_C2R_decomposed(const InputData_t* __restrict__ input_values, OutputData_t* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q);
 
-template <class FFT, class ComplexDataType, class ScalarDataType>
-__global__ void thread_fft_kernel_C2R_decomposed_transposed(const ComplexDataType* __restrict__ input_values, ScalarDataType* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q);
+template <class FFT, class InputData_t, class OutputData_t>
+__global__ void thread_fft_kernel_C2R_decomposed_transposed(const InputData_t* __restrict__ input_values, OutputData_t* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q);
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // End FFT Kernels
@@ -191,8 +192,8 @@ __global__ void clip_into_real_kernel(InputType*      real_values_gpu,
 
 // TODO: This would be much cleaner if we could first go from complex_compute_t -> float 2 then do conversions
 // I think since this would be a compile time decision, it would be fine, but it would be good to confirm.
-template <class FFT, typename WantedType, typename GivenType>
-inline __device__ WantedType convert_if_needed(const GivenType* __restrict__ ptr, const int idx) {
+template <class FFT, typename SetTo_t, typename GetFrom_t>
+inline __device__ SetTo_t convert_if_needed(const GetFrom_t* __restrict__ ptr, const int idx) {
     using complex_compute_t = typename FFT::value_type;
     using scalar_compute_t  = typename complex_compute_t::value_type;
 
@@ -206,93 +207,112 @@ inline __device__ WantedType convert_if_needed(const GivenType* __restrict__ ptr
         static_no_half_support_yet( );
     }
 
-    if constexpr ( std::is_same_v<std::decay_t<GivenType>, complex_compute_t> || std::is_same_v<std::decay_t<GivenType>, float2> ) {
-        if constexpr ( std::is_same_v<WantedType, scalar_compute_t> || std::is_same_v<WantedType, float> ) {
+    if constexpr ( std::is_same_v<std::decay_t<GetFrom_t>, complex_compute_t> || std::is_same_v<std::decay_t<GetFrom_t>, float2> ) {
+        if constexpr ( std::is_same_v<SetTo_t, scalar_compute_t> || std::is_same_v<SetTo_t, float> ) {
             // In this case we assume we have a real valued result, packed into the first half of the complex array
             // TODO: think about cases where we may hit this block unintentionally and how to catch this
-            return std::move(static_cast<const WantedType*>(ptr)[idx]);
+            return std::move(reinterpret_cast<const SetTo_t*>(ptr)[idx]);
         }
-        else if constexpr ( std::is_same_v<WantedType, __half> ) {
+        else if constexpr ( std::is_same_v<SetTo_t, __half> ) {
             // In this case we assume we have a real valued result, packed into the first half of the complex array
             // TODO: think about cases where we may hit this block unintentionally and how to catch this
-            return std::move(__float2half_rn(static_cast<const float*>(ptr)[idx]));
+            return std::move(__float2half_rn(reinterpret_cast<const float*>(ptr)[idx]));
         }
-        else if constexpr ( std::is_same_v<WantedType, __half2> ) {
+        else if constexpr ( std::is_same_v<SetTo_t, __half2> ) {
             // Note: we will eventually need a similar hase for __nv_bfloat16
             // I think I may need to strip the const news for this to work
-            if constexpr ( std::is_same_v<GivenType, complex_compute_t> ) {
+            if constexpr ( std::is_same_v<GetFrom_t, complex_compute_t> ) {
                 return std::move(__floats2half2_rn(ptr[idx].real( ), 0.f));
             }
             else {
                 return std::move(__floats2half2_rn(static_cast<const float*>(ptr)[idx], 0.f));
             }
         }
-        else if constexpr ( std::is_same_v<std::decay_t<GivenType>, complex_compute_t> && std::is_same_v<std::decay_t<WantedType>, complex_compute_t> ) {
-            // return std::move(static_cast<const WantedType*>(ptr)[idx]);
+        else if constexpr ( std::is_same_v<std::decay_t<GetFrom_t>, complex_compute_t> && std::is_same_v<std::decay_t<SetTo_t>, complex_compute_t> ) {
+            // return std::move(static_cast<const SetTo_t*>(ptr)[idx]);
             return std::move(ptr[idx]);
         }
-        else if constexpr ( std::is_same_v<std::decay_t<GivenType>, complex_compute_t> && std::is_same_v<std::decay_t<WantedType>, float2> ) {
-            // return std::move(static_cast<const WantedType*>(ptr)[idx]);
-            return std::move(WantedType{ptr[idx].real( ), ptr[idx].imag( )});
+        else if constexpr ( std::is_same_v<std::decay_t<GetFrom_t>, complex_compute_t> && std::is_same_v<std::decay_t<SetTo_t>, float2> ) {
+            // return std::move(static_cast<const SetTo_t*>(ptr)[idx]);
+            return std::move(SetTo_t{ptr[idx].real( ), ptr[idx].imag( )});
         }
-        else if constexpr ( std::is_same_v<std::decay_t<GivenType>, float2> && std::is_same_v<std::decay_t<WantedType>, float2> ) {
-            // return std::move(static_cast<const WantedType*>(ptr)[idx]);
+        else if constexpr ( std::is_same_v<std::decay_t<GetFrom_t>, float2> && std::is_same_v<std::decay_t<SetTo_t>, complex_compute_t> ) {
+            // return std::move(static_cast<const SetTo_t*>(ptr)[idx]);
+            return std::move(SetTo_t{ptr[idx].x, ptr[idx].y});
+        }
+        else if constexpr ( std::is_same_v<std::decay_t<GetFrom_t>, float2> && std::is_same_v<std::decay_t<SetTo_t>, float2> ) {
+            // return std::move(static_cast<const SetTo_t*>(ptr)[idx]);
             return std::move(ptr[idx]);
         }
         else {
-            static_assert_type_name(ptr);
             static_no_match( );
         }
     }
-    else if constexpr ( std::is_same_v<std::decay_t<GivenType>, scalar_compute_t> || std::is_same_v<std::decay_t<GivenType>, float> ) {
-        if constexpr ( std::is_same_v<WantedType, scalar_compute_t> || std::is_same_v<WantedType, float> ) {
+    else if constexpr ( std::is_same_v<std::decay_t<GetFrom_t>, scalar_compute_t> || std::is_same_v<std::decay_t<GetFrom_t>, float> ) {
+        if constexpr ( std::is_same_v<SetTo_t, scalar_compute_t> || std::is_same_v<SetTo_t, float> ) {
             // In this case we assume we have a real valued result, packed into the first half of the complex array
             // TODO: think about cases where we may hit this block unintentionally and how to catch this
-            return std::move(static_cast<const WantedType*>(ptr)[idx]);
+            return std::move(static_cast<const SetTo_t*>(ptr)[idx]);
         }
-        else if constexpr ( std::is_same_v<WantedType, __half> ) {
+        else if constexpr ( std::is_same_v<SetTo_t, __half> ) {
             // In this case we assume we have a real valued result, packed into the first half of the complex array
             // TODO: think about cases where we may hit this block unintentionally and how to catch this
             return std::move(__float2half_rn(static_cast<const float*>(ptr)[idx]));
         }
-        else if constexpr ( std::is_same_v<WantedType, __half2> ) {
+        else if constexpr ( std::is_same_v<SetTo_t, __half2> ) {
             // Here we assume we are reading a real value and placeing it in a complex array. Could this go sideways?
             return std::move(__floats2half2_rn(static_cast<const float*>(ptr)[idx], 0.f));
         }
-        else if ( std::is_same_v<std::decay_t<WantedType>, complex_compute_t> || std::is_same_v<std::decay_t<WantedType>, float2> ) {
+        else if constexpr ( std::is_same_v<std::decay_t<SetTo_t>, complex_compute_t> || std::is_same_v<std::decay_t<SetTo_t>, float2> ) {
             // Here we assume we are reading a real value and placeing it in a complex array. Could this go sideways?
-            return std::move(WantedType{static_cast<const float*>(ptr)[idx], 0.f});
+            return std::move(SetTo_t{static_cast<const float*>(ptr)[idx], 0.f});
         }
         else {
-            static_assert_type_name(ptr);
             static_no_match( );
         }
     }
-    else if constexpr ( std::is_same_v<std::decay_t<GivenType>, __half> ) {
-        if constexpr ( std::is_same_v<WantedType, scalar_compute_t> || std::is_same_v<WantedType, float> ) {
+    else if constexpr ( std::is_same_v<std::decay_t<GetFrom_t>, __half> ) {
+        if constexpr ( std::is_same_v<SetTo_t, scalar_compute_t> || std::is_same_v<SetTo_t, float> ) {
             return std::move(__half2float(ptr[idx]));
         }
-        else if constexpr ( std::is_same_v<WantedType, __half> ) {
+        else if constexpr ( std::is_same_v<SetTo_t, __half> ) {
             // In this case we assume we have a real valued result, packed into the first half of the complex array
             // TODO: think about cases where we may hit this block unintentionally and how to catch this
-            return std::move(static_cast<const WantedType*>(ptr)[idx]);
+            return std::move(static_cast<const SetTo_t*>(ptr)[idx]);
         }
-        else if constexpr ( std::is_same_v<WantedType, __half2> ) {
+        else if constexpr ( std::is_same_v<SetTo_t, __half2> ) {
             // Here we assume we are reading a real value and placeing it in a complex array. Could this go sideways?
             // FIXME: For some reason CUDART_ZERO_FP16 is not defined even with cuda_fp16.h included
             return std::move(__halves2half2(static_cast<const __half*>(ptr)[idx], __ushort_as_half((unsigned short)0x0000U)));
         }
-        else if ( std::is_same_v<std::decay_t<WantedType>, complex_compute_t> || std::is_same_v<std::decay_t<WantedType>, float2> ) {
+        else if constexpr ( std::is_same_v<std::decay_t<SetTo_t>, complex_compute_t> || std::is_same_v<std::decay_t<SetTo_t>, float2> ) {
             // Here we assume we are reading a real value and placeing it in a complex array. Could this go sideways?
-            return std::move(WantedType{__half2float(static_cast<const __half*>(ptr)[idx]), 0.f});
+            return std::move(SetTo_t{__half2float(static_cast<const __half*>(ptr)[idx]), 0.f});
         }
         else {
-            static_assert_type_name(ptr);
+            static_no_match( );
+        }
+    }
+    else if constexpr ( std::is_same_v<std::decay_t<GetFrom_t>, __half2> ) {
+        if constexpr ( std::is_same_v<SetTo_t, scalar_compute_t> || std::is_same_v<SetTo_t, float> || std::is_same_v<SetTo_t, __half> ) {
+            // In this case we assume we have a real valued result, packed into the first half of the complex array
+            // TODO: think about cases where we may hit this block unintentionally and how to catch this
+            return std::move(reinterpret_cast<const SetTo_t*>(ptr)[idx]);
+        }
+        else if constexpr ( std::is_same_v<SetTo_t, __half2> ) {
+            // Here we assume we are reading a real value and placeing it in a complex array. Could this go sideways?
+            // FIXME: For some reason CUDART_ZERO_FP16 is not defined even with cuda_fp16.h included
+            return std::move(static_cast<const SetTo_t*>(ptr)[idx]);
+        }
+        else if constexpr ( std::is_same_v<std::decay_t<SetTo_t>, complex_compute_t> || std::is_same_v<std::decay_t<SetTo_t>, float2> ) {
+            // Here we assume we are reading a real value and placeing it in a complex array. Could this go sideways?
+            return std::move(SetTo_t{__low2float(static_cast<const __half2*>(ptr)[idx]), __high2float(static_cast<const __half2*>(ptr)[idx])});
+        }
+        else {
             static_no_match( );
         }
     }
     else {
-        static_assert_type_name(ptr);
         static_no_match( );
     }
 }
@@ -369,7 +389,8 @@ struct io {
     // Since we can make repeated use of the same shared memory for each sub-fft
     // we use this method to load into shared mem instead of directly to registers
     // TODO set this up for async mem load
-    static inline __device__ void load_shared(const complex_compute_t* __restrict__ input,
+    template <typename data_io_t>
+    static inline __device__ void load_shared(const data_io_t* __restrict__ input,
                                               complex_compute_t* __restrict__ shared_input,
                                               complex_compute_t* __restrict__ thread_data,
                                               float* __restrict__ twiddle_factor_args,
@@ -378,7 +399,7 @@ struct io {
         unsigned int       index  = threadIdx.x;
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
             twiddle_factor_args[i] = twiddle_in * index;
-            thread_data[i]         = input[index];
+            thread_data[i]         = convert_if_needed<FFT, scalar_compute_t>(input, index);
             shared_input[index]    = thread_data[i];
             index += stride;
         }
@@ -863,24 +884,6 @@ struct io {
         unsigned int       index  = threadIdx.x;
         for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
             thread_data[i] = convert_if_needed<FFT, complex_compute_t>(input, index);
-            // if (blockIdx.y == 0) printf("block %i , val %f %f\n", index, input[index].x, input[index].y);
-
-            index += stride;
-        }
-    }
-
-    // this may benefit from asynchronous execution
-    template <typename data_io_t>
-    static inline __device__ void load(const data_io_t* __restrict__ input,
-                                       complex_compute_t* __restrict__ thread_data,
-                                       int last_index_to_load) {
-        const unsigned int stride = stride_size( );
-        unsigned int       index  = threadIdx.x;
-        for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
-            if ( index < last_index_to_load )
-                thread_data[i] = convert_if_needed<FFT, complex_compute_t>(input, index);
-            else
-                thread_data[i] = complex_compute_t(0.0f, 0.0f);
             index += stride;
         }
     }
@@ -898,7 +901,7 @@ struct io {
                 if ( index < last_index_to_load )
                     thread_data[i] = pre_op_functor(convert_if_needed<FFT, complex_compute_t>(input, index));
                 else
-                    thread_data[i] = pre_op_functor(complex_compute_t(0.0f, 0.0f));
+                    thread_data[i] = pre_op_functor(complex_compute_t{0.0f, 0.0f});
                 index += stride;
             }
         }
@@ -907,7 +910,7 @@ struct io {
                 if ( index < last_index_to_load )
                     thread_data[i] = convert_if_needed<FFT, complex_compute_t>(input, index);
                 else
-                    thread_data[i] = complex_compute_t(0.0f, 0.0f);
+                    thread_data[i] = complex_compute_t{0.0f, 0.0f};
                 index += stride;
             }
         }
