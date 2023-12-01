@@ -140,9 +140,14 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
             cuFFT_input.real_memory_allocated  = cuFFT.ReturnInputMemorySize( );
             cuFFT_output.real_memory_allocated = cuFFT.ReturnInvOutputMemorySize( );
 
-            cudaErr(cudaMallocAsync((void**)&FT_buffer, FT_input.real_memory_allocated, cudaStreamPerThread));
-            cudaErr(cudaMallocAsync((void**)&cuFFT_buffer, cuFFT_input.real_memory_allocated, cudaStreamPerThread));
-            cudaErr(cudaMallocAsync((void**)&targetFT_buffer, target_search_image.real_memory_allocated, cudaStreamPerThread));
+            size_t device_memory = std::max(FT_input.n_bytes_allcoated, FT_output.n_bytes_allcoated);
+            cudaErr(cudaMallocAsync((void**)&FT_buffer, device_memory, cudaStreamPerThread));
+            cudaErr(cudaMallocAsync((void**)&cuFFT_buffer, device_memory, cudaStreamPerThread));
+            cudaErr(cudaMallocAsync((void**)&targetFT_buffer, device_memory, cudaStreamPerThread));
+            // Set to zero
+            cudaErr(cudaMemsetAsync(FT_buffer, 0, device_memory, cudaStreamPerThread));
+            cudaErr(cudaMemsetAsync(cuFFT_buffer, 0, device_memory, cudaStreamPerThread));
+            cudaErr(cudaMemsetAsync(targetFT_buffer, 0, device_memory, cudaStreamPerThread));
 
             if ( is_size_change_decrease )
                 target_search_image.real_memory_allocated = targetFT.ReturnInputMemorySize( );
@@ -181,9 +186,9 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
             // Transform the target on the host prior to transfer.
             target_search_image.FwdFFT( );
 
-            cudaErr(cudaMemcpyAsync(FT_buffer, FT_input.real_values, FT_input.real_memory_allocated, cudaMemcpyHostToDevice, cudaStreamPerThread));
-            cudaErr(cudaMemcpyAsync(cuFFT_buffer, cuFFT_input.real_values, cuFFT_input.real_memory_allocated, cudaMemcpyHostToDevice, cudaStreamPerThread));
-            cudaErr(cudaMemcpyAsync(targetFT_buffer, target_search_image.real_values, target_search_image.real_memory_allocated, cudaMemcpyHostToDevice, cudaStreamPerThread));
+            cudaErr(cudaMemcpyAsync(FT_buffer, FT_input.real_values, FT_input.n_bytes_allcoated, cudaMemcpyHostToDevice, cudaStreamPerThread));
+            cudaErr(cudaMemcpyAsync(cuFFT_buffer, cuFFT_input.real_values, cuFFT_input.n_bytes_allcoated, cudaMemcpyHostToDevice, cudaStreamPerThread));
+            cudaErr(cudaMemcpyAsync(targetFT_buffer, target_search_image.real_values, target_search_image.n_bytes_allcoated, cudaMemcpyHostToDevice, cudaStreamPerThread));
             cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
 
             // Positive control on the host.
@@ -229,11 +234,9 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
             if ( set_conjMult_callback || is_size_change_decrease ) {
                 // FT.CrossCorrelate(targetFT.d_ptr.momentum_space, false);
                 // Will type deduction work here?
-                MyFFTDebugPrintWithDetails("Calling FwdImageInvFFT");
                 FT.FwdImageInvFFT(FT_buffer, reinterpret_cast<float2*>(targetFT_buffer), noop, conj_mul, noop);
             }
             else {
-                MyFFTDebugPrintWithDetails("Calling Fwd then Inv");
                 FT.FwdFFT(FT_buffer);
                 FT.InvFFT(FT_buffer);
             }
@@ -242,10 +245,12 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
             if ( is_size_change_decrease ) {
                 // Because the output is smaller than the input, we just copy to FT input.
                 // TODO: In reality, we didn't need to allocate FT_output at all in this case
+
                 FT.CopyDeviceToHostAndSynchronize(FT_input.real_values);
                 continue_debugging = debug_partial_fft<FFT_DEBUG_STAGE, Rank>(FT_input, fwd_dims_in, fwd_dims_out, inv_dims_in, inv_dims_out, __LINE__);
             }
             else {
+
                 // the output is equal or > the input, so we can always copy there.
                 FT.CopyDeviceToHostAndSynchronize(FT_output.real_values);
                 continue_debugging = debug_partial_fft<FFT_DEBUG_STAGE, Rank>(FT_output, fwd_dims_in, fwd_dims_out, inv_dims_in, inv_dims_out, __LINE__);
@@ -417,9 +422,9 @@ int main(int argc, char** argv) {
 #endif
         SCT size_change_type;
         // Set the SCT to no_change, increase, or decrease
-        size_change_type = SCT::no_change;
-        compare_libraries<2>(FastFFT::test_size, size_change_type, false);
-        // compare_libraries<2>(test_size_rectangle, do_3d, size_change_type, true);
+        // size_change_type = SCT::no_change;
+        // compare_libraries<2>(FastFFT::test_size, size_change_type, false);
+        // // compare_libraries<2>(test_size_rectangle, do_3d, size_change_type, true);
 
         size_change_type = SCT::increase;
         compare_libraries<2>(FastFFT::test_size, size_change_type, false);

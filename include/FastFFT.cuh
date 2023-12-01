@@ -896,6 +896,7 @@ struct io {
                                        FunctionType pre_op_functor = nullptr) {
         const unsigned int stride = stride_size( );
         unsigned int       index  = threadIdx.x;
+
         if constexpr ( IS_IKF_t<FunctionType>( ) ) {
             for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
                 if ( index < last_index_to_load )

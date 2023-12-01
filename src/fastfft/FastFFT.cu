@@ -360,7 +360,6 @@ FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::Generic_Fw
                     SetPrecisionAndExectutionMethod<Generic_Fwd_FFT, true>(input_ptr, nullptr, c2c_fwd_decomposed, pre_op_functor, intra_op_functor);
                 }
                 else {
-                    std::cerr << "Made it to the right place" << std::endl;
                     SetPrecisionAndExectutionMethod<Generic_Fwd_FFT>(input_ptr, nullptr, r2c_none_XY, pre_op_functor, intra_op_functor);
                     transform_stage_completed = TransformStageCompleted::fwd; // technically not complete, needed for copy on validation of partial fft.
                     SetPrecisionAndExectutionMethod<Generic_Fwd_FFT>(input_ptr, nullptr, c2c_fwd_none, pre_op_functor, intra_op_functor);
@@ -877,6 +876,39 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetDi
 ////////////////////////////////////////////////////
 
 // R2C_decomposed
+
+template <class ComputeBaseType, class InputType, class OtherImageType, int Rank>
+void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::CopyDeviceToHostAndSynchronize(InputType* input_pointer, int n_elements_to_copy) {
+    SetDimensions(DimensionCheckType::CopyToHost);
+    int n_to_actually_copy = (n_elements_to_copy > 0) ? n_elements_to_copy : memory_size_to_copy_;
+
+    MyFFTDebugAssertTrue(n_to_actually_copy > 0, "Error in CopyDeviceToHostAndSynchronize: n_elements_to_copy must be > 0");
+    MyFFTDebugAssertTrue(is_pointer_in_memory_and_registered(input_pointer), "Error in CopyDeviceToHostAndSynchronize: input_pointer must be in memory and registered");
+
+    if ( is_in_buffer_memory ) {
+        std::cerr << " in buffer memory " << std::endl;
+        std::cerr << "  buffer_1 " << d_ptr.buffer_1 << std::endl;
+        std::cerr << "  buffer_2 " << d_ptr.buffer_2 << std::endl;
+        std::cerr << " input_ptr " << input_pointer << std::endl;
+        std::cerr << "copying " << n_to_actually_copy << " elements" << std::endl;
+        MyFFTDebugAssertTrue(is_pointer_in_device_memory(d_ptr.buffer_1), "Error in CopyDeviceToHostAndSynchronize: input_pointer must be in device memory");
+        cudaErr(cudaMemcpyAsync(input_pointer, d_ptr.buffer_1, n_to_actually_copy * sizeof(InputType), cudaMemcpyDeviceToHost, cudaStreamPerThread));
+    }
+    else {
+        std::cerr << " not in buffer memory " << std::endl;
+        std::cerr << "  buffer_1 " << d_ptr.buffer_1 << std::endl;
+        std::cerr << "  buffer_2 " << d_ptr.buffer_2 << std::endl;
+        std::cerr << " input_ptr " << input_pointer << std::endl;
+        std::cerr << "copying " << n_to_actually_copy << " elements" << std::endl;
+        std::cerr << "Size of input " << sizeof(InputType) << std::endl;
+        std::cerr << " is in device  d_ptr.buffer_2 " << is_pointer_in_device_memory(d_ptr.buffer_2) << std::endl;
+        std::cerr << " is in device input " << is_pointer_in_device_memory(input_pointer) << std::endl;
+        std::cerr << " is host allocated " << is_pointer_in_memory_and_registered(input_pointer) << std::endl;
+        MyFFTDebugAssertTrue(is_pointer_in_device_memory(d_ptr.buffer_2), "Error in CopyDeviceToHostAndSynchronize: input_pointer must be in device memory");
+        cudaErr(cudaMemcpyAsync(input_pointer, d_ptr.buffer_2, n_to_actually_copy * sizeof(InputType), cudaMemcpyDeviceToHost, cudaStreamPerThread));
+    }
+    cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
+};
 
 template <class FFT, class InputData_t, class OutputData_t>
 __global__ void thread_fft_kernel_R2C_decomposed(const InputData_t* __restrict__ input_values, OutputData_t* __restrict__ output_values, Offsets mem_offsets, float twiddle_in, int Q) {

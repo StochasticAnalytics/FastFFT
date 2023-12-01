@@ -98,7 +98,7 @@ void CheckUnitImpulseRealImage(Image<realType, complexType>& positive_control, i
                 // Only check the address if we have too.
                 if ( positive_control.real_values[address] != 0.0f && address != 0 ) {
                     PrintArray(positive_control.real_values, positive_control.size.x, positive_control.size.y, positive_control.size.z, positive_control.size.w);
-                    MyTestPrintAndExit(false, "Check Unit Impulse Real control val " + std::to_string(positive_control.real_values[address]) + " different from zero");
+                    MyTestPrintAndExit(false, "Check Unit Impulse Real control val " + std::to_string(positive_control.real_values[address]) + " different from zero at line " + std::to_string(input_line));
                 }
                 address++;
             }

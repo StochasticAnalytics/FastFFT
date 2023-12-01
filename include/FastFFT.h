@@ -116,28 +116,7 @@ class FourierTransformer {
     void CopyHostToDeviceAndSynchronize(InputType* input_pointer, int n_elements_to_copy = 0);
     void CopyHostToDevice(InputType* input_pointer, int n_elements_to_copy = 0);
 
-    void CopyDeviceToHostAndSynchronize(InputType* input_pointer, int n_elements_to_copy = 0) {
-        SetDimensions(DimensionCheckType::CopyToHost);
-        int n_to_actually_copy = (n_elements_to_copy > 0) ? n_elements_to_copy : memory_size_to_copy_;
-        if ( is_in_buffer_memory ) {
-            // std::cerr << " in buffer memory " << std::endl;
-            // std::cerr << "  buffer_1 " << d_ptr.buffer_1 << std::endl;
-            // std::cerr << "  buffer_2 " << d_ptr.buffer_2 << std::endl;
-            // std::cerr << " input_ptr " << input_pointer << std::endl;
-            // std::cerr << "copying " << n_to_actually_copy << " elements" << std::endl;
-            cudaErr(cudaMemcpyAsync(input_pointer, d_ptr.buffer_1, n_to_actually_copy * sizeof(InputType), cudaMemcpyDeviceToHost, cudaStreamPerThread));
-        }
-        else {
-            // std::cerr << " not in buffer memory " << std::endl;
-            // std::cerr << "  buffer_1 " << d_ptr.buffer_1 << std::endl;
-            // std::cerr << "  buffer_2 " << d_ptr.buffer_2 << std::endl;
-            // std::cerr << " input_ptr " << input_pointer << std::endl;
-            // std::cerr << "copying " << n_to_actually_copy << " elements" << std::endl;
-
-            cudaErr(cudaMemcpyAsync(input_pointer, d_ptr.buffer_2, n_to_actually_copy * sizeof(InputType), cudaMemcpyDeviceToHost, cudaStreamPerThread));
-        }
-        cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
-    };
+    void CopyDeviceToHostAndSynchronize(InputType* input_pointer, int n_elements_to_copy = 0);
 
     // Using the enum directly from python is not something I've figured out yet. Just make simple methods.
     // FIXME: these are not currently used, and perhaps are not needed.

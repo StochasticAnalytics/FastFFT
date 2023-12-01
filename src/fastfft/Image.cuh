@@ -35,6 +35,7 @@ class Image {
 
     short4 size;
     int    real_memory_allocated;
+    size_t n_bytes_allcoated;
     int    padding_jump_value;
 
     float fftw_epsilon;

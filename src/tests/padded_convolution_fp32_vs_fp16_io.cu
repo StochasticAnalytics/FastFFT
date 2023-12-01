@@ -144,10 +144,11 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
             cudaErr(cudaMallocAsync((void**)&cuFFT_buffer, cuFFT_input.real_memory_allocated, cudaStreamPerThread));
             cudaErr(cudaMallocAsync((void**)&targetFT_buffer, target_search_image.real_memory_allocated, cudaStreamPerThread));
 
+            // the larger of the two.
             if ( is_size_change_decrease )
                 target_search_image.real_memory_allocated = targetFT.ReturnInputMemorySize( );
             else
-                target_search_image.real_memory_allocated = targetFT.ReturnInvOutputMemorySize( ); // the larger of the two.
+                target_search_image.real_memory_allocated = targetFT.ReturnInvOutputMemorySize( );
 
             positive_control.real_memory_allocated = target_search_image.real_memory_allocated; // this won't change size
 
@@ -262,7 +263,7 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
             }
             MyTestPrintAndExit(continue_debugging, "Partial FFT debug stage " + std::to_string(FFT_DEBUG_STAGE));
 
-            if ( is_size_change_decrease ) {
+                if ( is_size_change_decrease ) {
                 CheckUnitImpulseRealImage(FT_input, __LINE__);
             }
             else {
