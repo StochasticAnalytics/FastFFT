@@ -904,6 +904,11 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::CopyD
     MyFFTDebugAssertTrue(n_to_actually_copy > 0, "Error in CopyDeviceToHostAndSynchronize: n_elements_to_copy must be > 0");
     MyFFTDebugAssertTrue(is_pointer_in_memory_and_registered(input_pointer), "Error in CopyDeviceToHostAndSynchronize: input_pointer must be in memory and registered");
 
+    std::cerr << "n_to_actually_copy = " << n_to_actually_copy << std::endl;
+    std::cerr << "input_memory_wanted_ = " << input_memory_wanted_ << std::endl;
+    std::cerr << "fwd_output_memory_wanted_ = " << fwd_output_memory_wanted_ << std::endl;
+    std::cerr << "inv_output_memory_wanted_ = " << inv_output_memory_wanted_ << std::endl;
+    std::cerr << "Current buffer = " << current_buffer << " " << buffer_name[current_buffer] << std::endl;
     switch ( current_buffer ) {
         case fastfft_external_buffer: {
             MyFFTDebugAssertTrue(is_pointer_in_device_memory(d_ptr.external_buffer), "Error in CopyDeviceToHostAndSynchronize: input_pointer must be in device memory");

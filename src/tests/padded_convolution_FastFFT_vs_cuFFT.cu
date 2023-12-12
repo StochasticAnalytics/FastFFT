@@ -140,7 +140,7 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
             cuFFT_input.real_memory_allocated  = cuFFT.ReturnInputMemorySize( );
             cuFFT_output.real_memory_allocated = cuFFT.ReturnInvOutputMemorySize( );
 
-            size_t device_memory = std::max(FT_input.n_bytes_allcoated, FT_output.n_bytes_allcoated);
+            size_t device_memory = std::max(FT_input.n_bytes_allocated, FT_output.n_bytes_allocated);
             cudaErr(cudaMallocAsync((void**)&FT_buffer, device_memory, cudaStreamPerThread));
             cudaErr(cudaMallocAsync((void**)&cuFFT_buffer, device_memory, cudaStreamPerThread));
             cudaErr(cudaMallocAsync((void**)&targetFT_buffer, device_memory, cudaStreamPerThread));
@@ -186,9 +186,9 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
             // Transform the target on the host prior to transfer.
             target_search_image.FwdFFT( );
 
-            cudaErr(cudaMemcpyAsync(FT_buffer, FT_input.real_values, FT_input.n_bytes_allcoated, cudaMemcpyHostToDevice, cudaStreamPerThread));
-            cudaErr(cudaMemcpyAsync(cuFFT_buffer, cuFFT_input.real_values, cuFFT_input.n_bytes_allcoated, cudaMemcpyHostToDevice, cudaStreamPerThread));
-            cudaErr(cudaMemcpyAsync(targetFT_buffer, target_search_image.real_values, target_search_image.n_bytes_allcoated, cudaMemcpyHostToDevice, cudaStreamPerThread));
+            cudaErr(cudaMemcpyAsync(FT_buffer, FT_input.real_values, FT_input.n_bytes_allocated, cudaMemcpyHostToDevice, cudaStreamPerThread));
+            cudaErr(cudaMemcpyAsync(cuFFT_buffer, cuFFT_input.real_values, cuFFT_input.n_bytes_allocated, cudaMemcpyHostToDevice, cudaStreamPerThread));
+            cudaErr(cudaMemcpyAsync(targetFT_buffer, target_search_image.real_values, target_search_image.n_bytes_allocated, cudaMemcpyHostToDevice, cudaStreamPerThread));
             cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
 
             // Positive control on the host.
@@ -422,9 +422,9 @@ int main(int argc, char** argv) {
 #endif
         SCT size_change_type;
         // Set the SCT to no_change, increase, or decrease
-        // size_change_type = SCT::no_change;
-        // compare_libraries<2>(FastFFT::test_size, size_change_type, false);
-        // // compare_libraries<2>(test_size_rectangle, do_3d, size_change_type, true);
+        size_change_type = SCT::no_change;
+        compare_libraries<2>(FastFFT::test_size, size_change_type, false);
+        // compare_libraries<2>(test_size_rectangle, do_3d, size_change_type, true);
 
         size_change_type = SCT::increase;
         compare_libraries<2>(FastFFT::test_size, size_change_type, false);

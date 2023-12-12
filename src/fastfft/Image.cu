@@ -19,7 +19,7 @@ Image<wanted_real_type, wanted_complex_type>::Image(short4 wanted_size) {
     is_fftw_planned       = false;
     data_is_fp16          = false;
     real_memory_allocated = size.w * size.y * size.z * 2;
-    n_bytes_allcoated     = real_memory_allocated * sizeof(wanted_real_type);
+    n_bytes_allocated     = real_memory_allocated * sizeof(wanted_real_type);
     is_registered         = false;
 }
 

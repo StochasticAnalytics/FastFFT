@@ -34,7 +34,7 @@ void PrintArray(float2* array, short NX, short NY, short NZ, int line_wrapping =
                     std::cout << std::endl;
                 } // line wrapping
             }
-            std::cout << "] " << std::endl;
+            std::cout << "] " << NY << std::endl;
             n = 0;
         }
         if ( NZ > 0 )
@@ -56,7 +56,7 @@ void PrintArray(float* array, short NX, short NY, short NZ, short NW, int line_w
                     std::cout << std::endl;
                 } // line wrapping
             }
-            std::cout << "] " << std::endl;
+            std::cout << "] " << NY << std::endl;
             n = 0;
         }
         if ( NZ > 0 )
@@ -79,7 +79,7 @@ void PrintArray_XZ(float2* array, short NX, short NY, short NZ, int line_wrappin
                     std::cout << std::endl;
                 } // line wrapping
             }
-            std::cout << "] " << std::endl;
+            std::cout << "] " << NY << std::endl;
             n = 0;
         }
         if ( NZ > 0 )
