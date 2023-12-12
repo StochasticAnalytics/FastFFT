@@ -23,10 +23,13 @@ using EnableIf = typename EnableIfT<cond, T>::Type;
 template <typename IntraOpType>
 constexpr bool HasIntraOpFunctor = IS_IKF_t<IntraOpType>( );
 
+// 3d is always odd (3 for fwd/inv or 5 for round trip)
+// 2d is odd if it is round trip (3) and even if fwd/inv (2 )
+template <int FFT_ALGO_t, int Rank>
+constexpr bool IsAlgoRoundTrip = (FFT_ALGO_t == Generic_Fwd_Image_Inv_FFT);
+
 template <typename IntraOpType, int FFT_ALGO_t>
 constexpr bool IfAppliesIntraOpFunctor_HasIntraOpFunctor = (FFT_ALGO_t != Generic_Fwd_Image_Inv_FFT || (FFT_ALGO_t == Generic_Fwd_Image_Inv_FFT && HasIntraOpFunctor<IntraOpType>));
-
-} // namespace FastFFT
 
 template <typename T>
 constexpr bool IsComplexType = (std::is_same_v<T, float2> || std::is_same_v<T, __half2>);
@@ -43,4 +46,8 @@ constexpr bool IsAllowedComplexType = (... && (std::is_same_v<Args, __half2> || 
 template <typename... Args>
 constexpr bool IsAllowedInputType = (... && (std::is_same_v<Args, __half> || std::is_same_v<Args, float> || std::is_same_v<Args, __half2> || std::is_same_v<Args, float2>));
 
+template <typename T1_wanted, typename T2_wanted, typename T1, typename T2>
+constexpr bool CheckPointerTypesForMatch = (std::is_same_v<T1_wanted, T1> && std::is_same_v<T2_wanted, T2>);
+
+} // namespace FastFFT
 #endif // __INCLUDE_DETAIL_CONCEPTS_H__

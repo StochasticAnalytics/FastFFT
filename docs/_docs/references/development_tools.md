@@ -127,7 +127,7 @@ FastFFT::PrintState()
     std::cout << "memory size to copy " << memory_size_to_copy << std::endl;
     std::cout << "fwd_size_change_type " << SizeChangeName[fwd_size_change_type] << std::endl;
     std::cout << "inv_size_change_type " << SizeChangeName[inv_size_change_type] << std::endl;
-    std::cout << "transform stage complete " << TransformStageCompletedName[transform_stage_completed] << std::endl;
+    std::cout << "transform stage complete " << transform_stage_completed << std::endl;
     std::cout << "input_origin_type " << OriginTypeName[input_origin_type] << std::endl;
     std::cout << "output_origin_type " << OriginTypeName[output_origin_type] << std::endl;
     

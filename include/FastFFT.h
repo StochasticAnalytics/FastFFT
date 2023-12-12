@@ -34,24 +34,28 @@ inline void static_no_half_support_yet( ) { static_assert(flag, "no __half suppo
 template <class C, class I, class OI>
 struct DevicePointers {
     // Use this to catch unsupported input/ compute types and throw exception.
+    std::nullptr_t external_buffer;
     std::nullptr_t buffer_1;
     std::nullptr_t buffer_2;
 };
 
 template <>
 struct DevicePointers<float*, float*, float2*> {
+    float*  external_buffer{ };
     float2* buffer_1{ };
     float2* buffer_2{ };
 };
 
 template <>
 struct DevicePointers<float*, __half*, float2*> {
+    __half*  external_buffer{ };
     __half2* buffer_1{ };
     __half2* buffer_2{ };
 };
 
 template <>
 struct DevicePointers<float*, __half*, __half2*> {
+    __half*  external_buffer{ };
     __half2* buffer_1{ };
     __half2* buffer_2{ };
 };
@@ -165,9 +169,7 @@ class FourierTransformer {
                         OtherImageType* image_to_search,
                         PreOpType       pre_op   = nullptr,
                         IntraOpType     intra_op = nullptr,
-                        PostOpType      post_op  = nullptr) {
-        Generic_Fwd_Image_Inv<PreOpType, IntraOpType, PostOpType>(input_ptr, image_to_search, pre_op, intra_op, post_op);
-    }
+                        PostOpType      post_op  = nullptr);
 
     void ClipIntoTopLeft(InputType* input_ptr);
     void ClipIntoReal(InputType*, int wanted_coordinate_of_box_center_x, int wanted_coordinate_of_box_center_y, int wanted_coordinate_of_box_center_z);
@@ -231,6 +233,16 @@ class FourierTransformer {
         }
     }
 
+    enum buffer_location : int { fastfft_external_buffer,
+                                 fastfft_internal_buffer_1,
+                                 fastfft_internal_buffer_2 };
+
+    std::string_view buffer_name[3] = {"fastfft_external_buffer",
+                                       "fastfft_internal_buffer_1",
+                                       "fastfft_internal_buffer_2"};
+
+    buffer_location current_buffer;
+
     void PrintState( ) {
         std::cerr << "================================================================" << std::endl;
         std::cerr << "Device Properties: " << std::endl;
@@ -246,7 +258,7 @@ class FourierTransformer {
         std::cerr << "State Variables:\n"
                   << std::endl;
         // std::cerr << "is_in_memory_device_pointer " << is_in_memory_device_pointer << std::endl; // FIXME: switched to is_pointer_in_device_memory(d_ptr.buffer_1) defined in FastFFT.cuh
-        std::cerr << "is_in_buffer_memory " << is_in_buffer_memory << std::endl;
+        std::cerr << "in buffer " << buffer_name[current_buffer] << std::endl;
         std::cerr << "is_fftw_padded_input " << is_fftw_padded_input << std::endl;
         std::cerr << "is_fftw_padded_output " << is_fftw_padded_output << std::endl;
         std::cerr << "is_real_valued_input " << IsAllowedRealType<InputType> << std::endl;
@@ -281,7 +293,7 @@ class FourierTransformer {
         std::cerr << "memory size to copy " << memory_size_to_copy_ << std::endl;
         std::cerr << "fwd_size_change_type " << SizeChangeName[fwd_size_change_type] << std::endl;
         std::cerr << "inv_size_change_type " << SizeChangeName[inv_size_change_type] << std::endl;
-        std::cerr << "transform stage complete " << TransformStageCompletedName[transform_stage_completed] << std::endl;
+        std::cerr << "transform stage complete " << transform_stage_completed << std::endl;
         std::cerr << "input_origin_type " << OriginType::name[input_origin_type] << std::endl;
         std::cerr << "output_origin_type " << OriginType::name[output_origin_type] << std::endl;
 
@@ -294,7 +306,6 @@ class FourierTransformer {
     OriginType::Enum output_origin_type;
 
     // booleans to track state, could be bit fields but that seem opaque to me.
-    bool is_in_buffer_memory; // To track whether the current result is in dev_ptr.position_space or dev_ptr.position_space_buffer (momemtum space/ momentum space buffer respectively.)
 
     bool is_fftw_padded_input; // Padding for in place r2c transforms
     bool is_fftw_padded_output; // Currently the output state will match the input state, otherwise it is an error.
@@ -309,16 +320,12 @@ class FourierTransformer {
 
     std::vector<std::string> SizeChangeName{"increase", "decrease", "no_change"};
 
-    std::vector<std::string> TransformStageCompletedName{"", "", "", "", "", // padding of 5
-                                                         "", "", "", "", "", // padding of 5
-                                                         "none", "fwd", "inv"};
-
     std::vector<std::string> DimensionCheckName{"CopyFromHost", "CopyToHost", "FwdTransform", "InvTransform"};
 
     SizeChangeType::Enum fwd_size_change_type;
     SizeChangeType::Enum inv_size_change_type;
 
-    TransformStageCompleted::Enum transform_stage_completed;
+    int transform_stage_completed;
 
     // dims_in may change during calculation, depending on padding, but is reset after each call.
     short4 dims_in;
@@ -591,8 +598,7 @@ class FourierTransformer {
     // First call passed from a public transform function, selects block or thread and the transform precision.
     template <int FFT_ALGO_t, bool use_thread_method = false, class PreOpType = std::nullptr_t, class IntraOpType = std::nullptr_t, class PostOpType = std::nullptr_t>
     EnableIf<IfAppliesIntraOpFunctor_HasIntraOpFunctor<IntraOpType, FFT_ALGO_t>>
-    SetPrecisionAndExectutionMethod(InputType*      input_ptr,
-                                    OtherImageType* other_image_ptr,
+    SetPrecisionAndExectutionMethod(OtherImageType* other_image_ptr,
                                     KernelType      kernel_type,
                                     PreOpType       pre_op_functor   = nullptr,
                                     IntraOpType     intra_op_functor = nullptr,
@@ -601,7 +607,7 @@ class FourierTransformer {
     // 2. // TODO: remove this now that the functors are working
     // Check to see if any intra kernel functions are wanted, and if so set the appropriate device pointers.
     template <int FFT_ALGO_t, class FFT_base, class PreOpType, class IntraOpType, class PostOpType>
-    void SetIntraKernelFunctions(InputType* input_ptr, OtherImageType* other_image_ptr, KernelType kernel_type, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
+    void SetIntraKernelFunctions(OtherImageType* other_image_ptr, KernelType kernel_type, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
 
     // 3.
     // Second call, sets size of the transform kernel, selects the appropriate GPU arch
@@ -611,15 +617,15 @@ class FourierTransformer {
     // This allows us to iterate through a set of constexpr sizes passed as a template parameter pack. The value is in providing a means to have different size packs
     // for different fft configurations, eg. 2d vs 3d
     template <int FFT_ALGO_t, class FFT_base, class PreOpType, class IntraOpType, class PostOpType>
-    void SelectSizeAndType(InputType* input_ptr, OtherImageType* other_image_ptr, KernelType kernel_type, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
+    void SelectSizeAndType(OtherImageType* other_image_ptr, KernelType kernel_type, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
 
     template <int FFT_ALGO_t, class FFT_base, class PreOpType, class IntraOpType, class PostOpType, unsigned int SizeValue, unsigned int Ept, unsigned int... OtherValues>
-    void SelectSizeAndType(InputType* input_ptr, OtherImageType* other_image_ptr, KernelType kernel_type, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
+    void SelectSizeAndType(OtherImageType* other_image_ptr, KernelType kernel_type, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
 
     // 3.
     // Third call, sets the input and output dimensions and type
     template <int FFT_ALGO_t, class FFT_base_arch, class PreOpType, class IntraOpType, class PostOpType>
-    void SetAndLaunchKernel(InputType* input_ptr, OtherImageType* other_image_ptr, KernelType kernel_type, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
+    void SetAndLaunchKernel(OtherImageType* other_image_ptr, KernelType kernel_type, PreOpType pre_op_functor, IntraOpType intra_op_functor, PostOpType post_op_functor);
 
     short padding_jump_val_;
     int   input_memory_wanted_;
@@ -637,8 +643,7 @@ class FourierTransformer {
               class IntraOpType,
               class PostOpType>
     EnableIf<HasIntraOpFunctor<IntraOpType> && IsAllowedInputType<InputType, OtherImageType>>
-    Generic_Fwd_Image_Inv(InputType*      input_ptr,
-                          OtherImageType* image_to_search,
+    Generic_Fwd_Image_Inv(OtherImageType* image_to_search,
                           PreOpType       pre_op,
                           IntraOpType     intra_op,
                           PostOpType      post_op);
@@ -646,15 +651,13 @@ class FourierTransformer {
     template <class PreOpType,
               class IntraOpType>
     EnableIf<IsAllowedInputType<InputType>>
-    Generic_Fwd(InputType*  input_ptr,
-                PreOpType   pre_op,
+    Generic_Fwd(PreOpType   pre_op,
                 IntraOpType intra_op);
 
     template <class IntraOpType,
               class PostOpType>
     EnableIf<IsAllowedInputType<InputType>>
-    Generic_Inv(InputType*  input_ptr,
-                IntraOpType intra_op,
+    Generic_Inv(IntraOpType intra_op,
                 PostOpType  post_op);
 
     inline bool IsTransormAlongZ(KernelType kernel_type) {

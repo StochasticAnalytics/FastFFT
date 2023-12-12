@@ -2,9 +2,16 @@
 
 // The purpose of this test is to ensure that we can build a "pure" cpp file and only link against the CUDA business at the end
 
+// Note FFT_DEBUG_STAGE is not handled here.
+
 #include "../../include/FastFFT.h"
 
 int main(int argc, char** argv) {
+
+#if ( FFT_DEBUG_STAGE != 8 )
+    std::cout << "Error: FFT_DEBUG_STAGE must be set to 8 when running this test." << std::endl;
+    std::exit(1);
+#endif
 
     const int input_size = 64;
 
@@ -26,7 +33,7 @@ int main(int argc, char** argv) {
     int host_input_real_memory_allocated  = FT.ReturnInputMemorySize( );
     int host_output_real_memory_allocated = FT.ReturnInvOutputMemorySize( );
 
-    cudaErr(cudaMallocAsync(&d_input, sizeof(decltype(d_input)) * host_input_real_memory_allocated, cudaStreamPerThread));
+    cudaErr(cudaMallocAsync(&d_input, sizeof(float) * host_input_real_memory_allocated, cudaStreamPerThread));
 
     if ( host_input_real_memory_allocated != host_output_real_memory_allocated ) {
         std::cout << "Error: input and output memory sizes do not match" << std::endl;
@@ -58,14 +65,14 @@ int main(int argc, char** argv) {
     host_input.at(0) = 1.0f;
 
     // Copy to the device
-    cudaErr(cudaMemcpyAsync(d_input, host_input.data( ), sizeof(decltype(d_input)) * host_input_real_memory_allocated, cudaMemcpyHostToDevice, cudaStreamPerThread));
+    cudaErr(cudaMemcpyAsync(d_input, host_input.data( ), sizeof(float) * host_input_real_memory_allocated, cudaMemcpyHostToDevice, cudaStreamPerThread));
     cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
     // Do a round trip FFT
     FT.FwdFFT(d_input);
     FT.InvFFT(d_input);
 
     // Now copy back to the output array (still set to -1)
-    cudaErr(cudaMemcpyAsync(host_output.data( ), d_input, sizeof(decltype(d_input)) * host_output_real_memory_allocated, cudaMemcpyDeviceToHost, cudaStreamPerThread));
+    cudaErr(cudaMemcpyAsync(host_output.data( ), d_input, sizeof(float) * host_output_real_memory_allocated, cudaMemcpyDeviceToHost, cudaStreamPerThread));
     if ( host_output.at(0) == input_size * input_size ) {
         std::cout << "Success: output memory copied back correctly after fft/ifft pair" << std::endl;
     }
