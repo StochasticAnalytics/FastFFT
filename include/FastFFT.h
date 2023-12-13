@@ -34,28 +34,32 @@ inline void static_no_half_support_yet( ) { static_assert(flag, "no __half suppo
 template <class C, class I, class OI>
 struct DevicePointers {
     // Use this to catch unsupported input/ compute types and throw exception.
-    std::nullptr_t external_buffer;
+    std::nullptr_t external_input;
+    std::nullptr_t external_output;
     std::nullptr_t buffer_1;
     std::nullptr_t buffer_2;
 };
 
 template <>
 struct DevicePointers<float*, float*, float2*> {
-    float*  external_buffer{ };
+    float*  external_input{ };
+    float*  external_output{ };
     float2* buffer_1{ };
     float2* buffer_2{ };
 };
 
 template <>
 struct DevicePointers<float*, __half*, float2*> {
-    __half*  external_buffer{ };
+    __half*  external_input{ };
+    __half*  external_output{ };
     __half2* buffer_1{ };
     __half2* buffer_2{ };
 };
 
 template <>
 struct DevicePointers<float*, __half*, __half2*> {
-    __half*  external_buffer{ };
+    __half*  external_input{ };
+    __half*  external_output{ };
     __half2* buffer_1{ };
     __half2* buffer_2{ };
 };
@@ -150,26 +154,29 @@ class FourierTransformer {
     // TODO: when picking up tomorrow, remove default values for input pointers and move EnableIf to the declarations for the generic functions and instantiate these from fastFFT.cus
     // Following this
     // Alias for FwdFFT, is there any overhead?
-    template <class PreOpType   = nullptr_t,
-              class IntraOpType = nullptr_t>
+    template <class PreOpType   = std::nullptr_t,
+              class IntraOpType = std::nullptr_t>
     void FwdFFT(InputType*  input_ptr,
-                PreOpType   pre_op   = nullptr,
-                IntraOpType intra_op = nullptr);
+                InputType*  output_ptr = nullptr,
+                PreOpType   pre_op     = nullptr,
+                IntraOpType intra_op   = nullptr);
 
-    template <class IntraOpType = nullptr_t,
-              class PostOpType  = nullptr_t>
+    template <class IntraOpType = std::nullptr_t,
+              class PostOpType  = std::nullptr_t>
     void InvFFT(InputType*  input_ptr,
-                IntraOpType intra_op = nullptr,
-                PostOpType  post_op  = nullptr);
+                InputType*  output_ptr = nullptr,
+                IntraOpType intra_op   = nullptr,
+                PostOpType  post_op    = nullptr);
 
-    template <class PreOpType   = nullptr_t,
-              class IntraOpType = nullptr_t,
-              class PostOpType  = nullptr_t>
+    template <class PreOpType   = std::nullptr_t,
+              class IntraOpType = std::nullptr_t,
+              class PostOpType  = std::nullptr_t>
     void FwdImageInvFFT(InputType*      input_ptr,
                         OtherImageType* image_to_search,
-                        PreOpType       pre_op   = nullptr,
-                        IntraOpType     intra_op = nullptr,
-                        PostOpType      post_op  = nullptr);
+                        InputType*      output_ptr = nullptr,
+                        PreOpType       pre_op     = nullptr,
+                        IntraOpType     intra_op   = nullptr,
+                        PostOpType      post_op    = nullptr);
 
     void ClipIntoTopLeft(InputType* input_ptr);
     void ClipIntoReal(InputType*, int wanted_coordinate_of_box_center_x, int wanted_coordinate_of_box_center_y, int wanted_coordinate_of_box_center_z);
@@ -233,13 +240,15 @@ class FourierTransformer {
         }
     }
 
-    enum buffer_location : int { fastfft_external_buffer,
+    enum buffer_location : int { fastfft_external_input,
+                                 fastfft_external_output,
                                  fastfft_internal_buffer_1,
                                  fastfft_internal_buffer_2 };
 
-    std::string_view buffer_name[3] = {"fastfft_external_buffer",
-                                       "fastfft_internal_buffer_1",
-                                       "fastfft_internal_buffer_2"};
+    const std::string_view buffer_name[4] = {"fastfft_external_input",
+                                             "fastfft_external_output",
+                                             "fastfft_internal_buffer_1",
+                                             "fastfft_internal_buffer_2"};
 
     buffer_location current_buffer;
 

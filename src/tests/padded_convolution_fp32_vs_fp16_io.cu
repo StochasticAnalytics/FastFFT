@@ -234,8 +234,8 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
             if ( set_conjMult_callback || is_size_change_decrease ) {
                 // FT.CrossCorrelate(targetFT.d_ptr.momentum_space, false);
                 // Will type deduction work here?
-                FT.FwdImageInvFFT(FT_buffer, reinterpret_cast<float2*>(targetFT_buffer), noop, conj_mul, noop);
-                FT_fp16.FwdImageInvFFT(FT_fp16_buffer, reinterpret_cast<__half2*>(targetFT_fp16_buffer), noop, conj_mul, noop);
+                FT.FwdImageInvFFT(FT_buffer, reinterpret_cast<float2*>(targetFT_buffer), FT_buffer, noop, conj_mul, noop);
+                FT_fp16.FwdImageInvFFT(FT_fp16_buffer, reinterpret_cast<__half2*>(targetFT_fp16_buffer), FT_fp16_buffer, noop, conj_mul, noop);
             }
             else {
                 FT.FwdFFT(FT_buffer);
@@ -281,7 +281,7 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
                 if ( set_conjMult_callback || is_size_change_decrease ) {
                     //   FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
                     // Will type deduction work here?
-                    FT.FwdImageInvFFT(FT_buffer, reinterpret_cast<float2*>(targetFT_buffer), noop, conj_mul, noop);
+                    FT.FwdImageInvFFT(FT_buffer, reinterpret_cast<float2*>(targetFT_buffer), FT_buffer, noop, conj_mul, noop);
                 }
                 else {
                     FT.FwdFFT(FT_buffer);
@@ -298,7 +298,7 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
                 if ( set_conjMult_callback || is_size_change_decrease ) {
                     //   FT.CrossCorrelate(targetFT.d_ptr.momentum_space_buffer, false);
                     // Will type deduction work here?
-                    FT_fp16.FwdImageInvFFT(FT_fp16_buffer, reinterpret_cast<__half2*>(targetFT_fp16_buffer), noop, conj_mul, noop);
+                    FT_fp16.FwdImageInvFFT(FT_fp16_buffer, reinterpret_cast<__half2*>(targetFT_fp16_buffer), FT_fp16_buffer, noop, conj_mul, noop);
                 }
                 else {
                     FT_fp16.FwdFFT(FT_fp16_buffer);

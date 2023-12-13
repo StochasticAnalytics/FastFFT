@@ -2,7 +2,7 @@
 #define __INCLUDE_DETAIL_DEVICE_HELPERS_H__
 
 #include <cuda_fp16.h>
-#include "cufftdx/include/cufftdx.hpp"
+#include "../cufftdx/include/cufftdx.hpp"
 
 #include "checks_and_debug.h"
 

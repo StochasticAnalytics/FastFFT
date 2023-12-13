@@ -2,7 +2,7 @@
 #define __INCLUDE_DETAIL_MEMORY_ADDRESSING_H__
 
 #include <cuda_fp16.h>
-#include "cufftdx/include/detail/system_checks.hpp"
+#include "../cufftdx/include/detail/system_checks.hpp"
 
 namespace FastFFT {
 

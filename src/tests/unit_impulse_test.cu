@@ -2,7 +2,7 @@
 #include "tests.h"
 
 template <int Rank>
-bool unit_impulse_test(std::vector<int> size, bool do_increase_size) {
+bool unit_impulse_test(std::vector<int> size, bool do_increase_size, bool inplace_transform = true) {
 
     bool              all_passed = true;
     std::vector<bool> init_passed(size.size( ), true);
@@ -49,6 +49,8 @@ bool unit_impulse_test(std::vector<int> size, bool do_increase_size) {
             FastFFT::FourierTransformer<float, float, float2, Rank> FT;
 
             float* FT_buffer;
+            // This is only used for the out of place test.
+            float* FT_buffer_output;
             // This is similar to creating an FFT/CUFFT plan, so set these up before doing anything on the GPU
             FT.SetForwardFFTPlan(input_size.x, input_size.y, input_size.z, output_size.x, output_size.y, output_size.z);
             FT.SetInverseFFTPlan(output_size.x, output_size.y, output_size.z, output_size.x, output_size.y, output_size.z);
@@ -69,6 +71,10 @@ bool unit_impulse_test(std::vector<int> size, bool do_increase_size) {
             device_output.real_memory_allocated = std::max(host_input.real_memory_allocated, host_output.real_memory_allocated);
             cudaErr(cudaMallocAsync((void**)&FT_buffer, device_output.real_memory_allocated * sizeof(float), cudaStreamPerThread));
             cudaErr(cudaMemsetAsync(FT_buffer, 0, device_output.real_memory_allocated * sizeof(float), cudaStreamPerThread));
+            if ( ! inplace_transform ) {
+                cudaErr(cudaMallocAsync((void**)&FT_buffer_output, device_output.real_memory_allocated * sizeof(float), cudaStreamPerThread));
+                cudaErr(cudaMemsetAsync(FT_buffer_output, 0, device_output.real_memory_allocated * sizeof(float), cudaStreamPerThread));
+            }
             // In your own programs, you will be handling this memory allocation yourself. We'll just make something here.
             // I think fftwf_malloc may potentially create a different alignment than new/delete, but kinda doubt it. For cisTEM consistency...
             bool set_fftw_plan = true;
@@ -114,8 +120,15 @@ bool unit_impulse_test(std::vector<int> size, bool do_increase_size) {
 
             // This method will call the regular FFT kernels given the input/output dimensions are equal when the class is instantiated.
             // bool swap_real_space_quadrants = true;
+            if ( inplace_transform ) {
+                FT.FwdFFT(FT_buffer);
+            }
+            else {
+                FT.FwdFFT(FT_buffer, FT_buffer_output);
+                // To make sure we are not getting a false positive, set the input to some undesired value.
+                cudaErr(cudaMemsetAsync(FT_buffer, 0, device_output.real_memory_allocated * sizeof(float), cudaStreamPerThread));
+            }
 
-            FT.FwdFFT(FT_buffer);
             bool continue_debugging = true;
             // We don't want this to break compilation of other tests, so only check at runtime.
             if constexpr ( FFT_DEBUG_STAGE < 5 ) {
@@ -145,7 +158,14 @@ bool unit_impulse_test(std::vector<int> size, bool do_increase_size) {
             // MyFFTDebugAssertTestTrue( abs(sum - host_output.fftw_epsilon) < 1e-8, "FastFFT unit impulse forward FFT");
             FT.SetToConstant(host_output.real_values, host_output.real_memory_allocated, 2.0f);
 
-            FT.InvFFT(FT_buffer);
+            if ( inplace_transform ) {
+                FT.InvFFT(FT_buffer);
+            }
+            else {
+                // Switch the role of the buffers
+                FT.InvFFT(FT_buffer_output, FT_buffer);
+                cudaErr(cudaMemsetAsync(FT_buffer_output, 0, device_output.real_memory_allocated * sizeof(float), cudaStreamPerThread));
+            }
             FT.CopyDeviceToHostAndSynchronize(host_output.real_values);
 
             if constexpr ( FFT_DEBUG_STAGE > 4 ) {
@@ -165,25 +185,33 @@ bool unit_impulse_test(std::vector<int> size, bool do_increase_size) {
 
             oSize++;
             cudaErr(cudaFreeAsync(FT_buffer, cudaStreamPerThread));
+            if ( ! inplace_transform )
+                cudaErr(cudaFreeAsync(FT_buffer_output, cudaStreamPerThread));
         } // while loop over pad to size
     } // for loop over pad from size
 
+    std::string is_in_place;
+    if ( inplace_transform )
+        is_in_place = "in place";
+    else
+        is_in_place = "out of place";
+
     if ( all_passed ) {
         if ( ! do_increase_size )
-            std::cout << "    All rank " << Rank << " size_decrease unit impulse tests passed!" << std::endl;
+            std::cout << "    All rank " << Rank << " size_decrease unit impulse, " << is_in_place << " tests passed!" << std::endl;
         else
-            std::cout << "    All rank " << Rank << " size_increase unit impulse tests passed!" << std::endl;
+            std::cout << "    All rank " << Rank << " size_increase unit impulse, " << is_in_place << "  tests passed!" << std::endl;
     }
     else {
         for ( int n = 0; n < size.size( ); n++ ) {
             if ( ! init_passed[n] )
-                std::cout << "    Initialization failed for size " << size[n] << " rank " << Rank << std::endl;
+                std::cout << "    Initialization failed for size " << size[n] << " rank " << Rank << " " << is_in_place << std::endl;
             if ( ! FFTW_passed[n] )
-                std::cout << "    FFTW failed for size " << size[n] << " rank " << Rank << std::endl;
+                std::cout << "    FFTW failed for size " << size[n] << " rank " << Rank << " " << is_in_place << std::endl;
             if ( ! FastFFT_forward_passed[n] )
-                std::cout << "    FastFFT failed for forward transform size " << size[n] << " rank " << Rank << " increase " << do_increase_size << std::endl;
+                std::cout << "    FastFFT failed for forward transform size " << size[n] << " rank " << Rank << " " << is_in_place << " increase " << do_increase_size << std::endl;
             if ( ! FastFFT_roundTrip_passed[n] )
-                std::cout << "    FastFFT failed for roundtrip transform size " << size[n] << " rank " << Rank << " increase " << do_increase_size << std::endl;
+                std::cout << "    FastFFT failed for roundtrip transform size " << size[n] << " rank " << Rank << " " << is_in_place << " increase " << do_increase_size << std::endl;
         }
     }
     return all_passed;
@@ -201,11 +229,14 @@ int main(int argc, char** argv) {
 
     // TODO: size decrease
     if ( run_2d_unit_tests ) {
-        constexpr bool do_increase_size_first = true;
+        constexpr bool do_increase_size_first = false;
         constexpr bool second_round           = ! do_increase_size_first;
         if ( ! unit_impulse_test<2>(FastFFT::test_size, do_increase_size_first) )
             return 1;
         if ( ! unit_impulse_test<2>(FastFFT::test_size, second_round) )
+            return 1;
+        // Also test case where the external pointer is different on output
+        if ( ! unit_impulse_test<2>(FastFFT::test_size, true, false) )
             return 1;
     }
 

@@ -5,41 +5,41 @@
 #include <iostream>
 
 namespace FastFFT {
-    // hacky and non-conclusive way to trouble shoot mismatched types in function calls
-    // Intented to be place ind constexpr conditionals that should not be reached.
-    // Relies on exhaustive list of types at compile time, so there is also a runtime
-    // bool to catch any types that are not in the list.
-    template <typename T>
-    __device__ __host__ inline void static_assert_type_name(T v) {
-        if constexpr (std::is_pointer_v<T>) {
-            static_assert(!std::is_convertible_v<T, int*>, "int*");
-            static_assert(!std::is_convertible_v<T, int2*>, "int2*");
-            static_assert(!std::is_convertible_v<T, int3*>, "int3*");
-            static_assert(!std::is_convertible_v<T, int4*>, "int4*");
-            static_assert(!std::is_convertible_v<T, float*>, "float*");
-            static_assert(!std::is_convertible_v<T, float2*>, "float2*");
-            static_assert(!std::is_convertible_v<T, float3*>, "float3*");
-            static_assert(!std::is_convertible_v<T, float4*>, "float4*");
-            static_assert(!std::is_convertible_v<T, double*>, "double*");
-            static_assert(!std::is_convertible_v<T, __half*>, "__half*");
-            static_assert(!std::is_convertible_v<T, __half2*>, "__half2*");
-            static_assert(!std::is_convertible_v<T, nullptr_t>, "nullptr_t");
-        }
-        else {
-            static_assert(!std::is_convertible_v<T, int>, "int");
-            static_assert(!std::is_convertible_v<T, int2>, "int2");
-            static_assert(!std::is_convertible_v<T, int3>, "int3");
-            static_assert(!std::is_convertible_v<T, int4>, "int4");
-            static_assert(!std::is_convertible_v<T, float>, "float");
-            static_assert(!std::is_convertible_v<T, float2>, "float2");
-            static_assert(!std::is_convertible_v<T, float3>, "float3");
-            static_assert(!std::is_convertible_v<T, float4>, "float4");
-            static_assert(!std::is_convertible_v<T, double>, "double");
-            static_assert(!std::is_convertible_v<T, __half>, "__half");
-            static_assert(!std::is_convertible_v<T, __half2>, "__half2");
-            static_assert(!std::is_convertible_v<T, nullptr_t>, "nullptr_t");
-        }
-    };
+// hacky and non-conclusive way to trouble shoot mismatched types in function calls
+// Intented to be place ind constexpr conditionals that should not be reached.
+// Relies on exhaustive list of types at compile time, so there is also a runtime
+// bool to catch any types that are not in the list.
+template <typename T>
+__device__ __host__ inline void static_assert_type_name(T v) {
+    if constexpr ( std::is_pointer_v<T> ) {
+        static_assert(! std::is_convertible_v<T, int*>, "int*");
+        static_assert(! std::is_convertible_v<T, int2*>, "int2*");
+        static_assert(! std::is_convertible_v<T, int3*>, "int3*");
+        static_assert(! std::is_convertible_v<T, int4*>, "int4*");
+        static_assert(! std::is_convertible_v<T, float*>, "float*");
+        static_assert(! std::is_convertible_v<T, float2*>, "float2*");
+        static_assert(! std::is_convertible_v<T, float3*>, "float3*");
+        static_assert(! std::is_convertible_v<T, float4*>, "float4*");
+        static_assert(! std::is_convertible_v<T, double*>, "double*");
+        static_assert(! std::is_convertible_v<T, __half*>, "__half*");
+        static_assert(! std::is_convertible_v<T, __half2*>, "__half2*");
+        static_assert(! std::is_convertible_v<T, std::nullptr_t>, "nullptr_t");
+    }
+    else {
+        static_assert(! std::is_convertible_v<T, int>, "int");
+        static_assert(! std::is_convertible_v<T, int2>, "int2");
+        static_assert(! std::is_convertible_v<T, int3>, "int3");
+        static_assert(! std::is_convertible_v<T, int4>, "int4");
+        static_assert(! std::is_convertible_v<T, float>, "float");
+        static_assert(! std::is_convertible_v<T, float2>, "float2");
+        static_assert(! std::is_convertible_v<T, float3>, "float3");
+        static_assert(! std::is_convertible_v<T, float4>, "float4");
+        static_assert(! std::is_convertible_v<T, double>, "double");
+        static_assert(! std::is_convertible_v<T, __half>, "__half");
+        static_assert(! std::is_convertible_v<T, __half2>, "__half2");
+        static_assert(! std::is_convertible_v<T, std::nullptr_t>, "nullptr_t");
+    }
+};
 
     // clang-format off
 
@@ -122,29 +122,29 @@ namespace FastFFT {
         }
     };
 
-    // clang-format on
+// clang-format on
 
-    // For debugging
+// For debugging
 
-    inline void PrintVectorType(int3 input) {
-        std::cerr << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
-    }
+inline void PrintVectorType(int3 input) {
+    std::cerr << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
+}
 
-    inline void PrintVectorType(int4 input) {
-        std::cerr << "(x,y,z,w) " << input.x << " " << input.y << " " << input.z << " " << input.w << std::endl;
-    }
+inline void PrintVectorType(int4 input) {
+    std::cerr << "(x,y,z,w) " << input.x << " " << input.y << " " << input.z << " " << input.w << std::endl;
+}
 
-    inline void PrintVectorType(dim3 input) {
-        std::cerr << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
-    }
+inline void PrintVectorType(dim3 input) {
+    std::cerr << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
+}
 
-    inline void PrintVectorType(short3 input) {
-        std::cerr << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
-    }
+inline void PrintVectorType(short3 input) {
+    std::cerr << "(x,y,z) " << input.x << " " << input.y << " " << input.z << std::endl;
+}
 
-    inline void PrintVectorType(short4 input) {
-        std::cerr << "(x,y,z,w) " << input.x << " " << input.y << " " << input.z << " " << input.w << std::endl;
-    }
+inline void PrintVectorType(short4 input) {
+    std::cerr << "(x,y,z,w) " << input.x << " " << input.y << " " << input.z << " " << input.w << std::endl;
+}
 
 } // namespace FastFFT
 
