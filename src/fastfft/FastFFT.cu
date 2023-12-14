@@ -1174,23 +1174,23 @@ __global__ void block_fft_kernel_R2C_DECREASE_XY(const InputData_t* __restrict__
 
     complex_compute_t thread_data[FFT::storage_size];
 
-    // // Load in natural order
-    // io<FFT>::load_r2c_shared_and_pad(&input_values[Return1DFFTAddress(mem_offsets.physical_x_input)], shared_mem);
+    // Load in natural order
+    io<FFT>::load_r2c_shared_and_pad(&input_values[Return1DFFTAddress(mem_offsets.physical_x_input)], shared_mem);
 
-    // // DIT shuffle, bank conflict free
-    // io<FFT>::copy_from_shared(shared_mem, thread_data, Q);
+    // DIT shuffle, bank conflict free
+    io<FFT>::copy_from_shared(shared_mem, thread_data, Q);
 
-    // // The FFT operator has no idea we are using threadIdx.z to get multiple sub transforms, so we need to
-    // // segment the shared memory it accesses to avoid conflicts.
-    // constexpr const unsigned int fft_shared_mem_num_elements = FFT::shared_memory_size / sizeof(complex_compute_t);
-    // FFT( ).execute(thread_data, &shared_mem[fft_shared_mem_num_elements * threadIdx.z], workspace);
-    // __syncthreads( );
+    // The FFT operator has no idea we are using threadIdx.z to get multiple sub transforms, so we need to
+    // segment the shared memory it accesses to avoid conflicts.
+    constexpr const unsigned int fft_shared_mem_num_elements = FFT::shared_memory_size / sizeof(complex_compute_t);
+    FFT( ).execute(thread_data, &shared_mem[fft_shared_mem_num_elements * threadIdx.z], workspace);
+    __syncthreads( );
 
-    // // Full twiddle multiply and store in natural order in shared memory
-    // io<FFT>::reduce_block_fft(thread_data, shared_mem, twiddle_in, Q);
+    // Full twiddle multiply and store in natural order in shared memory
+    io<FFT>::reduce_block_fft(thread_data, shared_mem, twiddle_in, Q);
 
-    // // Reduce from shared memory into registers, ending up with only P valid outputs.
-    // io<FFT>::store_r2c_reduced(thread_data, &output_values[mem_offsets.physical_x_output * threadIdx.z], gridDim.y, mem_offsets.physical_x_output);
+    // Reduce from shared memory into registers, ending up with only P valid outputs.
+    io<FFT>::store_r2c_reduced(thread_data, &output_values[mem_offsets.physical_x_output * threadIdx.z], gridDim.y, mem_offsets.physical_x_output);
 }
 
 template <class ExternalImage_t, class FFT, class invFFT, class ComplexData_t>
@@ -2860,15 +2860,15 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::GetTr
     // Set member variable transform_size.N (.P .L .Q)
 
     if ( IsR2CType(kernel_type) ) {
-        AssertDivisibleAndFactorOf2(std::max(fwd_dims_in.x, fwd_dims_out.x), std::min(fwd_dims_in.x, fwd_dims_out.x));
+        AssertDivisibleAndFactorOf2(kernel_type, std::max(fwd_dims_in.x, fwd_dims_out.x), std::min(fwd_dims_in.x, fwd_dims_out.x));
     }
     else if ( IsC2RType(kernel_type) ) {
         // FIXME
         if ( kernel_type == c2r_decrease_XY ) {
-            AssertDivisibleAndFactorOf2(std::max(inv_dims_in.x, inv_dims_out.x), std::max(inv_dims_in.x, inv_dims_out.x));
+            AssertDivisibleAndFactorOf2(kernel_type, std::max(inv_dims_in.x, inv_dims_out.x), std::max(inv_dims_in.x, inv_dims_out.x));
         }
         else {
-            AssertDivisibleAndFactorOf2(std::max(inv_dims_in.x, inv_dims_out.x), std::min(inv_dims_in.x, inv_dims_out.x));
+            AssertDivisibleAndFactorOf2(kernel_type, std::max(inv_dims_in.x, inv_dims_out.x), std::min(inv_dims_in.x, inv_dims_out.x));
         }
     }
     else {
@@ -2876,25 +2876,25 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::GetTr
         if ( IsForwardType(kernel_type) ) {
             switch ( transform_dimension ) {
                 case 1: {
-                    AssertDivisibleAndFactorOf2(std::max(fwd_dims_in.x, fwd_dims_out.x), std::min(fwd_dims_in.x, fwd_dims_out.x));
+                    AssertDivisibleAndFactorOf2(kernel_type, std::max(fwd_dims_in.x, fwd_dims_out.x), std::min(fwd_dims_in.x, fwd_dims_out.x));
                     break;
                 }
                 case 2: {
                     if ( kernel_type == generic_fwd_increase_op_inv_none ) {
                         // FIXME
-                        AssertDivisibleAndFactorOf2(std::max(fwd_dims_in.y, fwd_dims_out.y), std::max(fwd_dims_in.y, fwd_dims_out.y));
+                        AssertDivisibleAndFactorOf2(kernel_type, std::max(fwd_dims_in.y, fwd_dims_out.y), std::max(fwd_dims_in.y, fwd_dims_out.y));
                     }
                     else {
-                        AssertDivisibleAndFactorOf2(std::max(fwd_dims_in.y, fwd_dims_out.y), std::min(fwd_dims_in.y, fwd_dims_out.y));
+                        AssertDivisibleAndFactorOf2(kernel_type, std::max(fwd_dims_in.y, fwd_dims_out.y), std::min(fwd_dims_in.y, fwd_dims_out.y));
                     }
                     break;
                 }
                 case 3: {
                     if ( IsTransormAlongZ(kernel_type) ) {
-                        AssertDivisibleAndFactorOf2(std::max(fwd_dims_in.z, fwd_dims_out.z), std::min(fwd_dims_in.z, fwd_dims_out.z));
+                        AssertDivisibleAndFactorOf2(kernel_type, std::max(fwd_dims_in.z, fwd_dims_out.z), std::min(fwd_dims_in.z, fwd_dims_out.z));
                     }
                     else {
-                        AssertDivisibleAndFactorOf2(std::max(fwd_dims_in.y, fwd_dims_out.y), std::min(fwd_dims_in.y, fwd_dims_out.y));
+                        AssertDivisibleAndFactorOf2(kernel_type, std::max(fwd_dims_in.y, fwd_dims_out.y), std::min(fwd_dims_in.y, fwd_dims_out.y));
                     }
 
                     break;
@@ -2908,25 +2908,25 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::GetTr
         else {
             switch ( transform_dimension ) {
                 case 1: {
-                    AssertDivisibleAndFactorOf2(std::max(inv_dims_in.x, inv_dims_out.x), std::min(inv_dims_in.x, inv_dims_out.x));
+                    AssertDivisibleAndFactorOf2(kernel_type, std::max(inv_dims_in.x, inv_dims_out.x), std::min(inv_dims_in.x, inv_dims_out.x));
                     break;
                 }
                 case 2: {
                     if ( kernel_type == xcorr_fwd_none_inv_decrease ) {
                         // FIXME, for now using full transform
-                        AssertDivisibleAndFactorOf2(std::max(inv_dims_in.y, inv_dims_out.y), std::max(inv_dims_in.y, inv_dims_out.y));
+                        AssertDivisibleAndFactorOf2(kernel_type, std::max(inv_dims_in.y, inv_dims_out.y), std::max(inv_dims_in.y, inv_dims_out.y));
                     }
                     else {
-                        AssertDivisibleAndFactorOf2(std::max(inv_dims_in.y, inv_dims_out.y), std::min(inv_dims_in.y, inv_dims_out.y));
+                        AssertDivisibleAndFactorOf2(kernel_type, std::max(inv_dims_in.y, inv_dims_out.y), std::min(inv_dims_in.y, inv_dims_out.y));
                     }
                     break;
                 }
                 case 3: {
                     if ( IsTransormAlongZ(kernel_type) ) {
-                        AssertDivisibleAndFactorOf2(std::max(inv_dims_in.z, inv_dims_out.z), std::min(inv_dims_in.z, inv_dims_out.z));
+                        AssertDivisibleAndFactorOf2(kernel_type, std::max(inv_dims_in.z, inv_dims_out.z), std::min(inv_dims_in.z, inv_dims_out.z));
                     }
                     else {
-                        AssertDivisibleAndFactorOf2(std::max(inv_dims_in.y, inv_dims_out.y), std::min(inv_dims_in.y, inv_dims_out.y));
+                        AssertDivisibleAndFactorOf2(kernel_type, std::max(inv_dims_in.y, inv_dims_out.y), std::min(inv_dims_in.y, inv_dims_out.y));
                     }
 
                     break;

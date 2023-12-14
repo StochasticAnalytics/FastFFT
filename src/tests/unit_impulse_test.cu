@@ -33,6 +33,11 @@ bool unit_impulse_test(std::vector<int> size, bool do_increase_size, bool inplac
                     input_size  = make_short4(size[oSize], size[oSize], size[oSize], 0);
                 }
                 else {
+                    // FIXME: Nvidia bug report 4417253
+                    if ( size[oSize] / size[iSize] > 64 ) {
+                        oSize++;
+                        continue;
+                    }
                     output_size = make_short4(size[iSize], size[iSize], 1, 0);
                     input_size  = make_short4(size[oSize], size[oSize], 1, 0);
                 }
@@ -229,7 +234,7 @@ int main(int argc, char** argv) {
 
     // TODO: size decrease
     if ( run_2d_unit_tests ) {
-        constexpr bool do_increase_size_first = false;
+        constexpr bool do_increase_size_first = true;
         constexpr bool second_round           = ! do_increase_size_first;
         if ( ! unit_impulse_test<2>(FastFFT::test_size, do_increase_size_first) )
             return 1;

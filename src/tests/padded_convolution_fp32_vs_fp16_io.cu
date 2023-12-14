@@ -7,8 +7,7 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
 
     using SCT = FastFFT::SizeChangeType::Enum;
 
-    constexpr bool skip_cufft_for_profiling = false;
-    constexpr bool print_out_time           = true;
+    constexpr bool print_out_time = true;
     // bool set_padding_callback = false; // the padding callback is slower than pasting in b/c the read size of the pointers is larger than the actual data. do not use.
     bool set_conjMult_callback   = true;
     bool is_size_change_decrease = false;

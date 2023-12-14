@@ -420,37 +420,39 @@ class FourierTransformer {
     IMPORTANT: if you add a kernel, you need to modify
       1) enum KernelType
       2) KernelName: this is positionally dependent on KernelType
-      3) If appropriate:
-        a) IsThreadType()
-        b) IsR2CType()
-        c) IsC2RType()
-        d) IsForwardType()
-        e) IsTransformAlongZ()
+
+      The names should match the enum exactly and adhere to the following rules, which are used to query the string view
+      to obtain properties about the transform kernel.
   */
 
     /*
     MEANING of KERNEL TYPE NAMES:
     
     - r2c and c2r are for real valued input/output images
+        - r2c implies forward transform, c2r implies inverse transform
+        - all other transform enum/names must contain _fwd_ or _inv_ to indicate direction
 
-    - any kernel with "decomposed" is a thread based routine (not currently supported)
+    - any kernel with "_decomposed_" is a thread based routine (not currently supported)
 
     - if a kernel is part of a size change routine it is specified as none/increase/decrease
     
     - if 2 axes are specified, those dimensions are transposed.
-        - 1d - this is meaningless
+        - 1d - this is meaningless. Many XY routines are currently also used for 1d with a constexpr check on rank.
         - 2d - should always be XY
         - 3d - should always be XZ
 
     - if 3 axes are specified, those dimensions are permuted XYZ (only 3d)
+        - Having _XY or _XYZ is used to check a kernel name to see if it is 3d
 
-    - any c2c FWD method without an axes is a terminal stage of a forward transform
-    - any c2c INV method without an axes is a initial stage of an inverse transform
+    - Data are always transposed in XY in momentum space 
+        - any c2c FWD method without an axes specifier must be a terminal stage of a forward transform
+        - any c2c INV method without an axes specifier must be a initial stage of an inverse transform
 
  */
 
     // FIXME: in the execution blocks, we should have some check that the correct direction is implemented.
     // Or better yet, have this templated and
+
     enum KernelType { r2c_decomposed, // 1D fwd
                       r2c_decomposed_transposed, // 2d fwd 1st stage
                       r2c_none_XY, // 1d fwd  //  2d fwd 1st stage
@@ -481,10 +483,12 @@ class FourierTransformer {
                       xcorr_fwd_none_inv_decrease, // (e.g. movie/particle translational search)
                       xcorr_fwd_decrease_inv_decrease, // (e.g. bandlimit, xcorr, translational search)
                       xcorr_decomposed,
-                      generic_fwd_increase_op_inv_none };
+                      generic_fwd_increase_op_inv_none,
+                      COUNT };
 
+    static const int n_kernel_types = static_cast<int>(KernelType::COUNT);
     // WARNING this is flimsy and prone to breaking, you must ensure the order matches the KernelType enum.
-    std::vector<std::string>
+    std::array<std::string_view, n_kernel_types>
             KernelName{"r2c_decomposed",
                        "r2c_decomposed_transposed",
                        "r2c_none_XY",
@@ -520,86 +524,83 @@ class FourierTransformer {
     // All in a column so it is obvious if a "==" is missing which will of course break the or co nditions and
     // always evaluate true.
     inline bool IsThreadType(KernelType kernel_type) {
-        if ( kernel_type == r2c_decomposed ||
-             kernel_type == r2c_decomposed_transposed ||
-             kernel_type == c2c_fwd_decomposed ||
-             kernel_type == c2c_inv_decomposed ||
-             kernel_type == c2r_decomposed ||
-             kernel_type == c2r_decomposed_transposed ||
-             kernel_type == xcorr_decomposed ) {
+        if ( KernelName.at(kernel_type).find("decomposed") != KernelName.at(kernel_type).npos )
             return true;
-        }
-        else {
-            if ( kernel_type == r2c_none_XY ||
-                 kernel_type == r2c_none_XZ ||
-                 kernel_type == r2c_decrease_XY ||
-                 kernel_type == r2c_increase_XY ||
-                 kernel_type == r2c_increase_XZ ||
-                 kernel_type == c2c_fwd_none ||
-                 kernel_type == c2c_fwd_none_XYZ ||
-                 kernel_type == c2c_fwd_decrease ||
-                 kernel_type == c2c_fwd_increase ||
-                 kernel_type == c2c_fwd_increase_XYZ ||
-                 kernel_type == c2c_inv_none ||
-                 kernel_type == c2c_inv_none_XZ ||
-                 kernel_type == c2c_inv_none_XYZ ||
-                 kernel_type == c2c_inv_decrease ||
-                 kernel_type == c2c_inv_increase ||
-                 kernel_type == c2r_none ||
-                 kernel_type == c2r_none_XY ||
-                 kernel_type == c2r_decrease_XY ||
-                 kernel_type == c2r_increase ||
-                 kernel_type == xcorr_fwd_increase_inv_none ||
-                 kernel_type == xcorr_fwd_decrease_inv_none ||
-                 kernel_type == xcorr_fwd_none_inv_decrease ||
-                 kernel_type == xcorr_fwd_decrease_inv_decrease ||
-                 kernel_type == generic_fwd_increase_op_inv_none ) {
-                return false;
-            }
-            else {
-                std::cerr << "Function IsThreadType does not recognize the kernel type ( " << KernelName[kernel_type] << " )" << std::endl;
-                exit(-1);
-            }
-        }
-    };
+        else
+            return false;
+    }
 
     inline bool IsR2CType(KernelType kernel_type) {
-        if ( kernel_type == r2c_decomposed || kernel_type == r2c_decomposed_transposed ||
-             kernel_type == r2c_none_XY || kernel_type == r2c_none_XZ ||
-             kernel_type == r2c_decrease_XY || kernel_type == r2c_increase_XY || kernel_type == r2c_increase_XZ ) {
+        if ( KernelName.at(kernel_type).find("r2c_") != KernelName.at(kernel_type).npos )
             return true;
-        }
         else
             return false;
     }
 
     inline bool IsC2RType(KernelType kernel_type) {
-        if ( kernel_type == c2r_decomposed || kernel_type == c2r_decomposed_transposed ||
-             kernel_type == c2r_none || kernel_type == c2r_none_XY || kernel_type == c2r_decrease_XY || kernel_type == c2r_increase ) {
+        if ( KernelName.at(kernel_type).find("c2r_") != KernelName.at(kernel_type).npos )
             return true;
-        }
         else
             return false;
     }
 
-    // This is used to set the sign of the twiddle factor for decomposed kernels, whether threaded, or part of a block fft.
-    // For mixed kernels (eg. xcorr_* the size type is defined by where the size change happens.
+    // Note: round trip transforms are forward types
+    // TODO: this is a bit confusing and should be cleaned up.
     inline bool IsForwardType(KernelType kernel_type) {
-        if ( kernel_type == r2c_decomposed || kernel_type == r2c_decomposed_transposed ||
-             kernel_type == r2c_none_XY || kernel_type == r2c_none_XZ ||
-             kernel_type == r2c_decrease_XY || kernel_type == r2c_increase_XY || kernel_type == r2c_increase_XZ ||
-             kernel_type == c2c_fwd_none || kernel_type == c2c_fwd_none_XYZ || kernel_type == c2c_fwd_increase_XYZ ||
-             kernel_type == c2c_fwd_decrease ||
-             kernel_type == c2c_fwd_increase ||
-             kernel_type == xcorr_fwd_decrease_inv_none || kernel_type == xcorr_fwd_increase_inv_none ||
-             kernel_type == generic_fwd_increase_op_inv_none ) {
+        if ( IsR2CType(kernel_type) || KernelName.at(kernel_type).find("_fwd_") != KernelName.at(kernel_type).npos )
             return true;
-        }
         else
             return false;
     }
 
-    void         GetTransformSize(KernelType kernel_type);
+    inline bool IsInverseType(KernelType kernel_type) {
+        if ( IsC2RType(kernel_type) || KernelName.at(kernel_type).find("_inv_") != KernelName.at(kernel_type).npos )
+            return true;
+        else
+            return false;
+    }
+
+    inline bool IsIncreaseSizeType(KernelType kernel_type) {
+        if ( KernelName.at(kernel_type).find("_increase_") != KernelName.at(kernel_type).npos )
+            return true;
+        else
+            return false;
+    }
+
+    inline bool IsDecreaseSizeType(KernelType kernel_type) {
+        if ( KernelName.at(kernel_type).find("_decrease_") != KernelName.at(kernel_type).npos )
+            return true;
+        else
+            return false;
+    }
+
+    // Note: currently unused
+    inline bool IsRoundTripType(KernelType kernel_type) {
+        if ( KernelName.at(kernel_type).find("_fwd_") != KernelName.at(kernel_type).npos &&
+             KernelName.at(kernel_type).find("_inv_") != KernelName.at(kernel_type).npos )
+            return true;
+        else
+            return false;
+    }
+
+    inline bool IsTransormAlongZ(KernelType kernel_type) {
+        if ( KernelName.at(kernel_type).find("_XYZ") != KernelName.at(kernel_type).npos )
+            return true;
+        else
+            return false;
+    }
+
+    inline bool IsRank3(KernelType kernel_type) {
+        if ( KernelName.at(kernel_type).find("_XZ") != KernelName.at(kernel_type).npos ||
+             KernelName.at(kernel_type).find("_XYZ") != KernelName.at(kernel_type).npos )
+            return true;
+        else
+            return false;
+    }
+
+    void
+    GetTransformSize(KernelType kernel_type);
+
     void         GetTransformSize_thread(KernelType kernel_type, int thread_fft_size);
     LaunchParams SetLaunchParameters(const int& ept, KernelType kernel_type);
 
@@ -669,44 +670,33 @@ class FourierTransformer {
     Generic_Inv(IntraOpType intra_op,
                 PostOpType  post_op);
 
-    inline bool IsTransormAlongZ(KernelType kernel_type) {
-        if ( kernel_type == c2c_fwd_none_XYZ || kernel_type == c2c_fwd_increase_XYZ ||
-             kernel_type == c2c_inv_none_XYZ ) {
-            return true;
-        }
-        else
-            return false;
-    }
+    // FIXME: This function could be named more appropriately.
+    // FIXME: kernel_type is only needed for the current debug checks based on the blockDim.z bug
+    inline void AssertDivisibleAndFactorOf2(KernelType kernel_type, int full_size_transform, const int number_non_zero_inputs_or_outputs) {
 
-    inline bool IsRank3(KernelType kernel_type) {
-        if ( kernel_type == r2c_none_XZ || kernel_type == r2c_increase_XZ ||
-             kernel_type == c2c_fwd_increase_XYZ || kernel_type == c2c_inv_none_XZ ||
-             kernel_type == c2c_fwd_none_XYZ || kernel_type == c2c_inv_none_XYZ ) {
-            return true;
-        }
-        else
-            return false;
-    }
-
-    inline void AssertDivisibleAndFactorOf2(int full_size_transform, int number_non_zero_inputs_or_outputs) {
-        // FIXME: This function could be named more appropriately.
+        // The size we would need to use with a general purpose library, eg. FFTW
+        // Note: this is not limited by the power of 2 restriction as we can compose this with sub ffts that are power of 2
         transform_size.N = full_size_transform;
+        // The input/output size we care about. non-zero comes from zero padding, but probably doesn't make sense
+        // for a size reduction algo e.g. TODO: rename
         transform_size.L = number_non_zero_inputs_or_outputs;
-        // FIXME: in principle, transform_size.L should equal number_non_zero_inputs_or_outputs and transform_size.P only needs to be >= and satisfy other requirements, e.g. power of two (currently.)
-        transform_size.P = number_non_zero_inputs_or_outputs;
 
-        if ( transform_size.N % transform_size.P == 0 ) {
-            transform_size.Q = transform_size.N / transform_size.P;
-        }
-        else {
-            std::cerr << "Array size " << transform_size.N << " is not divisible by wanted output size " << transform_size.P << std::endl;
-            exit(1);
-        }
+        // Get the closest >= power of 2
+        transform_size.P = 1;
+        while ( transform_size.P < number_non_zero_inputs_or_outputs )
+            transform_size.P = transform_size.P << 1;
 
-        if ( abs(fmod(log2(float(transform_size.P)), 1)) > 1e-6 ) {
-            std::cerr << "Wanted output size " << transform_size.P << " is not a power of 2." << std::endl;
-            exit(1);
-        }
+        MyFFTDebugAssertFalse(transform_size.P > transform_size.N, "transform_size.P > tranform_size.N");
+
+        // Our full transform size must have AT LEAST one factor of 2
+        MyFFTDebugAssertTrue(transform_size.N % transform_size.P == 0, "transform_size.N % tranform_size.P != 0");
+        transform_size.Q = transform_size.N / transform_size.P;
+
+        // FIXME: there is a bug in cuda that crashes for thread block size > 64 in the Z dimension.
+        // Note: for size increase or rount trip transforms, we can use on chip explicit padding, so this bug
+        // does not apply.
+        if ( IsDecreaseSizeType(kernel_type) )
+            MyFFTRunTimeAssertFalse(transform_size.Q > 64, "transform_size.Q > 64, see Nvidia bug report 4417253");
     }
 
     // Input is real or complex inferred from InputType
