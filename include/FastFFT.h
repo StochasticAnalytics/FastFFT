@@ -695,8 +695,8 @@ class FourierTransformer {
         // FIXME: there is a bug in cuda that crashes for thread block size > 64 in the Z dimension.
         // Note: for size increase or rount trip transforms, we can use on chip explicit padding, so this bug
         // does not apply.
-        if ( IsDecreaseSizeType(kernel_type) )
-            MyFFTRunTimeAssertFalse(transform_size.Q > 64, "transform_size.Q > 64, see Nvidia bug report 4417253");
+        // if ( IsDecreaseSizeType(kernel_type) )
+        //     MyFFTRunTimeAssertFalse(transform_size.Q > 64, "transform_size.Q > 64, see Nvidia bug report 4417253");
     }
 
     // Input is real or complex inferred from InputType

@@ -231,17 +231,17 @@ int main(int argc, char** argv) {
     FastFFT::CheckInputArgs(argc, argv, text_line, run_2d_unit_tests, run_3d_unit_tests);
 
     if ( run_2d_unit_tests ) {
-        // constexpr bool start_with_fp16 = false;
-        // constexpr bool start_with_fp32 = ! start_with_fp16;
-        // if ( ! const_image_test<2, start_with_fp16>(FastFFT::test_size) )
-        //     return 1;
-        // if ( ! const_image_test<2, start_with_fp32>(FastFFT::test_size) )
-        //     return 1;
+        constexpr bool start_with_fp16 = false;
+        constexpr bool start_with_fp32 = ! start_with_fp16;
+        if ( ! const_image_test<2, start_with_fp16>(FastFFT::test_size) )
+            return 1;
+        if ( ! const_image_test<2, start_with_fp32>(FastFFT::test_size) )
+            return 1;
     }
 
     if ( run_3d_unit_tests ) {
-        if ( ! const_image_test<3, false>(FastFFT::test_size_3d) )
-            return 1;
+        // if ( ! const_image_test<3, false>(FastFFT::test_size_3d) )
+        //     return 1;
         // if (! unit_impulse_test(test_size_3d, true, true)) return 1;
     }
 

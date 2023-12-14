@@ -29,9 +29,9 @@ static __device__ __forceinline__ unsigned int Return1DFFTAddress(const unsigned
 
 // Return the address of the 1D transform index 0. Right now testing for a stride of 2, but this could be modifiable if it works.
 static __device__ __forceinline__ unsigned int Return1DFFTAddress_strided_Z(const unsigned int pixel_pitch) {
-    // In the current condition, threadIdx.z is either 0 || 1, and gridDim.z = size_z / 2
+    // In the current condition, threadIdx.y is either 0 || 1, and gridDim.z = size_z / 2
     // index into a 2D tile in the XZ plane, for output in the ZX transposed plane (for coalsced write.)
-    return pixel_pitch * (blockIdx.y + (XZ_STRIDE * blockIdx.z + threadIdx.z) * gridDim.y);
+    return pixel_pitch * (blockIdx.y + (XZ_STRIDE * blockIdx.z + threadIdx.y) * gridDim.y);
 }
 
 // Return the address of the 1D transform index 0
@@ -48,7 +48,7 @@ static __device__ __forceinline__ unsigned int Return1DFFTAddress_Z(const unsign
 static __device__ __forceinline__ unsigned int Return1DFFTColumn_XYZ_transpose(const unsigned int NX) {
     // NX should be size_of<FFT>::value for this method. Should this be templated?
     // presumably the XZ axis is alread transposed on the forward, used to index into this state. Indexs in (ZY)' plane for input, to be transposed and permuted to output.'
-    return NX * (XZ_STRIDE * (blockIdx.y + gridDim.y * blockIdx.z) + threadIdx.z);
+    return NX * (XZ_STRIDE * (blockIdx.y + gridDim.y * blockIdx.z) + threadIdx.y);
 }
 
 // Return the address of the 1D transform index 0
