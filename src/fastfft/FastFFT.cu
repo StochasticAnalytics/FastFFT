@@ -205,14 +205,16 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::Alloc
     MyFFTDebugAssertTrue(compute_memory_wanted_ > 0, "Compute memory already allocated");
 
     // Allocate enough for the out of place buffer as well.
-    constexpr size_t compute_memory_multiplier = 2;
+    constexpr size_t compute_memory_scalar = 2;
+    // To get the address of the second buffer we want half of the number of ComputeType, not ComputeBaseType elements
+    constexpr size_t buffer_address_scalar = 2;
     precheck;
-    cudaErr(cudaMallocAsync(&d_ptr.buffer_1, compute_memory_multiplier * compute_memory_wanted_ * sizeof(ComputeBaseType), cudaStreamPerThread));
+    cudaErr(cudaMallocAsync(&d_ptr.buffer_1, compute_memory_scalar * compute_memory_wanted_ * sizeof(ComputeBaseType), cudaStreamPerThread));
     postcheck;
 
     // cudaMallocAsync returns the pointer immediately, even though the allocation has not yet completed, so we
     // should be fine to go on and point our secondary buffer to the correct location.
-    d_ptr.buffer_2 = &d_ptr.buffer_1[compute_memory_wanted_];
+    d_ptr.buffer_2 = &d_ptr.buffer_1[compute_memory_wanted_ / buffer_address_scalar];
 }
 
 template <class ComputeBaseType, class InputType, class OtherImageType, int Rank>
@@ -3263,6 +3265,7 @@ using namespace FastFFT::KernelFunction;
 
 INSTANTIATE(float, float, float2, 2);
 INSTANTIATE(float, __half, __half2, 2);
+INSTANTIATE(float, float, __half2, 2);
 INSTANTIATE(float, float, float2, 3);
 INSTANTIATE(float, __half, __half2, 3);
 #undef INSTANTIATE
