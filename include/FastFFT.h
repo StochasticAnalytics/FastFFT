@@ -29,8 +29,8 @@ inline void static_no_doubles( ) { static_assert(flag, "no doubles are allowed")
 template <bool flag = false>
 inline void static_no_half_support_yet( ) { static_assert(flag, "no __half support yet"); }
 
-// TODO: Device pointers are probably no longer needed, and only depend on InputType
-// TODO: Add a method to set the cuda stream
+// Currently the buffer types match the input type which also determines the output type.
+// The compute and otherImage type are independent.
 template <class C, class I, class OI>
 struct DevicePointers {
     // Use this to catch unsupported input/ compute types and throw exception.
@@ -42,6 +42,14 @@ struct DevicePointers {
 
 template <>
 struct DevicePointers<float*, float*, float2*> {
+    float*  external_input{ };
+    float*  external_output{ };
+    float2* buffer_1{ };
+    float2* buffer_2{ };
+};
+
+template <>
+struct DevicePointers<float*, float*, __half2*> {
     float*  external_input{ };
     float*  external_output{ };
     float2* buffer_1{ };

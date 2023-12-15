@@ -11,6 +11,9 @@ NVCC_FLAGS+=--expt-relaxed-constexpr
 # For testing, particularly until the cufftdx::BlockDim() operator is enabled
 NVCC_FLAGS+=-DCUFFTDX_DISABLE_RUNTIME_ASSERTS
 
+# Don't explicitly instantiate the 3d versions unless requested
+NVCC_FLAGS+=-DFastFFT_3d_instantiation
+
 # Gencode arguments, only supporting Volta or newer
 # SMS ?= 70 75 80 86
 # In initial dev, only compile for 70 or 86 depending on which workstation I'm on, b/c it is faster.

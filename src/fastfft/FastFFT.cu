@@ -3264,10 +3264,13 @@ using namespace FastFFT::KernelFunction;
                                                                                                                                                my_functor<float, 0, IKF_t::NOOP>);
 
 INSTANTIATE(float, float, float2, 2);
-INSTANTIATE(float, __half, __half2, 2);
+INSTANTIATE(float, __half, float2, 2);
 INSTANTIATE(float, float, __half2, 2);
+INSTANTIATE(float, __half, __half2, 2);
+#ifdef FastFFT_3d_instantiation
 INSTANTIATE(float, float, float2, 3);
 INSTANTIATE(float, __half, __half2, 3);
+#endif
 #undef INSTANTIATE
 
 } // namespace FastFFT
