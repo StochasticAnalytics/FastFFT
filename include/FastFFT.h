@@ -58,18 +58,18 @@ struct DevicePointers<float*, float*, __half2*> {
 
 template <>
 struct DevicePointers<float*, __half*, float2*> {
-    __half*  external_input{ };
-    __half*  external_output{ };
-    __half2* buffer_1{ };
-    __half2* buffer_2{ };
+    __half* external_input{ };
+    __half* external_output{ };
+    float2* buffer_1{ };
+    float2* buffer_2{ };
 };
 
 template <>
 struct DevicePointers<float*, __half*, __half2*> {
-    __half*  external_input{ };
-    __half*  external_output{ };
-    __half2* buffer_1{ };
-    __half2* buffer_2{ };
+    __half* external_input{ };
+    __half* external_output{ };
+    float2* buffer_1{ };
+    float2* buffer_2{ };
 };
 
 /**
