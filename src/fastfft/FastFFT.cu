@@ -56,8 +56,6 @@ FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::FourierTra
     static_assert(std::is_same_v<InputType, __half> || std::is_same_v<InputType, float> || std::is_same_v<InputType, __half2> || std::is_same_v<InputType, float2>,
                   "Input base type must be either __half or float");
 
-    // FIXME: For now, we don't support complex valued input
-    static_assert(std::is_same_v<InputType, __half> || std::is_same_v<InputType, float>, "Input base type must be either __half or float, complex valued images are planned for support.");
     // exit(0);
     // This assumption precludes the use of a packed _half2 that is really RRII layout for two arrays of __half.
     static_assert(IsAllowedRealType<InputType> || IsAllowedComplexType<InputType>, "Input type must be either float or __half");
@@ -78,6 +76,8 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetDe
     // booleans to track state, could be bit fields but that seem opaque to me.
     current_buffer            = fastfft_external_input;
     transform_stage_completed = 0;
+
+    implicit_dimension_change = false;
 
     is_fftw_padded_input  = false; // Padding for in place r2c transforms
     is_fftw_padded_output = false; // Currently the output state will match the input state, otherwise it is an error.
@@ -312,6 +312,9 @@ FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::Generic_Fw
 
     SetDimensions(DimensionCheckType::FwdTransform);
 
+    // TODO: extend me
+    MyFFTRunTimeAssertFalse(implicit_dimension_change, "Implicit dimension change not yet supported for FwdFFT");
+
     // All placeholders
     constexpr bool use_thread_method = false;
     // const bool     swap_real_space_quadrants = false;
@@ -454,6 +457,7 @@ FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::Generic_In
                                                                                   PostOpType  post_op) {
 
     SetDimensions(DimensionCheckType::InvTransform);
+    MyFFTRunTimeAssertFalse(implicit_dimension_change, "Implicit dimension change not yet supported for InvFFT");
 
     // All placeholders
     constexpr bool use_thread_method = false;
@@ -860,10 +864,57 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::Valid
     else {
         transform_dimension                = 3;
         constexpr unsigned int max_3d_size = 512;
-        MyFFTRunTimeAssertFalse(fwd_dims_in.z > max_3d_size || fwd_dims_out.z > max_3d_size || inv_dims_in.z > max_3d_size || inv_dims_out.z > max_3d_size ||
-                                        fwd_dims_in.y > max_3d_size || fwd_dims_out.y > max_3d_size || inv_dims_in.y > max_3d_size || inv_dims_out.y > max_3d_size ||
-                                        fwd_dims_in.x > max_3d_size || fwd_dims_out.x > max_3d_size || inv_dims_in.x > max_3d_size || inv_dims_out.x > max_3d_size,
+        MyFFTRunTimeAssertFalse(fwd_dims_in.z > max_3d_size ||
+                                        fwd_dims_out.z > max_3d_size ||
+                                        inv_dims_in.z > max_3d_size ||
+                                        inv_dims_out.z > max_3d_size ||
+                                        fwd_dims_in.y > max_3d_size ||
+                                        fwd_dims_out.y > max_3d_size ||
+                                        inv_dims_in.y > max_3d_size ||
+                                        inv_dims_out.y > max_3d_size ||
+                                        fwd_dims_in.x > max_3d_size ||
+                                        fwd_dims_out.x > max_3d_size ||
+                                        inv_dims_in.x > max_3d_size ||
+                                        inv_dims_out.x > max_3d_size,
                                 "Error in validating the dimension: Currently all dimensions must be <= 512 for 3d transforms.");
+    }
+
+    // Allow some non-power of 2 sizes if there is a size change type.
+    // For now, just forward increase.
+    // Note: initially we'll only allow this logic for round trip transforms (that don't write out fwd_dims_out or read inv_dims_in) where
+    //       the caller may be "surprised" by the size change.
+    if ( ! IsAPowerOfTwo(fwd_dims_in.x) ) {
+        MyFFTRunTimeAssertTrue(fwd_size_change_type == SizeChangeType::increase, "Input x dimension must be a power of 2");
+        implicit_dimension_change = true;
+    }
+    if ( ! IsAPowerOfTwo(fwd_dims_in.y) ) {
+        MyFFTRunTimeAssertTrue(fwd_size_change_type == SizeChangeType::increase, "Input y dimension must be a power of 2");
+        implicit_dimension_change = true;
+    }
+    if ( ! IsAPowerOfTwo(fwd_dims_in.z) ) {
+        MyFFTRunTimeAssertTrue(fwd_size_change_type == SizeChangeType::increase, "Input z dimension must be a power of 2");
+        implicit_dimension_change = true;
+    }
+
+    MyFFTRunTimeAssertTrue(IsAPowerOfTwo(fwd_dims_out.x), "Output x dimension must be a power of 2");
+    MyFFTRunTimeAssertTrue(IsAPowerOfTwo(fwd_dims_out.y), "Output y dimension must be a power of 2");
+    MyFFTRunTimeAssertTrue(IsAPowerOfTwo(fwd_dims_out.z), "Output z dimension must be a power of 2");
+
+    MyFFTRunTimeAssertTrue(IsAPowerOfTwo(inv_dims_in.x), "Input x dimension must be a power of 2");
+    MyFFTRunTimeAssertTrue(IsAPowerOfTwo(inv_dims_in.y), "Input y dimension must be a power of 2");
+    MyFFTRunTimeAssertTrue(IsAPowerOfTwo(inv_dims_in.z), "Input z dimension must be a power of 2");
+
+    if ( ! IsAPowerOfTwo(inv_dims_out.x) ) {
+        MyFFTRunTimeAssertTrue(inv_size_change_type == SizeChangeType::decrease, "Output x dimension must be a power of 2");
+        implicit_dimension_change = true;
+    }
+    if ( ! IsAPowerOfTwo(inv_dims_out.y) ) {
+        MyFFTRunTimeAssertTrue(inv_size_change_type == SizeChangeType::decrease, "Output y dimension must be a power of 2");
+        implicit_dimension_change = true;
+    }
+    if ( ! IsAPowerOfTwo(inv_dims_out.z) ) {
+        MyFFTRunTimeAssertTrue(inv_size_change_type == SizeChangeType::decrease, "Output z dimension must be a power of 2");
+        implicit_dimension_change = true;
     }
 
     is_size_validated = true;
@@ -1819,7 +1870,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetIn
         }
         else {
             // TODO: 8192 will fail for sm75 if wanted need some extra logic ... , 8192, 16
-            SelectSizeAndType<FFT_ALGO_t, FFT_base, PreOpType, IntraOpType, PostOpType, 16, 4, 32, 8, 64, 8, 128, 8, 256, 8, 512, 8, 1024, 8, 2048, 8, 4096, 8>(other_image_ptr, kernel_type, pre_op_functor, intra_op_functor, post_op_functor);
+            SelectSizeAndType<FFT_ALGO_t, FFT_base, PreOpType, IntraOpType, PostOpType, 16, 4, 32, 8, 64, 8, 128, 8, 256, 8, 512, 8, 1024, 8, 2048, 8, 4096, 8, 8192, 16>(other_image_ptr, kernel_type, pre_op_functor, intra_op_functor, post_op_functor);
         }
     }
 }
@@ -1834,7 +1885,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::Selec
     // This provides both a termination point for the recursive version needed for the block transform case as well as the actual function for thread transform with fixed size 32
     GetTransformSize(kernel_type);
     if constexpr ( ! detail::has_any_block_operator<FFT_base>::value ) {
-        elements_per_thread_complex = 8;
+        SetEptForUseInLaunchParameters(8);
         switch ( device_properties.device_arch ) {
             case 700: {
                 using FFT = decltype(FFT_base( ) + SM<700>( ) + ElementsPerThread<8>( ));
@@ -1864,6 +1915,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::Selec
     }
 }
 
+// TODO: see if you can replace this with a fold expression?
 template <class ComputeBaseType, class InputType, class OtherImageType, int Rank>
 template <int FFT_ALGO_t, class FFT_base, class PreOpType, class IntraOpType, class PostOpType, unsigned int SizeValue, unsigned int Ept, unsigned int... OtherValues>
 void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SelectSizeAndType(OtherImageType* other_image_ptr,
@@ -1874,28 +1926,34 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::Selec
     // Use recursion to step through the allowed sizes.
     GetTransformSize(kernel_type);
 
+    // Note: the size of the input/output may not match the size of the transform, i.e. transform_size.L <= transform_size.P
     if ( SizeValue == transform_size.P ) {
-        elements_per_thread_complex = Ept;
         switch ( device_properties.device_arch ) {
             case 700: {
-                using FFT = decltype(FFT_base( ) + Size<SizeValue>( ) + SM<700>( ) + ElementsPerThread<8>( ));
+                SetEptForUseInLaunchParameters(Ept);
+                using FFT = decltype(FFT_base( ) + Size<SizeValue>( ) + SM<700>( ) + ElementsPerThread<Ept>( ));
                 SetAndLaunchKernel<FFT_ALGO_t, FFT, PreOpType, IntraOpType, PostOpType>(other_image_ptr, kernel_type, pre_op_functor, intra_op_functor, post_op_functor);
                 break;
             }
             case 750: {
+                SetEptForUseInLaunchParameters(Ept);
                 if constexpr ( SizeValue <= 4096 ) {
-                    using FFT = decltype(FFT_base( ) + Size<SizeValue>( ) + SM<750>( ) + ElementsPerThread<8>( ));
+                    using FFT = decltype(FFT_base( ) + Size<SizeValue>( ) + SM<750>( ) + ElementsPerThread<Ept>( ));
                     SetAndLaunchKernel<FFT_ALGO_t, FFT, PreOpType, IntraOpType, PostOpType>(other_image_ptr, kernel_type, pre_op_functor, intra_op_functor, post_op_functor);
                 }
                 break;
             }
             case 800: {
-                using FFT = decltype(FFT_base( ) + Size<SizeValue>( ) + SM<800>( ) + ElementsPerThread<8>( ));
+                SetEptForUseInLaunchParameters(Ept);
+                using FFT = decltype(FFT_base( ) + Size<SizeValue>( ) + SM<800>( ) + ElementsPerThread<Ept>( ));
                 SetAndLaunchKernel<FFT_ALGO_t, FFT, PreOpType, IntraOpType, PostOpType>(other_image_ptr, kernel_type, pre_op_functor, intra_op_functor, post_op_functor);
                 break;
             }
             case 860: {
-                using FFT = decltype(FFT_base( ) + Size<SizeValue>( ) + SM<700>( ) + ElementsPerThread<8>( ));
+                // TODO: confirm that this is needed (over 860) which at the time just redirects to 700
+                //       if maintining this, we could save some time on compilation by combining with the 700 case
+                SetEptForUseInLaunchParameters(Ept);
+                using FFT = decltype(FFT_base( ) + Size<SizeValue>( ) + SM<700>( ) + ElementsPerThread<Ept>( ));
                 SetAndLaunchKernel<FFT_ALGO_t, FFT, PreOpType, IntraOpType, PostOpType>(other_image_ptr, kernel_type, pre_op_functor, intra_op_functor, post_op_functor);
                 break;
             }
@@ -1949,7 +2007,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
                 if constexpr ( FFT_ALGO_t == Generic_Fwd_FFT ) {
                     using FFT = decltype(FFT_base_arch( ) + Direction<fft_direction::forward>( ) + Type<fft_type::c2c>( ));
 
-                    LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_decomposed);
+                    LaunchParams LP = SetLaunchParameters(r2c_decomposed);
 
                     int shared_mem = LP.mem_offsets.shared_output * sizeof(complex_compute_t);
                     CheckSharedMemory(shared_mem, device_properties);
@@ -1973,7 +2031,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
                 if constexpr ( FFT_ALGO_t == Generic_Fwd_FFT ) {
                     using FFT = decltype(FFT_base_arch( ) + Direction<fft_direction::forward>( ) + Type<fft_type::c2c>( ));
 
-                    LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, r2c_decomposed_transposed);
+                    LaunchParams LP = SetLaunchParameters(r2c_decomposed_transposed);
 
                     int shared_mem = LP.mem_offsets.shared_output * sizeof(complex_compute_t);
                     CheckSharedMemory(shared_mem, device_properties);
@@ -1998,7 +2056,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
                     using FFT = decltype(FFT_base_arch( ) + Direction<fft_direction::inverse>( ) + Type<fft_type::c2c>( ));
                     // TODO add completeness check.
 
-                    LaunchParams LP            = SetLaunchParameters(elements_per_thread_complex, c2r_decomposed);
+                    LaunchParams LP            = SetLaunchParameters(c2r_decomposed);
                     int          shared_memory = LP.mem_offsets.shared_output * sizeof(scalar_compute_t);
                     CheckSharedMemory(shared_memory, device_properties);
 #if FFT_DEBUG_STAGE > 6
@@ -2020,7 +2078,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
                     // Note that unlike the block C2R we require a C2C sub xform.
                     using FFT = decltype(FFT_base_arch( ) + Direction<fft_direction::inverse>( ) + Type<fft_type::c2c>( ));
 
-                    LaunchParams LP            = SetLaunchParameters(elements_per_thread_complex, c2r_decomposed_transposed);
+                    LaunchParams LP            = SetLaunchParameters(c2r_decomposed_transposed);
                     int          shared_memory = LP.mem_offsets.shared_output * sizeof(scalar_compute_t);
                     CheckSharedMemory(shared_memory, device_properties);
 #if FFT_DEBUG_STAGE > 6
@@ -2044,7 +2102,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
                 //                 using FFT    = decltype(FFT_base_arch( ) + Type<fft_type::c2c>( ) + Direction<fft_direction::forward>( ));
                 //                 using invFFT = decltype(FFT_base_arch( ) + Type<fft_type::c2c>( ) + Direction<fft_direction::inverse>( ));
 
-                //                 LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, xcorr_decomposed);
+                //                 LaunchParams LP = SetLaunchParameters( xcorr_decomposed);
 
                 //                 int shared_memory = LP.mem_offsets.shared_output * sizeof(complex_compute_t);
                 //                 CheckSharedMemory(shared_memory, device_properties);
@@ -2065,7 +2123,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
             case c2c_fwd_decomposed: {
                 // TODO: FFT_ALGO_t
                 using FFT_nodir = decltype(FFT_base_arch( ) + Type<fft_type::c2c>( ));
-                LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_fwd_decomposed);
+                LaunchParams LP = SetLaunchParameters(c2c_fwd_decomposed);
 
                 using FFT         = decltype(FFT_nodir( ) + Direction<fft_direction::forward>( ));
                 int shared_memory = LP.mem_offsets.shared_output * sizeof(complex_compute_t);
@@ -2093,7 +2151,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
             case c2c_inv_decomposed: {
 
                 using FFT_nodir = decltype(FFT_base_arch( ) + Type<fft_type::c2c>( ));
-                LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_inv_decomposed);
+                LaunchParams LP = SetLaunchParameters(c2c_inv_decomposed);
 
                 using FFT         = decltype(FFT_nodir( ) + Direction<fft_direction::inverse>( ));
                 int shared_memory = LP.mem_offsets.shared_output * sizeof(complex_compute_t);
@@ -2128,7 +2186,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
                     using FFT               = decltype(FFT_base_arch( ) + Direction<fft_direction::forward>( ) + Type<fft_type::c2c>( ));
                     cudaError_t  error_code = cudaSuccess;
                     auto         workspace  = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
-                    LaunchParams LP         = SetLaunchParameters(elements_per_thread_complex, r2c_none_XY);
+                    LaunchParams LP         = SetLaunchParameters(r2c_none_XY);
 
                     int shared_memory = FFT::shared_memory_size;
                     CheckSharedMemory(shared_memory, device_properties);
@@ -2166,7 +2224,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
                         using FFT               = decltype(FFT_base_arch( ) + Direction<fft_direction::forward>( ) + Type<fft_type::c2c>( ));
                         cudaError_t  error_code = cudaSuccess;
                         auto         workspace  = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
-                        LaunchParams LP         = SetLaunchParameters(elements_per_thread_complex, r2c_none_XZ);
+                        LaunchParams LP         = SetLaunchParameters(r2c_none_XZ);
 
                         int shared_memory = std::max(LP.threadsPerBlock.y * FFT::shared_memory_size, LP.threadsPerBlock.y * LP.mem_offsets.physical_x_output * (unsigned int)sizeof(complex_compute_t));
                         CheckSharedMemory(shared_memory, device_properties);
@@ -2189,7 +2247,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
                     using FFT               = decltype(FFT_base_arch( ) + Direction<fft_direction::forward>( ) + Type<fft_type::c2c>( ));
                     cudaError_t  error_code = cudaSuccess;
                     auto         workspace  = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
-                    LaunchParams LP         = SetLaunchParameters(elements_per_thread_complex, r2c_decrease_XY);
+                    LaunchParams LP         = SetLaunchParameters(r2c_decrease_XY);
 
                     // the shared mem is mixed between storage, shuffling and FFT. For this kernel we need to add padding to avoid bank conlicts (N/32)
                     int shared_memory = std::max(FFT::shared_memory_size * LP.threadsPerBlock.y, (LP.mem_offsets.shared_input + LP.mem_offsets.shared_input / 32) * (unsigned int)sizeof(complex_compute_t));
@@ -2242,7 +2300,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
                     using FFT               = decltype(FFT_base_arch( ) + Direction<fft_direction::forward>( ) + Type<fft_type::c2c>( ));
                     cudaError_t  error_code = cudaSuccess;
                     auto         workspace  = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
-                    LaunchParams LP         = SetLaunchParameters(elements_per_thread_complex, r2c_increase_XY);
+                    LaunchParams LP         = SetLaunchParameters(r2c_increase_XY);
 
                     int shared_memory = LP.mem_offsets.shared_input * sizeof(scalar_compute_t) + FFT::shared_memory_size;
 
@@ -2277,7 +2335,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
                         using FFT               = decltype(FFT_base_arch( ) + Direction<fft_direction::forward>( ) + Type<fft_type::c2c>( ));
                         cudaError_t  error_code = cudaSuccess;
                         auto         workspace  = make_workspace<FFT>(error_code); // FIXME: I don't think this is right when XZ_STRIDE is used
-                        LaunchParams LP         = SetLaunchParameters(elements_per_thread_complex, r2c_increase_XZ);
+                        LaunchParams LP         = SetLaunchParameters(r2c_increase_XZ);
 
                         // We need shared memory to hold the input array(s) that is const through the kernel.
                         // We alternate using additional shared memory for the computation and the transposition of the data.
@@ -2302,7 +2360,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
                 if constexpr ( FFT_ALGO_t == Generic_Fwd_FFT ) {
                     using FFT = decltype(FFT_base_arch( ) + Direction<fft_direction::forward>( ) + Type<fft_type::c2c>( ));
 
-                    LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_fwd_none);
+                    LaunchParams LP = SetLaunchParameters(c2c_fwd_none);
 
                     cudaError_t      error_code    = cudaSuccess;
                     DebugUnused auto workspace     = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
@@ -2345,7 +2403,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
 
                         using FFT = decltype(FFT_base_arch( ) + Direction<fft_direction::forward>( ) + Type<fft_type::c2c>( ));
 
-                        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_fwd_none_XYZ);
+                        LaunchParams LP = SetLaunchParameters(c2c_fwd_none_XYZ);
 
                         cudaError_t error_code    = cudaSuccess;
                         auto        workspace     = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
@@ -2371,7 +2429,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
                     using FFT               = decltype(FFT_base_arch( ) + Direction<fft_direction::forward>( ) + Type<fft_type::c2c>( ));
                     cudaError_t  error_code = cudaSuccess;
                     auto         workspace  = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
-                    LaunchParams LP         = SetLaunchParameters(elements_per_thread_complex, c2c_fwd_decrease);
+                    LaunchParams LP         = SetLaunchParameters(c2c_fwd_decrease);
 
 #if FFT_DEBUG_STAGE > 2
                     // the shared mem is mixed between storage, shuffling and FFT. For this kernel we need to add padding to avoid bank conlicts (N/32)
@@ -2408,7 +2466,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
                         MyFFTDebugAssertTrue(current_buffer == fastfft_internal_buffer_1, "current_buffer != fastfft_internal_buffer_1");
                         using FFT = decltype(FFT_base_arch( ) + Direction<fft_direction::forward>( ) + Type<fft_type::c2c>( ));
 
-                        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_fwd_increase_XYZ);
+                        LaunchParams LP = SetLaunchParameters(c2c_fwd_increase_XYZ);
 
                         cudaError_t error_code = cudaSuccess;
                         auto        workspace  = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
@@ -2437,7 +2495,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
                 if constexpr ( FFT_ALGO_t == Generic_Fwd_FFT ) {
                     using FFT = decltype(FFT_base_arch( ) + Direction<fft_direction::forward>( ) + Type<fft_type::c2c>( ));
 
-                    LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_fwd_increase);
+                    LaunchParams LP = SetLaunchParameters(c2c_fwd_increase);
 
                     cudaError_t error_code    = cudaSuccess;
                     auto        workspace     = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
@@ -2478,7 +2536,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
                 if constexpr ( FFT_ALGO_t == Generic_Inv_FFT ) {
                     using FFT = decltype(FFT_base_arch( ) + Type<fft_type::c2c>( ) + Direction<fft_direction::inverse>( ));
 
-                    LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_inv_none);
+                    LaunchParams LP = SetLaunchParameters(c2c_inv_none);
 
                     cudaError_t error_code = cudaSuccess;
                     auto        workspace  = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
@@ -2517,7 +2575,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
                         MyFFTDebugAssertTrue(current_buffer == fastfft_external_input, "current_buffer != fastfft_external_input");
                         using FFT = decltype(FFT_base_arch( ) + Type<fft_type::c2c>( ) + Direction<fft_direction::inverse>( ));
 
-                        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_inv_none_XZ);
+                        LaunchParams LP = SetLaunchParameters(c2c_inv_none_XZ);
 
                         cudaError_t error_code = cudaSuccess;
                         auto        workspace  = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
@@ -2545,7 +2603,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
                         MyFFTDebugAssertTrue(current_buffer == fastfft_internal_buffer_1, "current_buffer != fastfft_internal_buffer_1");
                         using FFT = decltype(FFT_base_arch( ) + Direction<fft_direction::inverse>( ) + Type<fft_type::c2c>( ));
 
-                        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2c_inv_none_XYZ);
+                        LaunchParams LP = SetLaunchParameters(c2c_inv_none_XYZ);
 
                         cudaError_t error_code    = cudaSuccess;
                         auto        workspace     = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
@@ -2570,7 +2628,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
                     using FFT               = decltype(FFT_base_arch( ) + Direction<fft_direction::inverse>( ) + Type<fft_type::c2c>( ));
                     cudaError_t  error_code = cudaSuccess;
                     auto         workspace  = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;
-                    LaunchParams LP         = SetLaunchParameters(elements_per_thread_complex, c2c_inv_decrease);
+                    LaunchParams LP         = SetLaunchParameters(c2c_inv_decrease);
 
 #if FFT_DEBUG_STAGE > 4
                     // the shared mem is mixed between storage, shuffling and FFT. For this kernel we need to add padding to avoid bank conlicts (N/32)
@@ -2617,7 +2675,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
                 if constexpr ( FFT_ALGO_t == Generic_Inv_FFT ) {
                     using FFT = decltype(FFT_base_arch( ) + Direction<fft_direction::inverse>( ) + Type<fft_type::c2r>( ));
 
-                    LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2r_none);
+                    LaunchParams LP = SetLaunchParameters(c2r_none);
 
                     cudaError_t error_code = cudaSuccess;
                     auto        workspace  = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;        cudaErr(error_code);
@@ -2659,7 +2717,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
                 if constexpr ( FFT_ALGO_t == Generic_Inv_FFT ) {
                     using FFT = decltype(FFT_base_arch( ) + Direction<fft_direction::inverse>( ) + Type<fft_type::c2r>( ));
 
-                    LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2r_none_XY);
+                    LaunchParams LP = SetLaunchParameters(c2r_none_XY);
 
                     cudaError_t error_code = cudaSuccess;
                     auto        workspace  = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;        cudaErr(error_code);
@@ -2708,7 +2766,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
                 if constexpr ( FFT_ALGO_t == Generic_Inv_FFT ) {
                     using FFT = decltype(FFT_base_arch( ) + Direction<fft_direction::inverse>( ) + Type<fft_type::c2r>( ));
 
-                    LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, c2r_decrease_XY);
+                    LaunchParams LP = SetLaunchParameters(c2r_decrease_XY);
 
                     cudaError_t error_code = cudaSuccess;
                     auto        workspace  = make_workspace<FFT>(error_code); // std::cout << " EPT: " << FFT::elements_per_thread << "kernel " << KernelName[kernel_type] << std::endl;        cudaErr(error_code);
@@ -2763,7 +2821,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
                         using FFT    = decltype(FFT_base_arch( ) + Type<fft_type::c2c>( ) + Direction<fft_direction::forward>( ));
                         using invFFT = decltype(FFT_base_arch( ) + Type<fft_type::c2c>( ) + Direction<fft_direction::inverse>( ));
 
-                        LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, xcorr_fwd_none_inv_decrease);
+                        LaunchParams LP = SetLaunchParameters(xcorr_fwd_none_inv_decrease);
 
                         cudaError_t error_code    = cudaSuccess;
                         auto        workspace_fwd = make_workspace<FFT>(error_code); // presumably larger of the two
@@ -2801,7 +2859,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
                     using FFT    = decltype(FFT_base_arch( ) + Type<fft_type::c2c>( ) + Direction<fft_direction::forward>( ));
                     using invFFT = decltype(FFT_base_arch( ) + Type<fft_type::c2c>( ) + Direction<fft_direction::inverse>( ));
 
-                    LaunchParams LP = SetLaunchParameters(elements_per_thread_complex, generic_fwd_increase_op_inv_none);
+                    LaunchParams LP = SetLaunchParameters(generic_fwd_increase_op_inv_none);
 
                     cudaError_t error_code    = cudaSuccess;
                     auto        workspace_fwd = make_workspace<FFT>(error_code); // presumably larger of the two
@@ -3000,7 +3058,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::GetTr
 } // end GetTransformSize_thread function
 
 template <class ComputeBaseType, class InputType, class OtherImageType, int Rank>
-LaunchParams FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetLaunchParameters(const int& ept, KernelType kernel_type) {
+LaunchParams FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetLaunchParameters(KernelType kernel_type) {
     /*
     Assuming:
     1) r2c/c2r imply forward/inverse transform. 
@@ -3016,6 +3074,8 @@ LaunchParams FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank
     twiddle_in = +/- 2*PI/Largest dimension : + for the inverse transform
     Q = number of sub-transforms
   */
+    MyFFTDebugAssertTrue(elements_per_thread_complex > 1 && elements_per_thread_complex < 33 && IsAPowerOfTwo(elements_per_thread_complex), "elements_per_thead_complex must be a power of 2 and > 2.");
+    const int    ept = elements_per_thread_complex;
     LaunchParams L;
 
     // This is the same for all kernels as set in AssertDivisibleAndFactorOf2()
@@ -3255,12 +3315,12 @@ using namespace FastFFT::KernelFunction;
                                                                                                                                        my_functor<float, 0, IKF_t::NOOP>);            \
                                                                                                                                                                                       \
     template void FourierTransformer<COMPUTE_BASE_TYPE, INPUT_TYPE, OTHER_IMAGE_TYPE, RANK>::FwdImageInvFFT<my_functor<float, 0, IKF_t::NOOP>,                                        \
-                                                                                                            my_functor<float, 2, IKF_t::CONJ_MUL>,                                    \
+                                                                                                            my_functor<float, 4, IKF_t::CONJ_MUL>,                                    \
                                                                                                             my_functor<float, 0, IKF_t::NOOP>>(INPUT_TYPE*,                           \
                                                                                                                                                OTHER_IMAGE_TYPE*,                     \
                                                                                                                                                INPUT_TYPE*,                           \
                                                                                                                                                my_functor<float, 0, IKF_t::NOOP>,     \
-                                                                                                                                               my_functor<float, 2, IKF_t::CONJ_MUL>, \
+                                                                                                                                               my_functor<float, 4, IKF_t::CONJ_MUL>, \
                                                                                                                                                my_functor<float, 0, IKF_t::NOOP>);
 
 INSTANTIATE(float, float, float2, 2);

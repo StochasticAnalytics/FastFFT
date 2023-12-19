@@ -9,7 +9,7 @@
 struct __half;
 struct __half2;
 
-#ifndef ENABLE_FastFFT // ifdef being used in cisTEM that defines these
+#ifndef cisTEM_USING_FastFFT // ifdef being used in cisTEM that defines these
 #if __cplusplus >= 202002L
 #include <numbers>
 using namespace std::numbers;

@@ -2,9 +2,27 @@
 #define __INCLUDE_DETAIL_CONCEPTS_H__
 
 #include <type_traits>
-#include "functors.h"
+
+template <typename K>
+constexpr inline bool IS_IKF_t( ) {
+    if constexpr ( std::is_final_v<K> ) {
+        return true;
+    }
+    else {
+        return false;
+    }
+};
 
 namespace FastFFT {
+
+namespace KernelFunction {
+
+// Define an enum for different functors
+// Intra Kernel Function Type
+enum IKF_t { NOOP,
+             SCALE,
+             CONJ_MUL };
+} // namespace KernelFunction
 
 // To limit which kernels are instantiated, define a set of constants for the FFT method to be used at compile time.
 constexpr int Generic_Fwd_FFT           = 1;
@@ -39,6 +57,9 @@ constexpr bool IsPointerOrNullPtrType = (... && (std::is_same<Args, std::nullptr
 
 template <typename... Args>
 constexpr bool IsAllowedRealType = (... && (std::is_same_v<Args, __half> || std::is_same_v<Args, float>));
+
+template <typename... Args>
+constexpr bool IsAllowedComplexBaseType = IsAllowedRealType<Args...>;
 
 template <typename... Args>
 constexpr bool IsAllowedComplexType = (... && (std::is_same_v<Args, __half2> || std::is_same_v<Args, float2>));

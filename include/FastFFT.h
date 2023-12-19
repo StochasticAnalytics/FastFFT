@@ -333,7 +333,6 @@ class FourierTransformer {
 
     int      transform_dimension; // 1,2,3d.
     FFT_Size transform_size;
-    int      elements_per_thread_complex; // Set depending on the kernel and size of the transform.
 
     std::vector<std::string> SizeChangeName{"increase", "decrease", "no_change"};
 
@@ -341,6 +340,8 @@ class FourierTransformer {
 
     SizeChangeType::Enum fwd_size_change_type;
     SizeChangeType::Enum inv_size_change_type;
+
+    bool implicit_dimension_change;
 
     int transform_stage_completed;
 
@@ -610,7 +611,11 @@ class FourierTransformer {
     GetTransformSize(KernelType kernel_type);
 
     void         GetTransformSize_thread(KernelType kernel_type, int thread_fft_size);
-    LaunchParams SetLaunchParameters(const int& ept, KernelType kernel_type);
+    LaunchParams SetLaunchParameters(KernelType kernel_type);
+
+    inline void SetEptForUseInLaunchParameters(const int elements_per_thread) {
+        elements_per_thread_complex = elements_per_thread;
+    }
 
     // 1.
     // First call passed from a public transform function, selects block or thread and the transform precision.
@@ -680,6 +685,17 @@ class FourierTransformer {
 
     // FIXME: This function could be named more appropriately.
     // FIXME: kernel_type is only needed for the current debug checks based on the blockDim.z bug
+    inline bool IsAPowerOfTwo(const int input_value) {
+        int tmp_val = 1;
+        while ( tmp_val < input_value )
+            tmp_val = tmp_val << 1;
+
+        if ( tmp_val > input_value )
+            return false;
+        else
+            return true;
+    }
+
     inline void AssertDivisibleAndFactorOf2(KernelType kernel_type, int full_size_transform, const int number_non_zero_inputs_or_outputs) {
 
         // The size we would need to use with a general purpose library, eg. FFTW
@@ -710,6 +726,8 @@ class FourierTransformer {
     // Input is real or complex inferred from InputType
     DevicePointers<ComputeBaseType*, InputType*, OtherImageType*> d_ptr;
     // Check to make sure we haven't fouled up the explicit instantiation of DevicePointers
+
+    int elements_per_thread_complex; // Set depending on the kernel and size of the transform.
 
 }; // class Fourier Transformer
 

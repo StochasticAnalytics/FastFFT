@@ -224,7 +224,7 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
             FT_output.create_timing_events( );
 
             FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::NOOP>     noop;
-            FastFFT::KernelFunction::my_functor<float, 2, FastFFT::KernelFunction::CONJ_MUL> conj_mul;
+            FastFFT::KernelFunction::my_functor<float, 4, FastFFT::KernelFunction::CONJ_MUL> conj_mul;
 
             //////////////////////////////////////////
             //////////////////////////////////////////
