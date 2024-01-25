@@ -41,8 +41,14 @@ struct my_functor<T, 4, IKF_t::CONJ_MUL, EnableIf<IsAllowedRealType<T>>> final {
 
 template <typename T>
 struct my_functor<T, 2, IKF_t::SCALE, EnableIf<IsAllowedInputType<T>>> final {
+
+    const T scale_factor;
+
+    // Pass in the scale factor on construction
+    __device__ __forceinline__ my_functor(const T& scale_factor) : scale_factor(scale_factor) {}
+
     __device__ __forceinline__ T
-    operator( )(T& input_value, const T& scale_factor) {
+    operator( )(T& input_value) {
         input_value *= scale_factor;
     }
 };

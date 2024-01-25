@@ -242,7 +242,7 @@ int main(int argc, char** argv) {
 
     if ( run_3d_unit_tests ) {
         // FIXME: tests are failing for 3d
-        constexpr bool do_increase_size_first = true;
+        // constexpr bool do_increase_size_first = true;
         // constexpr bool second_round           = ! do_increase_size_first;
         // if ( ! unit_impulse_test<3>(FastFFT::test_size_3d, do_increase_size_first) )
         //     return 1;
