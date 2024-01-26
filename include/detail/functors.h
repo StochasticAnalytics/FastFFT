@@ -43,7 +43,7 @@ template <typename T>
 struct my_functor<T, 4, IKF_t::CONJ_MUL_THEN_SCALE, EnableIf<IsAllowedRealType<T>>> final {
 
     // Pass in the scale factor on construction
-    __device__ __forceinline__ my_functor(const T& scale_factor) : scale_factor(scale_factor) {}
+    my_functor(const T& scale_factor) : scale_factor(scale_factor) {}
 
     __device__ __forceinline__ void
     operator( )(T& template_fft_x, T& template_fft_y, const T& target_fft_x, const T& target_fft_y) {
