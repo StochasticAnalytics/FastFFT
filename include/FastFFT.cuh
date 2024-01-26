@@ -888,18 +888,18 @@ struct io {
         unsigned int       index  = threadIdx.x;
         // FIXME: working out how to use these functors and this is NOT what is intended
         if constexpr ( IS_IKF_t<FunctionType>( ) ) {
+            float2 temp;
             for ( unsigned int i = 0; i < FFT::elements_per_thread; i++ ) {
                 if ( index < last_index_to_load ) {
-                    complex_compute_t val = convert_if_needed<FFT, complex_compute_t>(input, index);
-                    pre_op_functor(val.x);
-                    pre_op_functor(val.y);
-                    thread_data[i] = val;
+                    temp           = pre_op_functor(convert_if_needed<FFT, float2>(input, index));
+                    thread_data[i] = convert_if_needed<FFT, complex_compute_t>(&temp, 0);
                 }
-                // thread_data[i] = pre_op_functor(convert_if_needed<FFT, complex_compute_t>(input, index));
-                else
-                    thread_data[i] = complex_compute_t{0.0f, 0.0f};
+                else {
+                    // thread_data[i] = complex_compute_t{0.0f, 0.0f};
+                    temp           = pre_op_functor(float2{0.0f, 0.0f});
+                    thread_data[i] = convert_if_needed<FFT, complex_compute_t>(&temp, 0);
+                }
 
-                // thread_data[i] = pre_op_functor(complex_compute_t{0.0f, 0.0f});
                 index += stride;
             }
         }

@@ -21,7 +21,8 @@ namespace KernelFunction {
 // Intra Kernel Function Type
 enum IKF_t { NOOP,
              SCALE,
-             CONJ_MUL };
+             CONJ_MUL,
+             CONJ_MUL_THEN_SCALE };
 } // namespace KernelFunction
 
 // To limit which kernels are instantiated, define a set of constants for the FFT method to be used at compile time.

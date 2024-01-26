@@ -95,7 +95,7 @@ void preop_functor_scale(std::vector<int> size, FastFFT::SizeChangeType::Enum si
                 target_size = output_size;
 
             Image<float, float2> target_search_image(target_size);
-            Image<float, float2> target_search_image_fp16(input_size);
+            Image<float, float2> target_search_image_fp16(target_size);
             Image<float, float2> positive_control(target_size);
 
             // We just make one instance of the FourierTransformer class, with calc type float.
@@ -183,8 +183,8 @@ void preop_functor_scale(std::vector<int> size, FastFFT::SizeChangeType::Enum si
             FT.SetToConstant(positive_control.real_values, target_search_image.real_memory_allocated, 0.0f);
 
             // Place these values at the origin of the image and after convolution, should be at 0,0,0.
-            float testVal_1                         = 2.0f;
-            float testVal_2                         = set_conjMult_callback ? 3.0f : 1.0; // This way the test conditions are the same, the 1. indicating no conj
+            float testVal_1                         = 2.f;
+            float testVal_2                         = set_conjMult_callback ? 3.f : 1.0; // This way the test conditions are the same, the 1. indicating no conj
             FT_input.real_values[0]                 = testVal_1;
             FT_fp16_input.real_values[0]            = testVal_1;
             target_search_image.real_values[0]      = testVal_2;
@@ -206,9 +206,6 @@ void preop_functor_scale(std::vector<int> size, FastFFT::SizeChangeType::Enum si
             cudaErr(cudaMemcpyAsync(targetFT_fp16_buffer, target_search_image_fp16.real_values, target_search_image_fp16.real_memory_allocated * sizeof(__half), cudaMemcpyHostToDevice, cudaStreamPerThread));
             cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
 
-            //
-            FT_fp16_output.ConvertFP32ToFP16( );
-
             // Positive control on the host.
             // After both forward FFT's we should constant values in each pixel = testVal_1 and testVal_2.
             // After the Conjugate multiplication, we should have a constant value of testVal_1*testVal_2.
@@ -229,42 +226,52 @@ void preop_functor_scale(std::vector<int> size, FastFFT::SizeChangeType::Enum si
                 MyTestPrintAndExit(false, "Test failed for FFTW positive control. Value at zero is  " + std::to_string(positive_control.real_values[0]));
             }
 
-            FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::NOOP>     noop;
-            FastFFT::KernelFunction::my_functor<float, 2, FastFFT::KernelFunction::SCALE>    scale(1.f / scale_factor);
-            FastFFT::KernelFunction::my_functor<float, 4, FastFFT::KernelFunction::CONJ_MUL> conj_mul;
+            FastFFT::KernelFunction::my_functor<float, 0, FastFFT::KernelFunction::NOOP>                noop;
+            FastFFT::KernelFunction::my_functor<float, 2, FastFFT::KernelFunction::SCALE>               scale(1.f / scale_factor);
+            FastFFT::KernelFunction::my_functor<float, 4, FastFFT::KernelFunction::CONJ_MUL>            conj_mul;
+            FastFFT::KernelFunction::my_functor<float, 4, FastFFT::KernelFunction::CONJ_MUL_THEN_SCALE> conj_mul_then_scale(1.f / scale_factor);
 
             // Do first round without scaling
             FT.FwdImageInvFFT(FT_buffer, reinterpret_cast<float2*>(targetFT_buffer), FT_buffer, noop, conj_mul, noop);
             FT_fp16.FwdImageInvFFT(FT_fp16_buffer, reinterpret_cast<__half2*>(targetFT_fp16_buffer), FT_fp16_buffer, noop, conj_mul, noop);
 
             // Copy back to the host and check the results
-            cudaErr(cudaMemcpyAsync(FT_output.real_values, FT_buffer, FT_output.real_memory_allocated * sizeof(float), cudaMemcpyDeviceToHost, cudaStreamPerThread));
-            cudaErr(cudaMemcpyAsync(FT_fp16_output.real_values, FT_fp16_buffer, FT_fp16_output.real_memory_allocated * sizeof(__half), cudaMemcpyDeviceToHost, cudaStreamPerThread));
-            cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
+            if constexpr ( FFT_DEBUG_STAGE < 7 ) {
+                FT.CopyDeviceToHostAndSynchronize(FT_output.real_values);
+                FT_fp16.CopyDeviceToHostAndSynchronize(reinterpret_cast<__half*>(FT_fp16_output.real_values));
+            }
+            else {
+                // Copy back to the host and check the results
+                cudaErr(cudaMemcpyAsync(FT_output.real_values, FT_buffer, FT_output.real_memory_allocated * sizeof(float), cudaMemcpyDeviceToHost, cudaStreamPerThread));
+                cudaErr(cudaMemcpyAsync(FT_fp16_output.real_values, FT_fp16_buffer, FT_fp16_output.real_memory_allocated * sizeof(__half), cudaMemcpyDeviceToHost, cudaStreamPerThread));
+                cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
+            }
+            FT_fp16_output.data_is_fp16 = true;
             FT_fp16_output.ConvertFP16ToFP32( );
-            std::cerr << "FT_fp16_output.real_values[0] = " << FT_fp16_output.real_memory_allocated << std::endl;
-            // FT_fp16_input.ConvertFP16ToFP32( );
-            PrintArray(FT_fp16_input.real_values, FT_fp16_input.size.x, FT_fp16_input.size.y, FT_fp16_input.size.z, FT_fp16_input.size.w);
-            exit(1);
-            PrintArray(FT_fp16_output.real_values, FT_fp16_output.size.x, FT_fp16_output.size.y, FT_fp16_output.size.z, FT_fp16_output.size.w);
-            exit(1);
 
             if ( FT_output.real_values[0] == scale_factor ) {
                 if ( print_out_time ) {
                     std::cout << "Test passed for FP32 no scale." << std::endl;
                 }
             }
-            else
+            else {
+                debug_partial_fft<FFT_DEBUG_STAGE, Rank>(FT_output, fwd_dims_in, fwd_dims_out, inv_dims_in, inv_dims_out, __LINE__);
+                debug_partial_fft<FFT_DEBUG_STAGE, Rank>(FT_fp16_output, fwd_dims_in, fwd_dims_out, inv_dims_in, inv_dims_out, __LINE__);
                 MyTestPrintAndExit(false, "Test failed for FP32 positive control. Value at zero is  " + std::to_string(FT_output.real_values[0]));
+            }
+
             if ( FT_fp16_output.real_values[0] == scale_factor ) {
                 if ( print_out_time ) {
                     std::cout << "Test passed for FP16 no scale." << std::endl;
                 }
             }
-            else
+            else {
+                debug_partial_fft<FFT_DEBUG_STAGE, Rank>(FT_output, fwd_dims_in, fwd_dims_out, inv_dims_in, inv_dims_out, __LINE__);
+                debug_partial_fft<FFT_DEBUG_STAGE, Rank>(FT_fp16_output, fwd_dims_in, fwd_dims_out, inv_dims_in, inv_dims_out, __LINE__);
                 MyTestPrintAndExit(false, "Test failed for FP16 positive control. Value at zero is  " + std::to_string(FT_fp16_output.real_values[0]) + " and should be " + std::to_string(scale_factor));
+            }
 
-            // Restore the buffers and do the second round with scaling
+            // Restore the buffers and do the second round with preop scaling
             // Set to zero
             cudaErr(cudaMemsetAsync(FT_buffer, 0, device_memory * sizeof(float), cudaStreamPerThread));
             cudaErr(cudaMemsetAsync(targetFT_buffer, 0, device_memory * sizeof(float), cudaStreamPerThread));
@@ -281,11 +288,64 @@ void preop_functor_scale(std::vector<int> size, FastFFT::SizeChangeType::Enum si
             FT_fp16.FwdImageInvFFT(FT_fp16_buffer, reinterpret_cast<__half2*>(targetFT_fp16_buffer), FT_fp16_buffer, scale, conj_mul, noop);
 
             // Copy back to the host and check the results
-            cudaErr(cudaMemcpyAsync(FT_output.real_values, FT_buffer, FT_output.real_memory_allocated * sizeof(float), cudaMemcpyDeviceToHost, cudaStreamPerThread));
-            cudaErr(cudaMemcpyAsync(FT_fp16_output.real_values, FT_fp16_buffer, FT_fp16_output.real_memory_allocated * sizeof(__half), cudaMemcpyDeviceToHost, cudaStreamPerThread));
-            cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
-            //FIXME
-            // FT_fp16_output.ConvertFP16ToFP32( );
+            if constexpr ( FFT_DEBUG_STAGE < 7 ) {
+                FT.CopyDeviceToHostAndSynchronize(FT_output.real_values);
+                FT_fp16.CopyDeviceToHostAndSynchronize(reinterpret_cast<__half*>(FT_fp16_output.real_values));
+            }
+            else {
+                // Copy back to the host and check the results
+                cudaErr(cudaMemcpyAsync(FT_output.real_values, FT_buffer, FT_output.real_memory_allocated * sizeof(float), cudaMemcpyDeviceToHost, cudaStreamPerThread));
+                cudaErr(cudaMemcpyAsync(FT_fp16_output.real_values, FT_fp16_buffer, FT_fp16_output.real_memory_allocated * sizeof(__half), cudaMemcpyDeviceToHost, cudaStreamPerThread));
+                cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
+            }
+            FT_fp16_output.data_is_fp16 = true;
+            FT_fp16_output.ConvertFP16ToFP32( );
+
+            if ( FT_output.real_values[0] == 1.0f ) {
+                if ( print_out_time ) {
+                    std::cout << "Test passed for FP32 with scale." << std::endl;
+                }
+            }
+            else
+                MyTestPrintAndExit(false, "Test failed for FP32 positive control. Value at zero is  " + std::to_string(FT_output.real_values[0]) + " and should be " + std::to_string(scale_factor));
+
+            if ( FT_fp16_output.real_values[0] == 1.0f ) {
+                if ( print_out_time ) {
+                    std::cout << "Test passed for FP16 with scale." << std::endl;
+                }
+            }
+            else
+                MyTestPrintAndExit(false, "Test failed for FP16 positive control. Value at zero is  " + std::to_string(FT_fp16_output.real_values[0]) + " and should be " + std::to_string(scale_factor));
+
+            // Restore the buffers and do the second round with intra_op scaling
+            // Set to zero
+            cudaErr(cudaMemsetAsync(FT_buffer, 0, device_memory * sizeof(float), cudaStreamPerThread));
+            cudaErr(cudaMemsetAsync(targetFT_buffer, 0, device_memory * sizeof(float), cudaStreamPerThread));
+            cudaErr(cudaMemsetAsync(FT_fp16_buffer, 0, device_memory * sizeof(__half), cudaStreamPerThread));
+            cudaErr(cudaMemsetAsync(targetFT_fp16_buffer, 0, device_memory * sizeof(__half), cudaStreamPerThread));
+
+            cudaErr(cudaMemcpyAsync(FT_buffer, FT_input.real_values, FT_input.real_memory_allocated * sizeof(float), cudaMemcpyHostToDevice, cudaStreamPerThread));
+            cudaErr(cudaMemcpyAsync(targetFT_buffer, target_search_image.real_values, target_search_image.real_memory_allocated * sizeof(float), cudaMemcpyHostToDevice, cudaStreamPerThread));
+
+            cudaErr(cudaMemcpyAsync(FT_fp16_buffer, FT_fp16_input.real_values, FT_fp16_input.real_memory_allocated * sizeof(__half), cudaMemcpyHostToDevice, cudaStreamPerThread));
+            cudaErr(cudaMemcpyAsync(targetFT_fp16_buffer, target_search_image_fp16.real_values, target_search_image_fp16.real_memory_allocated * sizeof(__half), cudaMemcpyHostToDevice, cudaStreamPerThread));
+
+            FT.FwdImageInvFFT(FT_buffer, reinterpret_cast<float2*>(targetFT_buffer), FT_buffer, noop, conj_mul_then_scale, noop);
+            FT_fp16.FwdImageInvFFT(FT_fp16_buffer, reinterpret_cast<__half2*>(targetFT_fp16_buffer), FT_fp16_buffer, noop, conj_mul_then_scale, noop);
+
+            // Copy back to the host and check the results
+            if constexpr ( FFT_DEBUG_STAGE < 7 ) {
+                FT.CopyDeviceToHostAndSynchronize(FT_output.real_values);
+                FT_fp16.CopyDeviceToHostAndSynchronize(reinterpret_cast<__half*>(FT_fp16_output.real_values));
+            }
+            else {
+                // Copy back to the host and check the results
+                cudaErr(cudaMemcpyAsync(FT_output.real_values, FT_buffer, FT_output.real_memory_allocated * sizeof(float), cudaMemcpyDeviceToHost, cudaStreamPerThread));
+                cudaErr(cudaMemcpyAsync(FT_fp16_output.real_values, FT_fp16_buffer, FT_fp16_output.real_memory_allocated * sizeof(__half), cudaMemcpyDeviceToHost, cudaStreamPerThread));
+                cudaErr(cudaStreamSynchronize(cudaStreamPerThread));
+            }
+            FT_fp16_output.data_is_fp16 = true;
+            FT_fp16_output.ConvertFP16ToFP32( );
 
             if ( FT_output.real_values[0] == 1.0f ) {
                 if ( print_out_time ) {
@@ -310,6 +370,9 @@ void preop_functor_scale(std::vector<int> size, FastFFT::SizeChangeType::Enum si
             cudaErr(cudaFree(targetFT_buffer));
             cudaErr(cudaFree(FT_fp16_buffer));
             cudaErr(cudaFree(targetFT_fp16_buffer));
+
+            // Right now, we would overflow with larger arrays in fp16 so just exit
+            break;
         } // while loop over pad to size
 
     } // for loop over pad from size
@@ -357,6 +420,7 @@ int main(int argc, char** argv) {
         SCT size_change_type;
 
         size_change_type = SCT::no_change;
+
         preop_functor_scale<3>(FastFFT::test_size_3d, size_change_type, false);
 
         // TODO: These are not yet completed.

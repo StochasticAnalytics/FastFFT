@@ -15,7 +15,7 @@
 #include "../../include/FastFFT.cuh"
 
 // clang-format off
-#define MyTestPrintAndExit(cond, ...) { if(! cond) {std::cerr << __VA_ARGS__ << " From: " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1); }}
+#define MyTestPrintAndExit(cond, ...) { if(! cond) {std::cerr << __VA_ARGS__ << " From: " << __FILE__ << ":" << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1); }}
 
 // clang-format on
 

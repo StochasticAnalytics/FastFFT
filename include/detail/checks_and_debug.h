@@ -54,15 +54,15 @@ __device__ __host__ inline void static_assert_type_name(T v) {
 
 #else
 // Minimally define asserts that check state variables and setup.
-#define MyFFTDebugAssertTrue(cond, msg, ...) { if ( (cond) != true ) { std::cerr << msg << std::endl << " Failed Assert at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; std::abort(); } }
-#define MyFFTDebugAssertFalse(cond, msg, ...) { if ( (cond) == true ) { std::cerr << msg << std::endl  << " Failed Assert at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;  std::abort(); } }                                                                                                    
+#define MyFFTDebugAssertTrue(cond, msg, ...) { if ( (cond) != true ) { std::cerr << msg << std::endl << " Failed Assert at " << __FILE__ << ":" << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; std::abort(); } }
+#define MyFFTDebugAssertFalse(cond, msg, ...) { if ( (cond) == true ) { std::cerr << msg << std::endl  << " Failed Assert at " << __FILE__ << ":" << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;  std::abort(); } }                                                                                                    
 
 #endif
 
 #if FFT_DEBUG_LEVEL > 1
 // Turn on checkpoints in the testing functions.
-#define MyFFTDebugAssertTestTrue(cond, msg, ...)  { if ( (cond) != true ) { std::cerr << "    Test " << msg << " FAILED!" << std::endl  << "  at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;std::abort(); } else { std::cerr << "    Test " << msg << " passed!" << std::endl; }}
-#define MyFFTDebugAssertTestFalse(cond, msg, ...)  { if ( (cond) == true ) {  std::cerr << "    Test " << msg << " FAILED!" << std::endl   << " at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;   std::abort();  } else {  std::cerr << "    Test " << msg << " passed!" << std::endl;  } }
+#define MyFFTDebugAssertTestTrue(cond, msg, ...)  { if ( (cond) != true ) { std::cerr << "    Test " << msg << " FAILED!" << std::endl  << "  at " << __FILE__ << ":" << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;std::abort(); } else { std::cerr << "    Test " << msg << " passed!" << std::endl; }}
+#define MyFFTDebugAssertTestFalse(cond, msg, ...)  { if ( (cond) == true ) {  std::cerr << "    Test " << msg << " FAILED!" << std::endl   << " at " << __FILE__ << ":" << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;   std::abort();  } else {  std::cerr << "    Test " << msg << " passed!" << std::endl;  } }
 #define DebugUnused [[maybe_unused]]
 #endif
 
@@ -73,7 +73,7 @@ __device__ __host__ inline void static_assert_type_name(T v) {
 #if FFT_DEBUG_LEVEL >= 3
 // More verbose debug info
 #define MyFFTDebugPrint(...) { std::cerr << __VA_ARGS__ << std::endl; }
-#define MyFFTDebugPrintWithDetails(...) { std::cerr << __VA_ARGS__ << " From: " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; }
+#define MyFFTDebugPrintWithDetails(...) { std::cerr << __VA_ARGS__ << " From: " << __FILE__ << ":" << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; }
 #endif
 
 #if FFT_DEBUG_LEVEL == 4
@@ -83,8 +83,8 @@ __device__ __host__ inline void static_assert_type_name(T v) {
 // Always in use
 #define MyFFTPrint(...) { std::cerr << __VA_ARGS__ << std::endl; }
 #define MyFFTPrintWithDetails(...) { std::cerr << __VA_ARGS__ << " From: " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; }
-#define MyFFTRunTimeAssertTrue(cond, msg, ...) { if ( (cond) != true ) { std::cerr << msg << std::endl << " Failed Assert at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;std::abort(); }  }
-#define MyFFTRunTimeAssertFalse(cond, msg, ...) { if ( (cond) == true ) {std::cerr << msg << std::endl << " Failed Assert at " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;std::abort();  } }                                                                                                               
+#define MyFFTRunTimeAssertTrue(cond, msg, ...) { if ( (cond) != true ) { std::cerr << msg << std::endl << " Failed Assert at " << __FILE__ << ":" << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;std::abort(); }  }
+#define MyFFTRunTimeAssertFalse(cond, msg, ...) { if ( (cond) == true ) {std::cerr << msg << std::endl << " Failed Assert at " << __FILE__ << ":" << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl;std::abort();  } }                                                                                                               
 
 
 

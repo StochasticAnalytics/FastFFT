@@ -976,14 +976,19 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::CopyD
             cudaErr(cudaMemcpyAsync(input_pointer, d_ptr.external_output, n_to_actually_copy * sizeof(InputType), cudaMemcpyDeviceToHost, cudaStreamPerThread));
             break;
         }
+        // If we are in the internal buffers, our data is ComputeBaseType
         case fastfft_internal_buffer_1: {
             MyFFTDebugAssertTrue(is_pointer_in_device_memory(d_ptr.buffer_1), "Error in CopyDeviceToHostAndSynchronize: input_pointer must be in device memory");
-            cudaErr(cudaMemcpyAsync(input_pointer, d_ptr.buffer_1, n_to_actually_copy * sizeof(InputType), cudaMemcpyDeviceToHost, cudaStreamPerThread));
+            if ( sizeof(ComputeBaseType) != sizeof(InputType) )
+                std::cerr << "\n\tWarning: CopyDeviceToHostAndSynchronize: sizeof(ComputeBaseType) != sizeof(InputType) - this may be a problem\n\n";
+            cudaErr(cudaMemcpyAsync(input_pointer, d_ptr.buffer_1, n_to_actually_copy * sizeof(ComputeBaseType), cudaMemcpyDeviceToHost, cudaStreamPerThread));
             break;
         }
         case fastfft_internal_buffer_2: {
             MyFFTDebugAssertTrue(is_pointer_in_device_memory(d_ptr.buffer_2), "Error in CopyDeviceToHostAndSynchronize: input_pointer must be in device memory");
-            cudaErr(cudaMemcpyAsync(input_pointer, d_ptr.buffer_2, n_to_actually_copy * sizeof(InputType), cudaMemcpyDeviceToHost, cudaStreamPerThread));
+            if ( sizeof(ComputeBaseType) != sizeof(InputType) )
+                std::cerr << "\n\tWarning: CopyDeviceToHostAndSynchronize: sizeof(ComputeBaseType) != sizeof(InputType) - this may be a problem\n\n";
+            cudaErr(cudaMemcpyAsync(input_pointer, d_ptr.buffer_2, n_to_actually_copy * sizeof(ComputeBaseType), cudaMemcpyDeviceToHost, cudaStreamPerThread));
             break;
         }
         default: {
@@ -1907,6 +1912,12 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::Selec
                 SetAndLaunchKernel<FFT_ALGO_t, FFT, PreOpType, IntraOpType, PostOpType>(other_image_ptr, kernel_type, pre_op_functor, intra_op_functor, post_op_functor);
                 break;
             }
+            case 890: {
+                // FIXME: on migrating to cufftDx 1.1.1
+                using FFT = decltype(FFT_base( ) + SM<700>( ) + ElementsPerThread<8>( ));
+                SetAndLaunchKernel<FFT_ALGO_t, FFT, PreOpType, IntraOpType, PostOpType>(other_image_ptr, kernel_type, pre_op_functor, intra_op_functor, post_op_functor);
+                break;
+            }
             default: {
                 MyFFTRunTimeAssertTrue(false, "Unsupported architecture" + std::to_string(device_properties.device_arch));
                 break;
@@ -1952,6 +1963,16 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::Selec
             case 860: {
                 // TODO: confirm that this is needed (over 860) which at the time just redirects to 700
                 //       if maintining this, we could save some time on compilation by combining with the 700 case
+                SetEptForUseInLaunchParameters(Ept);
+                using FFT = decltype(FFT_base( ) + Size<SizeValue>( ) + SM<700>( ) + ElementsPerThread<Ept>( ));
+                SetAndLaunchKernel<FFT_ALGO_t, FFT, PreOpType, IntraOpType, PostOpType>(other_image_ptr, kernel_type, pre_op_functor, intra_op_functor, post_op_functor);
+                break;
+            }
+            case 890: {
+                // TODO: confirm that this is needed (over 860) which at the time just redirects to 700
+                //       if maintining this, we could save some time on compilation by combining with the 700 case
+                // FIXME: on migrating to cufftDx 1.1.1
+
                 SetEptForUseInLaunchParameters(Ept);
                 using FFT = decltype(FFT_base( ) + Size<SizeValue>( ) + SM<700>( ) + ElementsPerThread<Ept>( ));
                 SetAndLaunchKernel<FFT_ALGO_t, FFT, PreOpType, IntraOpType, PostOpType>(other_image_ptr, kernel_type, pre_op_functor, intra_op_functor, post_op_functor);
@@ -2874,7 +2895,6 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetAn
                     // __nv_is_extended_device_lambda_closure_type(type);
                     // __nv_is_extended_host_device_lambda_closure_type(type)
                     if constexpr ( IS_IKF_t<IntraOpType>( ) ) {
-
 // FIXME
 #if FFT_DEBUG_STAGE > 2
                         // Right now, because of the n_threads == size_of<FFT> requirement, we are explicitly zero padding, so we need to send an "apparent Q" to know the input size.
@@ -3264,7 +3284,7 @@ void GetCudaDeviceProps(DeviceProps& dp) {
 
     dp.device_arch = major * 100 + minor * 10;
 
-    MyFFTRunTimeAssertTrue(dp.device_arch == 700 || dp.device_arch == 750 || dp.device_arch == 800 || dp.device_arch == 860, "FastFFT currently only supports compute capability [7.0, 7.5, 8.0, 8.6].");
+    MyFFTRunTimeAssertTrue(dp.device_arch == 700 || dp.device_arch == 750 || dp.device_arch == 800 || dp.device_arch == 860 || dp.device_arch == 890, "FastFFT currently only supports compute capability [7.0, 7.5, 8.0, 8.6, 8.9].");
 
     cudaErr(cudaDeviceGetAttribute(&dp.max_shared_memory_per_block, cudaDevAttrMaxSharedMemoryPerBlock, dp.device_id));
     cudaErr(cudaDeviceGetAttribute(&dp.max_shared_memory_per_SM, cudaDevAttrMaxSharedMemoryPerMultiprocessor, dp.device_id));
@@ -3293,42 +3313,50 @@ using namespace FastFFT::KernelFunction;
 
 // TODO: Pass in functor types
 // TODO: Take another look at the explicit NOOP vs nullptr and determine if it is really needed
-#define INSTANTIATE(COMPUTE_BASE_TYPE, INPUT_TYPE, OTHER_IMAGE_TYPE, RANK)                                                                                                            \
-    template class FourierTransformer<COMPUTE_BASE_TYPE, INPUT_TYPE, OTHER_IMAGE_TYPE, RANK>;                                                                                         \
-                                                                                                                                                                                      \
-    template void FourierTransformer<COMPUTE_BASE_TYPE, INPUT_TYPE, OTHER_IMAGE_TYPE, RANK>::FwdFFT<std::nullptr_t,                                                                   \
-                                                                                                    std::nullptr_t>(INPUT_TYPE*, INPUT_TYPE*, std::nullptr_t, std::nullptr_t);        \
-                                                                                                                                                                                      \
-    template void FourierTransformer<COMPUTE_BASE_TYPE, INPUT_TYPE, OTHER_IMAGE_TYPE, RANK>::InvFFT<std::nullptr_t,                                                                   \
-                                                                                                    std::nullptr_t>(INPUT_TYPE*, INPUT_TYPE*, std::nullptr_t, std::nullptr_t);        \
-                                                                                                                                                                                      \
-    template void FourierTransformer<COMPUTE_BASE_TYPE, INPUT_TYPE, OTHER_IMAGE_TYPE, RANK>::FwdFFT<my_functor<float, 0, IKF_t::NOOP>,                                                \
-                                                                                                    my_functor<float, 0, IKF_t::NOOP>>(INPUT_TYPE*,                                   \
-                                                                                                                                       INPUT_TYPE*,                                   \
-                                                                                                                                       my_functor<float, 0, IKF_t::NOOP>,             \
-                                                                                                                                       my_functor<float, 0, IKF_t::NOOP>);            \
-                                                                                                                                                                                      \
-    template void FourierTransformer<COMPUTE_BASE_TYPE, INPUT_TYPE, OTHER_IMAGE_TYPE, RANK>::InvFFT<my_functor<float, 0, IKF_t::NOOP>,                                                \
-                                                                                                    my_functor<float, 0, IKF_t::NOOP>>(INPUT_TYPE*,                                   \
-                                                                                                                                       INPUT_TYPE*,                                   \
-                                                                                                                                       my_functor<float, 0, IKF_t::NOOP>,             \
-                                                                                                                                       my_functor<float, 0, IKF_t::NOOP>);            \
-                                                                                                                                                                                      \
-    template void FourierTransformer<COMPUTE_BASE_TYPE, INPUT_TYPE, OTHER_IMAGE_TYPE, RANK>::FwdImageInvFFT<my_functor<float, 0, IKF_t::NOOP>,                                        \
-                                                                                                            my_functor<float, 4, IKF_t::CONJ_MUL>,                                    \
-                                                                                                            my_functor<float, 0, IKF_t::NOOP>>(INPUT_TYPE*,                           \
-                                                                                                                                               OTHER_IMAGE_TYPE*,                     \
-                                                                                                                                               INPUT_TYPE*,                           \
-                                                                                                                                               my_functor<float, 0, IKF_t::NOOP>,     \
-                                                                                                                                               my_functor<float, 4, IKF_t::CONJ_MUL>, \
-                                                                                                                                               my_functor<float, 0, IKF_t::NOOP>);    \
-    template void FourierTransformer<COMPUTE_BASE_TYPE, INPUT_TYPE, OTHER_IMAGE_TYPE, RANK>::FwdImageInvFFT<my_functor<float, 2, IKF_t::SCALE>,                                       \
-                                                                                                            my_functor<float, 4, IKF_t::CONJ_MUL>,                                    \
-                                                                                                            my_functor<float, 0, IKF_t::NOOP>>(INPUT_TYPE*,                           \
-                                                                                                                                               OTHER_IMAGE_TYPE*,                     \
-                                                                                                                                               INPUT_TYPE*,                           \
-                                                                                                                                               my_functor<float, 2, IKF_t::SCALE>,    \
-                                                                                                                                               my_functor<float, 4, IKF_t::CONJ_MUL>, \
+#define INSTANTIATE(COMPUTE_BASE_TYPE, INPUT_TYPE, OTHER_IMAGE_TYPE, RANK)                                                                                                                       \
+    template class FourierTransformer<COMPUTE_BASE_TYPE, INPUT_TYPE, OTHER_IMAGE_TYPE, RANK>;                                                                                                    \
+                                                                                                                                                                                                 \
+    template void FourierTransformer<COMPUTE_BASE_TYPE, INPUT_TYPE, OTHER_IMAGE_TYPE, RANK>::FwdFFT<std::nullptr_t,                                                                              \
+                                                                                                    std::nullptr_t>(INPUT_TYPE*, INPUT_TYPE*, std::nullptr_t, std::nullptr_t);                   \
+                                                                                                                                                                                                 \
+    template void FourierTransformer<COMPUTE_BASE_TYPE, INPUT_TYPE, OTHER_IMAGE_TYPE, RANK>::InvFFT<std::nullptr_t,                                                                              \
+                                                                                                    std::nullptr_t>(INPUT_TYPE*, INPUT_TYPE*, std::nullptr_t, std::nullptr_t);                   \
+                                                                                                                                                                                                 \
+    template void FourierTransformer<COMPUTE_BASE_TYPE, INPUT_TYPE, OTHER_IMAGE_TYPE, RANK>::FwdFFT<my_functor<float, 0, IKF_t::NOOP>,                                                           \
+                                                                                                    my_functor<float, 0, IKF_t::NOOP>>(INPUT_TYPE*,                                              \
+                                                                                                                                       INPUT_TYPE*,                                              \
+                                                                                                                                       my_functor<float, 0, IKF_t::NOOP>,                        \
+                                                                                                                                       my_functor<float, 0, IKF_t::NOOP>);                       \
+                                                                                                                                                                                                 \
+    template void FourierTransformer<COMPUTE_BASE_TYPE, INPUT_TYPE, OTHER_IMAGE_TYPE, RANK>::InvFFT<my_functor<float, 0, IKF_t::NOOP>,                                                           \
+                                                                                                    my_functor<float, 0, IKF_t::NOOP>>(INPUT_TYPE*,                                              \
+                                                                                                                                       INPUT_TYPE*,                                              \
+                                                                                                                                       my_functor<float, 0, IKF_t::NOOP>,                        \
+                                                                                                                                       my_functor<float, 0, IKF_t::NOOP>);                       \
+                                                                                                                                                                                                 \
+    template void FourierTransformer<COMPUTE_BASE_TYPE, INPUT_TYPE, OTHER_IMAGE_TYPE, RANK>::FwdImageInvFFT<my_functor<float, 0, IKF_t::NOOP>,                                                   \
+                                                                                                            my_functor<float, 4, IKF_t::CONJ_MUL>,                                               \
+                                                                                                            my_functor<float, 0, IKF_t::NOOP>>(INPUT_TYPE*,                                      \
+                                                                                                                                               OTHER_IMAGE_TYPE*,                                \
+                                                                                                                                               INPUT_TYPE*,                                      \
+                                                                                                                                               my_functor<float, 0, IKF_t::NOOP>,                \
+                                                                                                                                               my_functor<float, 4, IKF_t::CONJ_MUL>,            \
+                                                                                                                                               my_functor<float, 0, IKF_t::NOOP>);               \
+    template void FourierTransformer<COMPUTE_BASE_TYPE, INPUT_TYPE, OTHER_IMAGE_TYPE, RANK>::FwdImageInvFFT<my_functor<float, 2, IKF_t::SCALE>,                                                  \
+                                                                                                            my_functor<float, 4, IKF_t::CONJ_MUL>,                                               \
+                                                                                                            my_functor<float, 0, IKF_t::NOOP>>(INPUT_TYPE*,                                      \
+                                                                                                                                               OTHER_IMAGE_TYPE*,                                \
+                                                                                                                                               INPUT_TYPE*,                                      \
+                                                                                                                                               my_functor<float, 2, IKF_t::SCALE>,               \
+                                                                                                                                               my_functor<float, 4, IKF_t::CONJ_MUL>,            \
+                                                                                                                                               my_functor<float, 0, IKF_t::NOOP>);               \
+    template void FourierTransformer<COMPUTE_BASE_TYPE, INPUT_TYPE, OTHER_IMAGE_TYPE, RANK>::FwdImageInvFFT<my_functor<float, 0, IKF_t::NOOP>,                                                   \
+                                                                                                            my_functor<float, 4, IKF_t::CONJ_MUL_THEN_SCALE>,                                    \
+                                                                                                            my_functor<float, 0, IKF_t::NOOP>>(INPUT_TYPE*,                                      \
+                                                                                                                                               OTHER_IMAGE_TYPE*,                                \
+                                                                                                                                               INPUT_TYPE*,                                      \
+                                                                                                                                               my_functor<float, 0, IKF_t::NOOP>,                \
+                                                                                                                                               my_functor<float, 4, IKF_t::CONJ_MUL_THEN_SCALE>, \
                                                                                                                                                my_functor<float, 0, IKF_t::NOOP>);
 
 INSTANTIATE(float, float, float2, 2);
