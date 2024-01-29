@@ -1870,7 +1870,7 @@ void FourierTransformer<ComputeBaseType, InputType, OtherImageType, Rank>::SetIn
         }
         else {
             // TODO: 8192 will fail for sm75 if wanted need some extra logic ... , 8192, 16
-            SelectSizeAndType<FFT_ALGO_t, FFT_base, PreOpType, IntraOpType, PostOpType, 16, 4, 32, 8, 64, 8, 128, 8, 256, 8, 512, 8, 1024, 8, 2048, 8, 4096, 8, 8192, 16>(other_image_ptr, kernel_type, pre_op_functor, intra_op_functor, post_op_functor);
+            SelectSizeAndType<FFT_ALGO_t, FFT_base, PreOpType, IntraOpType, PostOpType, 16, 4, 32, 8, 64, 8, 128, 8, 256, 8, 512, 8, 1024, 8, 2048, 8, 4096, 16, 8192, 16>(other_image_ptr, kernel_type, pre_op_functor, intra_op_functor, post_op_functor);
         }
     }
 }
