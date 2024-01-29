@@ -7,6 +7,14 @@
 
 #include "../../include/FastFFT.cuh"
 
+#ifndef FFT_DEBUG_STAGE
+#error "FFT_DEBUG_STAGE must be defined"
+#endif
+
+#ifndef FFT_DEBUG_LEVEL
+#error "FFT_DEBUG_LEVEL must be defined"
+#endif
+
 namespace FastFFT {
 
 template <class ExternalImage_t, class FFT, class invFFT, class ComplexData_t, class PreOpType, class IntraOpType, class PostOpType>
@@ -27,6 +35,7 @@ __launch_bounds__(FFT::max_threads_per_block) __global__
     // For simplicity, we explicitly zeropad the input data to the size of the FFT.
     // It may be worth trying to use threadIdx.y as in the DECREASE methods.
     // Until then, this
+
     io<FFT>::load(&input_values[Return1DFFTAddress(size_of<FFT>::value / apparent_Q)], thread_data, size_of<FFT>::value / apparent_Q, pre_op_functor);
 
     // In the first FFT the modifying twiddle factor is 1 so the data are reeal
