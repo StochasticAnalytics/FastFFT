@@ -311,29 +311,23 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
             cuFFT_output.record_stop( );
             cuFFT_output.synchronize( );
             cuFFT_output.print_time("FastFFT", print_out_time);
+            MyFFTPrintWithDetails("");
             float FastFFT_time = cuFFT_output.elapsed_gpu_ms;
-
-            // if (set_padding_callback)
-            // {
-            //   precheck;
-            //   cufftReal* overlap_pointer;
-            //   overlap_pointer = cuFFT.d_ptr.position_space;
-            //   cuFFT_output.SetClipIntoCallback(overlap_pointer, cuFFT_input.size.x, cuFFT_input.size.y, cuFFT_input.size.w*2);
-            //   postcheck;
-            // }
 
             if ( set_conjMult_callback ) {
                 precheck;
                 cuFFT_output.SetComplexConjMultiplyAndLoadCallBack((cufftComplex*)cuFFT_buffer, 1.0f);
                 postcheck;
             }
+            MyFFTPrintWithDetails("");
 
             if ( ! skip_cufft_for_profiling ) {
                 //////////////////////////////////////////
                 //////////////////////////////////////////
                 // Warm up and check for accuracy
+                MyFFTPrintWithDetails("");
                 if ( is_size_change_decrease ) {
-
+                    MyFFTPrintWithDetails("");
                     precheck;
                     cudaErr(cufftExecR2C(cuFFT_input.cuda_plan_forward, (cufftReal*)cuFFT_buffer, (cufftComplex*)cuFFT_buffer));
                     postcheck;
@@ -346,7 +340,7 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
                     // cuFFT.ClipIntoTopLeft();
                     // cuFFT.ClipIntoReal(cuFFT_output.size.x/2, cuFFT_output.size.y/2, cuFFT_output.size.z/2);
                     // cuFFT.CopyDeviceToHostAndSynchronize(cuFFT_output.real_values,false);
-
+                    MyFFTPrintWithDetails("");
                     precheck;
                     cudaErr(cufftExecR2C(cuFFT_output.cuda_plan_forward, (cufftReal*)cuFFT_buffer, (cufftComplex*)cuFFT_buffer));
                     postcheck;
@@ -355,7 +349,7 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
                     cudaErr(cufftExecC2R(cuFFT_output.cuda_plan_inverse, (cufftComplex*)cuFFT_buffer, (cufftReal*)cuFFT_buffer));
                     postcheck;
                 }
-
+                MyFFTPrintWithDetails("");
                 cuFFT_output.record_start( );
                 for ( int i = 0; i < n_loops; ++i ) {
                     // std::cout << i << "i / " << n_loops << "n_loops" << std::endl;
@@ -382,10 +376,14 @@ void compare_libraries(std::vector<int> size, FastFFT::SizeChangeType::Enum size
                         postcheck;
                     }
                 }
+                MyFFTPrintWithDetails("");
                 cuFFT_output.record_stop( );
                 cuFFT_output.synchronize( );
                 cuFFT_output.print_time("cuFFT", print_out_time);
+                MyFFTPrintWithDetails("");
             } // end of if (! skip_cufft_for_profiling)
+            MyFFTPrintWithDetails("");
+
             std::cout << "For size " << input_size.x << " to " << output_size.x << ": ";
             std::cout << "Ratio cuFFT/FastFFT : " << cuFFT_output.elapsed_gpu_ms / FastFFT_time << "\n\n"
                       << std::endl;
