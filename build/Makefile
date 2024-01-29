@@ -2,7 +2,6 @@
 NVCC=nvcc
 # TODO: test with gcc and clang
 NVCC_FLAGS=-ccbin=g++ -t 8 
-
 # TODO: static may need to be added later or independently just for benchmarks, while libs to link through python are probably going to need to be dynamic.
 NVCC_FLAGS+=--cudart=static
 NVCC_FLAGS+=--default-stream per-thread -m64 -O3 --use_fast_math --extra-device-vectorization --extended-lambda --Wext-lambda-captures-this -std=c++17 -Xptxas --warn-on-local-memory-usage,--warn-on-spills, --generate-line-info -Xcompiler=-std=c++17
@@ -10,6 +9,9 @@ NVCC_FLAGS+=--default-stream per-thread -m64 -O3 --use_fast_math --extra-device-
 NVCC_FLAGS+=--expt-relaxed-constexpr
 # For testing, particularly until the cufftdx::BlockDim() operator is enabled
 NVCC_FLAGS+=-DCUFFTDX_DISABLE_RUNTIME_ASSERTS
+
+# Don't explicitly instantiate the 3d versions unless requested
+NVCC_FLAGS+=-DFastFFT_3d_instantiation
 
 # Gencode arguments, only supporting Volta or newer
 # SMS ?= 70 75 80 86
@@ -38,7 +40,7 @@ $(info $$CUFFTDX_INCLUDE_DIR is [${CUFFTDX_INCLUDE_DIR}])
 CUDA_BIN_DIR=$(shell dirname `which $(NVCC)`)
 CUDA_INCLUDE_DIR=$(CUDA_BIN_DIR)/../include
 
-
+# TODO: Changing the debug flags will not force re compilation
 DEBUG_FLAGS :=  
 # Debug level determines various asserts and print macros defined in FastFFT.cuh These should only be set when building tests and developing.
 ifeq (${FFT_DEBUG_LEVEL},)
@@ -79,6 +81,10 @@ endif
 ifeq (${FastFFT_sync_checking},1)
 # If HEAVYERRORCHECKING_FFT is not already asked for, then add it anytime debug_stage < 8 (partial FFTs)
 	DEBUG_FLAGS+=-DHEAVYERRORCHECKING_FFT
+else
+	ifeq (${debug_level}, 4)
+		DEBUG_FLAGS+=-DHEAVYERRORCHECKING_FFT
+	endif
 endif
 
 
@@ -89,6 +95,7 @@ EXTERNAL_LIBS= -lfftw3f -lcufft_static -lculibos -lcudart_static -lrt
 TEST_BUILD_DIR=tests
 TEST_SRC_DIR=../src/tests
 # Get all the test source files and remove cu extension
+# TODO: selective targets
 TEST_TARGETS=$(patsubst %.cu,$(TEST_BUILD_DIR)/%,$(notdir $(wildcard $(TEST_SRC_DIR)/*.cu)))
 TEST_DEPS=$(wildcard $(TEST_SRC_DIR)/*.cuh)
 

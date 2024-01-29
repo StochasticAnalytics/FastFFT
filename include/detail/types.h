@@ -1,5 +1,5 @@
-#ifndef _SRC_FASTFFT_TYPES_H_
-#define _SRC_FASTFFT_TYPES_H_
+#ifndef __INCLUDE_DETAIL_FASTFFT_TYPES_H__
+#define __INCLUDE_DETAIL_FASTFFT_TYPES_H__
 
 #include <array>
 #include <string_view>
@@ -41,16 +41,9 @@ constexpr std::array<std::string_view, 3> name = {"natural", "centered", "quadra
 
 } // namespace OriginType
 
-namespace TransformStageCompleted {
-enum Enum : uint8_t { none = 10,
-                      fwd  = 11,
-                      inv  = 12 }; // none must be greater than number of sizeChangeTypes, padding must match in TransformStageCompletedName vector
-} // namespace TransformStageCompleted
-
 namespace DimensionCheckType {
 enum Enum : uint8_t { CopyFromHost,
                       CopyToHost,
-                      CopyDeviceToDevice,
                       FwdTransform,
                       InvTransform };
 
@@ -58,4 +51,4 @@ enum Enum : uint8_t { CopyFromHost,
 
 } // namespace FastFFT
 
-#endif /* _SRC_FASTFFT_TYPES_H_ */
+#endif // __INCLUDE_DETAIL_FASTFFT_TYPES_H__

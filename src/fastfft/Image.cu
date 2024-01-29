@@ -13,14 +13,20 @@ Image<wanted_real_type, wanted_complex_type>::Image(short4 wanted_size) {
 
     size.w = (size.x + padding_jump_value) / 2;
 
-    is_in_memory     = false;
-    is_in_real_space = true;
-    is_cufft_planned = false;
-    is_fftw_planned  = false;
+    is_in_memory          = false;
+    is_in_real_space      = true;
+    is_cufft_planned      = false;
+    is_fftw_planned       = false;
+    data_is_fp16          = false;
+    real_memory_allocated = size.w * size.y * size.z * 2;
+    n_bytes_allocated     = real_memory_allocated * sizeof(wanted_real_type);
+    is_registered         = false;
 }
 
 template <class wanted_real_type, class wanted_complex_type>
 Image<wanted_real_type, wanted_complex_type>::~Image( ) {
+
+    UnRegisterPageLockedMemory( );
 
     if ( is_in_memory ) {
         delete[] real_values;
@@ -102,11 +108,13 @@ void Image<wanted_real_type, wanted_complex_type>::Allocate( ) {
     complex_values  = (wanted_complex_type*)real_values; // Set the complex_values to point at the newly allocated real values;
     is_fftw_planned = false;
     is_in_memory    = true;
+
+    RegisterPageLockedMemory( );
 }
 
 template <class wanted_real_type, class wanted_complex_type>
 void Image<wanted_real_type, wanted_complex_type>::Allocate(bool set_fftw_plan) {
-    real_values = new wanted_real_type[real_memory_allocated];
+    real_values = new wanted_real_type[real_memory_allocated + 2];
     // real_values = (wanted_real_type *) fftw_malloc(sizeof(wanted_real_type) * real_memory_allocated);
     complex_values = (wanted_complex_type*)real_values; // Set the complex_values to point at the newly allocated real values;
 
@@ -118,6 +126,8 @@ void Image<wanted_real_type, wanted_complex_type>::Allocate(bool set_fftw_plan) 
     }
 
     is_in_memory = true;
+
+    RegisterPageLockedMemory( );
 }
 
 template <class wanted_real_type, class wanted_complex_type>
@@ -340,9 +350,29 @@ void Image<wanted_real_type, wanted_complex_type>::print_values_complex(float* i
     }
 }
 
-// Return sum of real values
+// // Return sum of real values
+// template <class wanted_real_type, class wanted_complex_type>
+// float Image<wanted_real_type, wanted_complex_type>::ReturnSumOfReal(float* input, short4 size, bool print_val) {
+//     double temp_sum         = 0;
+//     long   address          = 0;
+//     int    padding_jump_val = size.w * 2 - size.x;
+//     for ( int k = 0; k < size.z; k++ ) {
+//         for ( int j = 0; j < size.y; j++ ) {
+//             for ( int i = 0; i < size.x; i++ ) {
+
+//                 temp_sum += double(input[address]);
+//                 address++;
+//             }
+//             address += padding_jump_val;
+//         }
+//     }
+
+//     return float(temp_sum);
+// }
+
 template <class wanted_real_type, class wanted_complex_type>
-float Image<wanted_real_type, wanted_complex_type>::ReturnSumOfReal(float* input, short4 size, bool print_val) {
+template <typename T>
+float Image<wanted_real_type, wanted_complex_type>::ReturnSumOfReal(T* input, short4 size, bool print_val) {
     double temp_sum         = 0;
     long   address          = 0;
     int    padding_jump_val = size.w * 2 - size.x;
@@ -359,6 +389,10 @@ float Image<wanted_real_type, wanted_complex_type>::ReturnSumOfReal(float* input
 
     return float(temp_sum);
 }
+
+template float Image<float, float2>::ReturnSumOfReal<float>(float* input, short4 size, bool print_val);
+template float Image<float, float2>::ReturnSumOfReal<half_float::half>(half_float::half* input, short4 size, bool print_val);
+template float Image<float, float2>::ReturnSumOfReal<__half>(__half* input, short4 size, bool print_val);
 
 // Return the sum of the complex values
 
@@ -446,6 +480,60 @@ void Image<wanted_real_type, wanted_complex_type>::ClipInto(const float* array_t
     }
 
 } // end of clip into
+
+template <class wanted_real_type, class wanted_complex_type>
+void Image<wanted_real_type, wanted_complex_type>::ConvertFP32ToFP16( ) {
+    if ( data_is_fp16 ) {
+        std::cerr << "Error: Image is already in FP16." << std::endl;
+        exit(1);
+    }
+    if ( ! is_in_memory ) {
+        std::cerr << "Error: Image is not in memory." << std::endl;
+        exit(1);
+    }
+    // We can just do this in place as the new values are smaller than the old ones.
+    for ( int i = 0; i < real_memory_allocated; i++ ) {
+        reinterpret_cast<half_float::half*>(real_values)[i] = (half_float::half)real_values[i];
+    }
+    data_is_fp16 = true;
+}
+
+template <class wanted_real_type, class wanted_complex_type>
+void Image<wanted_real_type, wanted_complex_type>::ConvertFP16ToFP32( ) {
+    if ( ! data_is_fp16 ) {
+        std::cerr << "Error: Image is not already in FP16." << std::endl;
+        exit(1);
+    }
+    if ( ! is_in_memory ) {
+        std::cerr << "Error: Image is not in memory." << std::endl;
+        exit(1);
+    }
+    // We can just do this in place as the new values are smaller than the old ones.
+    float* tmp = new float[real_memory_allocated];
+    for ( int i = 0; i < real_memory_allocated; i++ ) {
+        tmp[i] = float(reinterpret_cast<half_float::half*>(real_values)[i]);
+    }
+    for ( int i = 0; i < real_memory_allocated; i++ ) {
+        real_values[i] = tmp[i];
+    }
+    delete[] tmp;
+    data_is_fp16 = false;
+}
+
+template <class wanted_real_type, class wanted_complex_type>
+void Image<wanted_real_type, wanted_complex_type>::RegisterPageLockedMemory( ) {
+    if ( ! is_registered ) {
+        cudaErr(cudaHostRegister(real_values, sizeof(wanted_real_type) * real_memory_allocated, cudaHostRegisterDefault));
+        is_registered = true;
+    }
+}
+
+template <class wanted_real_type, class wanted_complex_type>
+void Image<wanted_real_type, wanted_complex_type>::UnRegisterPageLockedMemory( ) {
+    if ( is_registered ) {
+        cudaErr(cudaHostUnregister(real_values));
+    }
+}
 
 template class Image<float, float2>;
 // template Image<float, float2>::Image(short4);

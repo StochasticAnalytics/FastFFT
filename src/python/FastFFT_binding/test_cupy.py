@@ -11,11 +11,12 @@ a[0][0] = 1.0
 print("Cupy array is {}".format(a))
 
 # Setup the plans
-FT.SetForwardFFTPlan(16,16,1,16,16,1, True)
+FT.
+(16,16,1,16,16,1, True)
 FT.Wait()
 FT.SetInverseFFTPlan(16,16,1,16,16,1, True)
 FT.Wait()
-FT.SetInputPointer(a.data.ptr)
+FT.SetInputPointerFromPython(a.data.ptr)
 FT.Wait()
 # These bools are defaults that are deprecated
 FT.FwdFFT(False, True)

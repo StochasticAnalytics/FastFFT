@@ -15,7 +15,7 @@
 #include "../../include/FastFFT.cuh"
 
 // clang-format off
-#define MyTestPrintAndExit(...) { std::cerr << __VA_ARGS__ << " From: " << __FILE__ << " " << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1); }
+#define MyTestPrintAndExit(cond, ...) { if(! cond) {std::cerr << __VA_ARGS__ << " From: " << __FILE__ << ":" << __LINE__ << " " << __PRETTY_FUNCTION__ << std::endl; exit(-1); }}
 
 // clang-format on
 
@@ -34,7 +34,7 @@ void PrintArray(float2* array, short NX, short NY, short NZ, int line_wrapping =
                     std::cout << std::endl;
                 } // line wrapping
             }
-            std::cout << "] " << std::endl;
+            std::cout << "] " << NY << std::endl;
             n = 0;
         }
         if ( NZ > 0 )
@@ -56,7 +56,7 @@ void PrintArray(float* array, short NX, short NY, short NZ, short NW, int line_w
                     std::cout << std::endl;
                 } // line wrapping
             }
-            std::cout << "] " << std::endl;
+            std::cout << "] " << NY << std::endl;
             n = 0;
         }
         if ( NZ > 0 )
@@ -79,7 +79,7 @@ void PrintArray_XZ(float2* array, short NX, short NY, short NZ, int line_wrappin
                     std::cout << std::endl;
                 } // line wrapping
             }
-            std::cout << "] " << std::endl;
+            std::cout << "] " << NY << std::endl;
             n = 0;
         }
         if ( NZ > 0 )
@@ -98,7 +98,7 @@ void CheckUnitImpulseRealImage(Image<realType, complexType>& positive_control, i
                 // Only check the address if we have too.
                 if ( positive_control.real_values[address] != 0.0f && address != 0 ) {
                     PrintArray(positive_control.real_values, positive_control.size.x, positive_control.size.y, positive_control.size.z, positive_control.size.w);
-                    MyTestPrintAndExit(" ");
+                    MyTestPrintAndExit(false, "Check Unit Impulse Real control val " + std::to_string(positive_control.real_values[address]) + " different from zero at line " + std::to_string(input_line));
                 }
                 address++;
             }
@@ -108,9 +108,20 @@ void CheckUnitImpulseRealImage(Image<realType, complexType>& positive_control, i
     return;
 }
 
-// For debugging the individual stages of the xforms
-// Note: for some reason, passing by value altered the values while passing by reference did not. (Opposite?)
+/**
+ * @brief  For debugging the individual stages of the xforms
+ *  Note: for some reason, passing by value altered the values while passing by reference did not. (Opposite?)
 // eg.
+ 
+ * @param test_image 
+ * @param fwd_dims_in 
+ * @param fwd_dims_out 
+ * @param inv_dims_in 
+ * @param inv_dims_out 
+ * @param input_line 
+ * @return true 
+ * @return false 
+ */
 template <int fft_debug_stage, int Rank, typename realType, typename complexType>
 bool debug_partial_fft(Image<realType, complexType>& test_image,
                        short4                        fwd_dims_in,
@@ -179,13 +190,11 @@ bool debug_partial_fft(Image<realType, complexType>& test_image,
         debug_stage_is_8 = true;
     }
     else
-        MyTestPrintAndExit("FFT_DEBUG_STAGE not recognized " + std::to_string(FFT_DEBUG_STAGE));
+        MyTestPrintAndExit(false, "FFT_DEBUG_STAGE not recognized " + std::to_string(FFT_DEBUG_STAGE));
 
     // std::cerr << "Debug stage " << fft_debug_stage << " passed." << std::endl;
-    return debug_stage_is_8;
 
-    if ( ! debug_stage_is_8 )
-        std::cerr << " Failed Assert at " << __FILE__ << " " << input_line << " " << __PRETTY_FUNCTION__ << std::endl;
+    return debug_stage_is_8;
 }
 
 #endif
