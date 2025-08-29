@@ -18,7 +18,7 @@ The FourierTransformer class, in the FastFFT namespace may be used in your cpp/c
 
 - The input/output data pointers, size and type are set. (analagous to the cufftXtMakePlanMany)
 - Class methods are provided to handle memory allocation on the gpu as well as transfer to/from host/device.
-- Simple methods for FwdFFT, InvFFT, CrossCorrelation etc. are public and call the correct combination of substranforms based on the data and padding/trimming wanted.
+- Simple methods for FwdFFT, InvFFT, CrossCorrelation etc. are public and call the correct combination of sulsbstranforms based on the data and padding/trimming wanted.
 
 
 ## Request new documentation or report bugs

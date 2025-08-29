@@ -46,6 +46,10 @@ build/*
 
 include/nvidia-mathdx-*
 include/cufftdx*
+include/nvidia-srcs/*
+!include/nvidia-srcs/setup.sh
+!include/nvidia-srcs/setup.md
+!include/nvidia-srcs/README.md
 .vscode/
 .vscode_shared/BenHimes/
 

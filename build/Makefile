@@ -49,8 +49,8 @@ endif
 # GENCODE_FLAGS := -gencode arch=compute_86,code=sm_86
 # endif
 
-# GENCODE_FLAGS := --gpu-architecture=sm_86 -gencode=arch=compute_86,code=compute_86 -gencode=arch=compute_80,code=sm_80 -gencode=arch=compute_89,code=sm_89
-GENCODE_FLAGS := --gpu-architecture=sm_86 -gencode=arch=compute_86,code=compute_86
+GENCODE_FLAGS := --gpu-architecture=sm_86 -gencode=arch=compute_86,code=compute_86 -gencode=arch=compute_80,code=sm_80 -gencode=arch=compute_89,code=sm_89
+# GENCODE_FLAGS := --gpu-architecture=sm_86 -gencode=arch=compute_86,code=compute_86
 # NVCC_FLAGS+=-DFastFFT_sizes=512,4096
 
 # TODO:

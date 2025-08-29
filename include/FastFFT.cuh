@@ -8,6 +8,7 @@
 #define USE_FOLDED_C2R
 #define C2R_BUFFER_LINES
 
+
 // cudaErr(cudaFuncSetSharedMemConfig((const void*)block_fft_kernel_C2R_DECREASE_XY<FFT, data_buffer_t, data_io_t>, cudaSharedMemBankSizeEightByte));
 
 #include "detail/detail.cuh"
