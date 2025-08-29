@@ -18,7 +18,7 @@
 // #define FastFFT_build_sizes 32, 64, 128, 256, 512, 1024, 2048, 4096
 
 // #define FastFFT_build_sizes 16, 4, 32, 8, 64, 8, 128, 8, 256, 8, 512, 8, 1024, 8, 2048, 8, 4096, 16, 8192, 16
-#define FastFFT_build_sizes 64, 128, 256, 512, 1024, 2048, 4096
+#define FastFFT_build_sizes 32, 64, 128, 256, 512, 1024, 2048, 4096
 
 namespace FastFFT {
 

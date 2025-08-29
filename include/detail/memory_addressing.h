@@ -2,7 +2,15 @@
 #define __INCLUDE_DETAIL_MEMORY_ADDRESSING_H__
 
 #include <cuda_fp16.h>
+#include <cufftdx/cufftdx_version.hpp>
+
+#ifndef CUFFTDX_VERSION
+#error "CUFFTDX_VERSION is not defined. Please include the cuFFTDx headers correctly."
+#else
+#if CUFFTDX_VERSION < 10501
 #include <cufftdx/include/detail/system_checks.hpp>
+#endif
+#endif
 
 namespace FastFFT {
 

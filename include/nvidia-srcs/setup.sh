@@ -5,15 +5,14 @@
 #   - TODO: see X for explanation
 # 2. Find the correct include directories
 
-# include "../cufftdx/include/cufftdx/include/detail/system_checks.hpp"
-# include "../cufftdx/include/cufftdx/include/cufftdx.hpp"
-# include "../cufftdx/include/cufftdx/include/cufftdx.hpp"
-# include "../cufftdx/include/cufftdx/include/operators/direction.hpp"
-# include "../../include/cufftdx/include/cufftdx.hpp"
-# include "../cufftdx/include/cufftdx/include/cufftdx.hpp"
+
+
+# Version info
+using_version=nvidia-mathdx-25.06.1
+
 
 # Incase you need to handle this in steps
-DO_STEP_1_TIDY_TO_TIDZ=false
+DO_STEP_1_TIDY_TO_TIDZ=true
 DO_STEP_2=true
 
 # Make sure we are in the correct directory
@@ -25,8 +24,6 @@ else
 fi
 
 
-# Version info
-using_version=nvidia-mathdx-24.08.0
 
 # Check that the directory exists
 if [ -d "$using_version" ]; then

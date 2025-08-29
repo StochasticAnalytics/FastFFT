@@ -1,5 +1,5 @@
 # Version for cufft
-include ../include/nvidia-srcs/nvidia-mathdx-24.08.0.mk
+include ../include/nvidia-srcs/nvidia-mathdx-25.06.1.mk
 
 NVCC=nvcc $(CUFFTDX_VERSION_INCLUDE_FLAGS)
 # TODO: test with gcc and clang
