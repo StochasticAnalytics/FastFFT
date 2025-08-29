@@ -1,8 +1,8 @@
 #ifndef __INCLUDE_DETAIL_DEVICE_FUNCTIONS_H__
 #define __INCLUDE_DETAIL_DEVICE_FUNCTIONS_H__
 
-#include "../cufftdx/include/cufftdx/include/cufftdx.hpp"
-#include "../cufftdx/include/cufftdx/include/operators/direction.hpp"
+#include <cufftdx/include/cufftdx.hpp>
+#include <cufftdx/include/operators/direction.hpp>
 
 namespace FastFFT {
 

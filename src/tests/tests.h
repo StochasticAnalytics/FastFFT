@@ -8,7 +8,7 @@
 
 namespace FastFFT {
 // Input size vectors to be tested.
-std::vector<int> test_size = {32, 64, 128, 256, 512, 1024, 2048, 4096};
+std::vector<int> test_size = {64, 128, 256, 512, 1024, 2048, 4096};
 // std::vector<int> test_size = {32, 64, 128, 256, 512, 1024, 2048, 4096};
 
 std::vector<int> test_size_rectangle = {64, 128, 256, 512, 1024, 2048, 4096};

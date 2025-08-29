@@ -1,5 +1,7 @@
+# Version for cufft
+include ../include/nvidia-srcs/nvidia-mathdx-24.08.0.mk
 
-NVCC=nvcc
+NVCC=nvcc $(CUFFTDX_VERSION_INCLUDE_FLAGS)
 # TODO: test with gcc and clang
 NVCC_FLAGS=-ccbin=g++ -t 8 
 # TODO: static may need to be added later or independently just for benchmarks, while libs to link through python are probably going to need to be dynamic. --split-compile=8

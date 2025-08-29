@@ -45,8 +45,9 @@ remaining_include_path=$(grep -oP '#include "\K[^"]+' $cufftdx_hpp_dir/cufftdx.h
 echo "Found remaining include path at $remaining_include_path"
 
 # We'll record the appropriate include path which will be accessed in the build process
+# The includes then look like <cufftdx/include/detail/system_checks.hpp>
 header_path=${cufftdx_hpp_dir#./} 
-echo "CPPFLAGS += -I\$(top_srcdir)/include/nvidia-srcs/${header_path}/${remaining_include_path}/" > ${using_version}.mk
+echo "CPPFLAGS += -I../include/nvidia-srcs/${header_path}/" > ${using_version}.mk
 
 
 # Get the path for the database of assembly we need to modify
