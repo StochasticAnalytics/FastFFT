@@ -1,0 +1,231 @@
+--- a/cufftdx/database/detail/block_fft.hpp
++++ b/cufftdx/database/detail/block_fft.hpp
+@@ -32,10 +32,10 @@
+             struct block_fft_record<Size, Precision, Type, Direction, 720>:
+                 public block_fft_record<Size, Precision, Type, Direction, 700> {};
+ 
+-            // Forward SM86 records to SM70 records
++            // FastFFT: forward SM86 records to SM80 records (changed from SM70 to support larger FFT sizes)
+             template<unsigned int Size /* FFT size */, class Precision, fft_type Type, fft_direction Direction>
+             struct block_fft_record<Size, Precision, Type, Direction, 860>:
+-                public block_fft_record<Size, Precision, Type, Direction, 700> {};
++                public block_fft_record<Size, Precision, Type, Direction, 800> {};
+ 
+             // Forward SM87 records to SM80 records
+             template<unsigned int Size /* FFT size */, class Precision, fft_type Type, fft_direction Direction>
+--- a/cufftdx/detail/fft_execution.hpp
++++ b/cufftdx/detail/fft_execution.hpp
+@@ -800,10 +800,17 @@
+ 
+         private:
+ 
+-            template<unsigned int N, class T>
++            template<unsigned int FPB, unsigned int N, class T>
+             inline __device__ void shared_to_registers_impl(T* shared_memory, T* thread_data) {
+-                const unsigned int batch_offset = threadIdx.y * N;
+-                unsigned int       index        = threadIdx.x;
++                // FastFFT: threadIdx.y is reserved for transform decomposition, only use it for
++                // batch offsets when there is more than one FFT per block.
++                unsigned int batch_offset;
++                if constexpr (FPB > 1) {
++                    batch_offset = threadIdx.y * N;
++                } else {
++                    batch_offset = 0;
++                }
++                unsigned int index = threadIdx.x;
+                 for (unsigned int i = 0; i < input_ept; i++) {
+                     if (index < N) {
+                         thread_data[i] = shared_memory[batch_offset + index];
+@@ -815,7 +822,7 @@
+             template<bool Bluestein, class V>
+             inline __device__ void shared_to_registers(void* shared_memory, V* thread_data) {
+                 using input_t = typename this_type::input_type;
+-                shared_to_registers_impl<this_type::input_length>(
++                shared_to_registers_impl<ffts_per_block, this_type::input_length>(
+                     reinterpret_cast<input_t*>(shared_memory),
+                     reinterpret_cast<input_t*>(thread_data));
+                 __syncthreads();
+--- a/cufftdx/detail/processing/fft_block_preprocess.hpp
++++ b/cufftdx/detail/processing/fft_block_preprocess.hpp
+@@ -75,7 +75,13 @@
+                 __syncthreads();
+ 
+                 // Move to the part of shared memory for that FFT batch
+-                ComplexType* smem_fft_batch = smem + (threadIdx.y * (fft_size / 2));
++                // FastFFT: threadIdx.y is reserved for transform decomposition; only offset when batching
++                ComplexType* smem_fft_batch;
++                if constexpr (FFT::ffts_per_block > 1) {
++                    smem_fft_batch = smem + (threadIdx.y * (fft_size / 2));
++                } else {
++                    smem_fft_batch = smem;
++                }
+                 for (unsigned int i = 0; i < (ept / 2); i++) {
+                     if (!(threadIdx.x == 0 && i == 0 && !fft_size_is_even)) {
+                         smem_fft_batch[threadIdx.x + (i * (fft_size / ept))-index_mod] = input[i];
+@@ -172,7 +178,13 @@
+             [[maybe_unused]] static constexpr unsigned int max_meaningful_ept = (fft_size / 2 + 1 + (stride - 1)) / stride;
+ 
+             // Move to the part of shared memory for that FFT batch
+-            [[maybe_unused]] ComplexType* smem_fft_batch = smem + (threadIdx.y * (fft_blue_size / 2));
++            // FastFFT: threadIdx.y is reserved for transform decomposition; only offset when batching
++            [[maybe_unused]] ComplexType* smem_fft_batch;
++            if constexpr (FFT::ffts_per_block > 1) {
++                smem_fft_batch = smem + (threadIdx.y * (fft_blue_size / 2));
++            } else {
++                smem_fft_batch = smem;
++            }
+ 
+             if constexpr (real_fft_layout_of<FFT>::value == complex_layout::full) {
+                 // nop, since
+@@ -286,7 +298,13 @@
+                 // loads all data
+             } else {
+                 // Move to the part of shared memory for that FFT batch
+-                ComplexType* smem_fft_batch = smem + (threadIdx.y * FFT::input_length);
++                // FastFFT: threadIdx.y is reserved for transform decomposition; only offset when batching
++                ComplexType* smem_fft_batch;
++                if constexpr (FFT::ffts_per_block > 1) {
++                    smem_fft_batch = smem + (threadIdx.y * FFT::input_length);
++                } else {
++                    smem_fft_batch = smem;
++                }
+                 for (unsigned int i = ept / 2; i < ept; i++) {
+                     if ((real_lay == complex_layout::packed) &&
+                         (threadIdx.x == mid_thread_idx) && (i == ept / 2)) {
+@@ -341,7 +359,13 @@
+             static constexpr auto         fft_blue_size  = get_bluestein_size(fft_size);
+             static constexpr unsigned int stride         = fft_blue_size / ept;
+ 
+-            [[maybe_unused]] ComplexType* smem_fft_batch = smem + (threadIdx.y * FFT::input_length);
++            // FastFFT: threadIdx.y is reserved for transform decomposition; only offset when batching
++            [[maybe_unused]] ComplexType* smem_fft_batch;
++            if constexpr (FFT::ffts_per_block > 1) {
++                smem_fft_batch = smem + (threadIdx.y * FFT::input_length);
++            } else {
++                smem_fft_batch = smem;
++            }
+ 
+             if constexpr (real_fft_layout_of<FFT>::value == complex_layout::full) {
+                 // nop, since
+--- a/cufftdx/detail/processing/fft_block_postprocess.hpp
++++ b/cufftdx/detail/processing/fft_block_postprocess.hpp
+@@ -27,13 +27,20 @@
+ 
+ 
+             if constexpr (size_of<FFT>::value > ept) {
+-                ComplexType* smem_fft_batch = smem + threadIdx.y;
+-                __syncthreads();
++                // FastFFT: threadIdx.y is reserved for transform decomposition; only offset when batching
++                ComplexType* smem_fft_batch;
++                if constexpr (FFT::ffts_per_block > 1) {
++                    smem_fft_batch = smem + threadIdx.y;
++                    __syncthreads();
+ 
+-                if (((size_of<FFT>::value / 2) % FFT::stride) == threadIdx.x) {
+-                    smem_fft_batch[0].x = input[((size_of<FFT>::value / 2) - threadIdx.x) / FFT::stride].x;
++                    if (((size_of<FFT>::value / 2) % FFT::stride) == threadIdx.x) {
++                        smem_fft_batch[0].x = input[((size_of<FFT>::value / 2) - threadIdx.x) / FFT::stride].x;
++                    }
++                } else {
++                    smem_fft_batch = smem;
+                 }
+-
++                // This sync was originally after the store that is now in the FPB > 1 branch; it is kept
++                // outside the constexpr so that it is always hit
+                 __syncthreads();
+ 
+                 if (threadIdx.x == 0) {
+--- a/cufftdx/detail/processing/fft_block_redistribute.hpp
++++ b/cufftdx/detail/processing/fft_block_redistribute.hpp
+@@ -32,7 +32,11 @@
+             template <bool redistribute, class T>
+             static __forceinline__ __device__ auto redistribute_to_shared(T* thread_data, T* smem) ->
+                 typename CUFFTDX_STD::enable_if_t< redistribute && (FFT::elements_per_thread % from_ept != 0)> {
+-                const unsigned int batch_offset = threadIdx.y * size;
++                // FastFFT: threadIdx.y is reserved for transform decomposition; only offset when batching
++                unsigned int batch_offset{};
++                if constexpr (FFT::ffts_per_block > 1) {
++                    batch_offset = threadIdx.y * size;
++                }
+                 unsigned int       index        = threadIdx.x;
+ 
+                 __syncthreads();
+@@ -53,7 +57,11 @@
+             template <bool redistribute, class T>
+             static __forceinline__ __device__ auto redistribute_to_shared(T* thread_data, T* smem) ->
+                 typename CUFFTDX_STD::enable_if_t< !redistribute || (FFT::elements_per_thread % from_ept == 0)> {
+-                const unsigned int batch_offset = threadIdx.y * output_size;
++                // FastFFT: threadIdx.y is reserved for transform decomposition; only offset when batching
++                unsigned int batch_offset{};
++                if constexpr (FFT::ffts_per_block > 1) {
++                    batch_offset = threadIdx.y * output_size;
++                }
+                 unsigned int       index        = threadIdx.x;
+ 
+                 __syncthreads();
+@@ -68,7 +76,11 @@
+ 
+             template <class T>
+             static __forceinline__ __device__ void redistribute_from_shared(T* thread_data, T* smem) {
+-                const unsigned int batch_offset = threadIdx.y * output_size;
++                // FastFFT: threadIdx.y is reserved for transform decomposition; only offset when batching
++                unsigned int batch_offset{};
++                if constexpr (FFT::ffts_per_block > 1) {
++                    batch_offset = threadIdx.y * output_size;
++                }
+                 unsigned int       index        = threadIdx.x;
+ 
+                 __syncthreads();
+--- a/cufftdx/detail/processing/postprocess_fold.hpp
++++ b/cufftdx/detail/processing/postprocess_fold.hpp
+@@ -266,7 +266,11 @@
+             ComplexType  twiddle;
+             unsigned int index = threadIdx.x;
+ 
+-            const unsigned int shared_offset = threadIdx.y * post<FFT>::half_complex_size;
++            // FastFFT: threadIdx.y is reserved for transform decomposition; only offset when batching
++            unsigned int shared_offset{};
++            if constexpr (FFT::ffts_per_block > 1) {
++                shared_offset = threadIdx.y * post<FFT>::half_complex_size;
++            }
+             smem += shared_offset;
+ 
+             // Shuffle data through shared memory so that each thread
+--- a/cufftdx/detail/processing/preprocess_fold.hpp
++++ b/cufftdx/detail/processing/preprocess_fold.hpp
+@@ -4,6 +4,11 @@
+ #include "cufftdx/detail/processing/lut.hpp"
+ #include "cufftdx/detail/utils.hpp"
+ 
++// FastFFT: used to fire a static_assert only when a blocked (unsupported) code path is instantiated.
++// A bare static_assert(false) inside an if-constexpr branch would fire unconditionally.
++template <bool flag = false>
++inline void static_no_shared_api( ) { static_assert(flag, "shared api is being accesed!"); }
++
+ namespace cufftdx {
+     namespace detail {
+ 
+@@ -219,12 +224,19 @@
+             ComplexType  twiddle;
+             unsigned int index = threadIdx.x;
+ 
+-            const unsigned int shared_offset = IsShared
+-                                                   ? threadIdx.y * FFT::input_length
+-                                                   : threadIdx.y * pre<FFT>::half_complex_size;
+-            smem += shared_offset;
++            // FastFFT: threadIdx.y is reserved for transform decomposition; only offset when batching
++            if constexpr (FFT::ffts_per_block > 1) {
++                if constexpr (IsShared) {
++                    smem += (threadIdx.y * FFT::input_length);
++                } else {
++                    smem += (threadIdx.y * pre<FFT>::half_complex_size);
++                }
++            }
+ 
+             if constexpr (IsShared) {
++                // FastFFT: the shared-memory API is not supported (shared memory layout is managed by
++                // FastFFT itself); fail loudly at compile time if a kernel tries to use it.
++                static_no_shared_api( );
+                 // If Shared API is used, there is no need to store data
+                 // from registers to shared, as it's already in there
+                 smem += pre<FFT>::half_complex_size;

@@ -17,9 +17,12 @@ NVCC_FLAGS+=-DCUFFTDX_DISABLE_RUNTIME_ASSERTS
 NVCC_FLAGS+=-DCUFFTDX_DISABLE_CUTLASS_DEPENDENCY
 
 # Gencode arguments, only supporting Volta or newer
-# SMS ?= 70 75 80 86
-# In initial dev, only compile for 70 or 86 depending on which workstation I'm on, b/c it is faster.
-SMS ?=  86
+# SMS ?= 75 80 86 89 90 100 120
+# CUDA 13+ dropped Volta (sm_70), so Turing (75) or newer only.
+# A cubin is built for every arch in SMS and PTX is embedded for the highest one (forward compatibility,
+# e.g. sm_121 JITs the compute_120 PTX). Runtime dispatch currently supports up to sm_120 (RTX 5090).
+# For faster dev builds, restrict to the local GPU, e.g. `make SMS=120`
+SMS ?= 86 89 120
 
 
 ifeq (${minBlocksPerMultiprocessor},)
@@ -51,8 +54,10 @@ endif
 # GENCODE_FLAGS := -gencode arch=compute_86,code=sm_86
 # endif
 
-GENCODE_FLAGS := --gpu-architecture=sm_86 -gencode=arch=compute_86,code=compute_86 -gencode=arch=compute_80,code=sm_80 -gencode=arch=compute_89,code=sm_89
-# GENCODE_FLAGS := --gpu-architecture=sm_86 -gencode=arch=compute_86,code=compute_86
+HIGHEST_SM := $(shell echo $(SMS) | tr ' ' '\n' | sort -n | tail -n1)
+GENCODE_FLAGS := $(foreach sm,$(SMS),-gencode=arch=compute_$(sm),code=sm_$(sm))
+GENCODE_FLAGS += -gencode=arch=compute_$(HIGHEST_SM),code=compute_$(HIGHEST_SM)
+$(info $$GENCODE_FLAGS is [${GENCODE_FLAGS}])
 # NVCC_FLAGS+=-DFastFFT_sizes=512,4096
 
 # TODO:

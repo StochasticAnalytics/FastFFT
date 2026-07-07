@@ -135,7 +135,7 @@ FourierTransformer<ComputeBaseType, PositionSpaceType, OtherImageType, Rank>::Fo
     // Make sure an explicit specializtion for the device pointers is available
     static_assert(! std::is_same_v<decltype(d_ptr.buffer_1), std::nullptr_t>, "Device pointer type not specialized");
 #ifdef FastFFT_DEBUG_BUILD_TIME
-    std::cerr << "Initi FastFFT object using code build on " << __DATE__ << " " << __TIME__ << std::endl;
+    std::cerr << "Init with  FastFFT object using code build on " << __DATE__ << " " << __TIME__ << std::endl;
 #endif
 }
 
@@ -1846,8 +1846,10 @@ void FourierTransformer<ComputeBaseType, PositionSpaceType, OtherImageType, Rank
     if ( SizeValue == transform_size.P ) {
         switch ( device_properties.device_arch ) {
             case 700: {
-                using FFT = decltype(FFT_base( ) + Size<SizeValue>( ) + SM<700>( ) + ElementsPerThread<Ept>( ));
-                SetAndLaunchKernel<FFT_ALGO_t, FFT, PreOpType, IntraOpType, PostOpType>(other_image_ptr, kernel_type, pre_op_functor, intra_op_functor, post_op_functor);
+                if constexpr ( SizeValue <= 4096 ) {
+                    using FFT = decltype(FFT_base( ) + Size<SizeValue>( ) + SM<700>( ) + ElementsPerThread<Ept>( ));
+                    SetAndLaunchKernel<FFT_ALGO_t, FFT, PreOpType, IntraOpType, PostOpType>(other_image_ptr, kernel_type, pre_op_functor, intra_op_functor, post_op_functor);
+                }
                 break;
             }
             case 750: {
@@ -1879,6 +1881,26 @@ void FourierTransformer<ComputeBaseType, PositionSpaceType, OtherImageType, Rank
                 // FIXME: on migrating to cufftDx 1.1.1
 
                 using FFT = decltype(FFT_base( ) + Size<SizeValue>( ) + SM<700>( ) + ElementsPerThread<Ept>( ));
+                SetAndLaunchKernel<FFT_ALGO_t, FFT, PreOpType, IntraOpType, PostOpType>(other_image_ptr, kernel_type, pre_op_functor, intra_op_functor, post_op_functor);
+                break;
+            }
+            case 900: {
+
+                using FFT = decltype(FFT_base( ) + Size<SizeValue>( ) + SM<900>( ) + ElementsPerThread<Ept>( ));
+                SetAndLaunchKernel<FFT_ALGO_t, FFT, PreOpType, IntraOpType, PostOpType>(other_image_ptr, kernel_type, pre_op_functor, intra_op_functor, post_op_functor);
+                break;
+            }
+            case 1000: {
+
+                // Blackwell data center (sm_100); 10.3 and 11.0 are normalized to 1000 in GetCudaDeviceProps
+                using FFT = decltype(FFT_base( ) + Size<SizeValue>( ) + SM<1000>( ) + ElementsPerThread<Ept>( ));
+                SetAndLaunchKernel<FFT_ALGO_t, FFT, PreOpType, IntraOpType, PostOpType>(other_image_ptr, kernel_type, pre_op_functor, intra_op_functor, post_op_functor);
+                break;
+            }
+            case 1200: {
+
+                // Blackwell GeForce/RTX (sm_120, e.g. RTX 5090); 12.1 is normalized to 1200 in GetCudaDeviceProps
+                using FFT = decltype(FFT_base( ) + Size<SizeValue>( ) + SM<1200>( ) + ElementsPerThread<Ept>( ));
                 SetAndLaunchKernel<FFT_ALGO_t, FFT, PreOpType, IntraOpType, PostOpType>(other_image_ptr, kernel_type, pre_op_functor, intra_op_functor, post_op_functor);
                 break;
             }
@@ -3247,7 +3269,22 @@ void GetCudaDeviceProps(DeviceProps& dp) {
 
     dp.device_arch = major * 100 + minor * 10;
 
-    MyFFTRunTimeAssertTrue(dp.device_arch == 700 || dp.device_arch == 750 || dp.device_arch == 800 || dp.device_arch == 860 || dp.device_arch == 890, "FastFFT currently only supports compute capability [7.0, 7.5, 8.0, 8.6, 8.9].");
+    // Newer architectures are normalized to the nearest (lower) arch with an explicit dispatch case in
+    // SelectSizeAndTypeWithFold. This mirrors cufftdx's own record forwarding (e.g. sm_121 -> sm_120 records).
+    //   9.x  (Hopper)                     -> 900
+    //   10.x, 11.x (Blackwell datacenter) -> 1000
+    //   12.x (Blackwell GeForce/RTX)      -> 1200
+    if ( dp.device_arch > 890 ) {
+        if ( dp.device_arch >= 1200 )
+            dp.device_arch = 1200;
+        else if ( dp.device_arch >= 1000 )
+            dp.device_arch = 1000;
+        else
+            dp.device_arch = 900;
+    }
+
+    MyFFTRunTimeAssertTrue(dp.device_arch == 700 || dp.device_arch == 750 || dp.device_arch == 800 || dp.device_arch == 860 || dp.device_arch == 890 || dp.device_arch == 900 || dp.device_arch == 1000 || dp.device_arch == 1200,
+                           "FastFFT currently only supports compute capability [7.0, 7.5, 8.0, 8.6, 8.9, 9.0+].");
 
     cudaErr(cudaDeviceGetAttribute(&dp.max_shared_memory_per_block, cudaDevAttrMaxSharedMemoryPerBlock, dp.device_id));
     cudaErr(cudaDeviceGetAttribute(&dp.max_shared_memory_per_SM, cudaDevAttrMaxSharedMemoryPerMultiprocessor, dp.device_id));

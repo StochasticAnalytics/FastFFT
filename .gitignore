@@ -50,6 +50,8 @@ include/nvidia-srcs/*
 !include/nvidia-srcs/setup.sh
 !include/nvidia-srcs/setup.md
 !include/nvidia-srcs/README.md
+!include/nvidia-srcs/update_cufftdx.sh
+!include/nvidia-srcs/patches/
 .vscode/
 .vscode_shared/BenHimes/
 
